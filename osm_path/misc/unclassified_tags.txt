@@ -1711,3 +1711,232 @@
 {'landuse': 'village_green'}
 {'bus': 'yes', 'public_transport': 'platform'}
 {'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Bohnice', 'ref': '730556', 'type': 'boundary', 'wikidata': 'Q2442419', 'wikipedia': 'cs:Bohnice', 'name:cs': 'Bohnice', 'name:de': 'Bochnitz'}
+{'landuse': 'grass', 'type': 'multipolygon'}
+{'access': 'customers', 'amenity': 'parking', 'fee': 'no', 'lit': 'yes', 'operator': 'Lidl Česká republika v.o.s.'}
+{}
+{'landuse': 'forest', 'leaf_type': 'broadleaved'}
+{'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Kobylisy', 'ref': '730475', 'type': 'boundary', 'wikidata': 'Q174248'}
+{'landuse': 'village_green'}
+{'natural': 'grassland'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'amenity': 'parking'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green', 'type': 'multipolygon'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'leaf_type': 'broadleaved', 'natural': 'tree_row'}
+{'landuse': 'forest', 'leaf_type': 'mixed'}
+{'landuse': 'recreation_ground'}
+{'landuse': 'recreation_ground'}
+{'landuse': 'village_green'}
+{'landuse': 'farmland', 'ref': '11743492', 'source': 'lpis', 'type': 'multipolygon'}
+{'source': 'survey;uhul:wms', 'alt_name': 'Čimický les', 'landuse': 'forest', 'leisure': 'park', 'name': 'Čimický háj', 'type': 'multipolygon', 'wikidata': 'Q11381908', 'wikipedia': 'cs:Čimický háj'}
+{'man_made': 'embankment', 'source': 'survey'}
+{'man_made': 'embankment', 'source': 'survey'}
+{'natural': 'tree_row'}
+{'natural': 'tree_row'}
+{'public_transport': 'platform'}
+{'landuse': 'commercial'}
+{'landuse': 'forest'}
+{'landuse': 'forest'}
+{'landuse': 'village_green'}
+{'leaf_type': 'broadleaved', 'natural': 'tree_row'}
+{'leaf_type': 'broadleaved', 'natural': 'tree_row'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'village_green'}
+{'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Troja', 'ref': '730190', 'type': 'boundary', 'wikidata': 'Q84682501', 'wikipedia': 'cs:Troja'}
+{'amenity': 'parking'}
+{'amenity': 'parking'}
+{'natural': 'tree_row'}
+{'natural': 'tree_row'}
+{'natural': 'tree_row'}
+{'natural': 'tree_row'}
+{'natural': 'scrub'}
+{'landuse': 'forest', 'type': 'multipolygon'}
+{'man_made': 'embankment'}
+{'natural': 'tree_row'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'man_made': 'embankment'}
+{'landuse': 'forest'}
+{}
+{'landuse': 'grass'}
+{'area:highway': 'footway'}
+{'landuse': 'village_green'}
+{'construction': 'residential', 'landuse': 'construction', 'operator': 'Bemett Čimice s.r.o.', 'website': 'https://www.premiovebydleni.cz/'}
+{'landuse': 'village_green'}
+{'natural': 'scrub'}
+{'landuse': 'grass'}
+{'landuse': 'village_green'}
+{'bus': 'yes', 'public_transport': 'platform'}
+{'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Bohnice', 'ref': '730556', 'type': 'boundary', 'wikidata': 'Q2442419', 'wikipedia': 'cs:Bohnice', 'name:cs': 'Bohnice', 'name:de': 'Bochnitz'}
+{'landuse': 'grass', 'type': 'multipolygon'}
+{'amenity': 'parking', 'parking': 'surface', 'surface': 'grass_paver'}
+{'landuse': 'allotments'}
+{'amenity': 'parking', 'parking': 'surface'}
+{'leisure': 'park', 'source': 'cuzk:km'}
+{'leisure': 'park', 'source': 'cuzk:km'}
+{'amenity': 'parking'}
+{'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Kobylisy', 'ref': '730475', 'type': 'boundary', 'wikidata': 'Q174248'}
+{'natural': 'grassland'}
+{'landuse': 'village_green', 'type': 'multipolygon'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'recreation_ground'}
+{'landuse': 'recreation_ground'}
+{'amenity': 'school', 'name': 'ZŠ Hovorčovická', 'wikidata': 'Q28523866', 'wikipedia': 'cs:Základní škola Hovorčovická'}
+{'landuse': 'recreation_ground'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green', 'type': 'multipolygon'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'farmland', 'ref': '11743492', 'source': 'lpis', 'type': 'multipolygon'}
+{}
+{'amenity': 'parking', 'parking': 'surface', 'source': 'survey', 'surface': 'grass_paver'}
+{'source': 'survey;uhul:wms', 'alt_name': 'Čimický les', 'landuse': 'forest', 'leisure': 'park', 'name': 'Čimický háj', 'type': 'multipolygon', 'wikidata': 'Q11381908', 'wikipedia': 'cs:Čimický háj'}
+{'source': 'survey;uhul:wms', 'alt_name': 'Čimický les', 'landuse': 'forest', 'leisure': 'park', 'name': 'Čimický háj', 'type': 'multipolygon', 'wikidata': 'Q11381908', 'wikipedia': 'cs:Čimický háj'}
+{'man_made': 'embankment', 'source': 'survey'}
+{'man_made': 'embankment', 'source': 'survey'}
+{'landuse': 'commercial'}
+{'leaf_type': 'broadleaved', 'natural': 'tree_row'}
+{'landuse': 'forest', 'leaf_type': 'mixed'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Troja', 'ref': '730190', 'type': 'boundary', 'wikidata': 'Q84682501', 'wikipedia': 'cs:Troja'}
+{'natural': 'scrub'}
+{'landuse': 'village_green', 'source': 'cuzk:ruian'}
+{'landuse': 'village_green', 'source': 'cuzk:ruian'}
+{'natural': 'tree_row'}
+{'natural': 'tree_row'}
+{'landuse': 'forest', 'type': 'multipolygon'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'man_made': 'embankment'}
+{'landuse': 'grass'}
+{'landuse': 'grass'}
+{'cables': '6', 'circuits': '2', 'layer': '-1', 'location': 'underground', 'power': 'cable', 'ref': 'K109;K110', 'voltage': '110000'}
+{'landuse': 'forest'}
+{'natural': 'scrub'}
+{'landuse': 'grass'}
+{'area:highway': 'footway'}
+{'landuse': 'grass', 'type': 'multipolygon'}
+{'landuse': 'forest'}
+{'landuse': 'village_green', 'source': 'IPR-orotofoto-vege-tms'}
+{'construction': 'residential', 'landuse': 'construction', 'operator': 'Bemett Čimice s.r.o.', 'website': 'https://www.premiovebydleni.cz/'}
+{'cables': '6', 'circuits': '2', 'end_date': '2020-05-27', 'frequency': '50', 'note': 'Vedeni asi bude casem taky zruseno', 'operator': 'PRE', 'operator:wikidata': 'Q15870812', 'operator:wikipedia': 'cs:Pražská energetika', 'power': 'line', 'ref': '111;112', 'voltage': '110000', 'wires': 'single'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'landuse': 'village_green'}
+{'access': 'permissive', 'amenity': 'parking', 'parking': 'surface', 'surface': 'compacted'}
+{'natural': 'scrub'}
+{'landuse': 'village_green'}
+{'natural': 'scrub'}
+{'natural': 'scrub'}
+{'landuse': 'village_green'}
+{'admin_level': '10', 'boundary': 'administrative', 'source': 'cuzk:ruian', 'name': 'Bohnice', 'ref': '730556', 'type': 'boundary', 'wikidata': 'Q2442419', 'wikipedia': 'cs:Bohnice', 'name:cs': 'Bohnice', 'name:de': 'Bochnitz'}

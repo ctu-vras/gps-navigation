@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+"""
+Node for sending empty Path therefore stopping robot.
+"""
+
+import rospy
+from nav_msgs.msg import Path
+import std_msgs.msg
+
+
+if __name__ == '__main__':
+    rospy.init_node('stop_path')
+    rate = rospy.Rate(10)
+    pub = rospy.Publisher('path', Path, queue_size=10)
+    msg = Path()
+
+    header = std_msgs.msg.Header()
+
+    while not rospy.is_shutdown():
+        header.stamp = rospy.Time.now()
+        header.frame_id = "map"
+        msg.header = header
+        pub.publish(msg)
+        rate.sleep()

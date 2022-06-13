@@ -1,0 +1,30 @@
+<launch>    
+    <!-- STATIC TRANSFORMS -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />             
+
+    <!-- LLH FROM GPS TO FIX -->
+    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
+        <param name="port" type="string" value="/dev/ttyACM0" />   
+        <param name="baud" type="int" value="115200" />
+    </node>
+
+   <!-- FAKE GPS -->
+<!--   <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+-->	
+   <!-- AZIMUTH -->
+   <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
+   </node>
+
+    <!-- PATH -->
+    <node pkg="gps_to_path" type="gps_to_path" name="gps_to_path" output="screen">
+	<param name="num_published_path_points" type="int" value="20"/>
+	<param name="gpx_file" type="string" value="$(find gps_to_path)/data/kn.gpx"/>
+	<param name="circular" type="bool" value="True"/>	
+	<param name="reversed_path" type="bool" value="True"/>
+	<param name="path_points_density" type="double" value="0.1"/>
+	<param name="repeat" type="bool" value="False" />
+	<param name="start_from_nearest_point" type="bool" value="True" />
+    </node>
+
+</launch>
+

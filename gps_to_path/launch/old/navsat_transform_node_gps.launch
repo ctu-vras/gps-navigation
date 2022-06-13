@@ -1,0 +1,33 @@
+<launch> 
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_gps" args="0 0 0 0 0 0 imu gps" />         
+   <!-- <node pkg="gps_to_path" type="fake_odom" name="fake_odom" /> -->
+    <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+
+<!--   <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="nmea_serial_driver">        
+        <param name="port" type="string" value="/dev/ttyACM0" />    
+        <param name="baud" type="int" value="115200" />
+	<param name="frame_id" type="string" value="gps" />
+        </node> -->  
+ 
+    
+    <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" output="screen">
+        <param name="magnetic_declination_radians" type="double" value="0.081"/>
+        <param name="broadcast_cartesian_transform" type="boolean" value="true" />
+        <param name="zero_altitude" type="boolean" value="true" />
+        <param name="base_link_frame_id" type="string" value="base_link" />
+        <param name="gps_frame_id" type="string" value="gps" />
+        <param name="world_frame_id" type="string" value="odom" />
+	<param name="use_odometry_yaw" type="boolean" value="true" />
+	<remap from="imu/data" to="imu/data" />
+        <remap from="gps/fix" to="fix" />
+        <remap from="odometry/filtered" to="imu_odom" />
+    </node>
+    
+   
+    
+    <node pkg="gps_to_path" type="gps_to_path" name="gps_to_path" output="screen">
+        <param name="target_coordinates" type="string" value="50.07627452533821, 14.418012602231874" />
+    </node>
+
+</launch>
+

@@ -1,0 +1,109 @@
+#!/usr/bin/env python
+
+from geodesy import utm
+import rospy
+import tf2_ros
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import NavSatFix
+from geometry_msgs.msg import TransformStamped
+from stamped_msgs.msg import Float64
+from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion, quaternion_inverse
+from numpy import deg2rad, rad2deg
+from math import pi,sin,cos
+
+class UtmBroadcaster():
+    def __init__(self):
+        self.tf_msg = TransformStamped()
+        self.broadcaster = tf2_ros.TransformBroadcaster()
+
+        self.sub_fix = rospy.Subscriber("fix", NavSatFix, self.update_tf, queue_size=10)
+
+        self.sub_azimuth = rospy.Subscriber("mag_azimuth", Float64, self.update_azimuth, queue_size=10)
+        self.azimuth = 0.
+        
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
+        self.odom_gps_trans = None
+
+        self.tfBuffer2 = tf2_ros.Buffer()
+        self.listener_odom_base_link = tf2_ros.TransformListener(self.tfBuffer2)
+        self.odom_base_link_trans = None
+
+        self.gps_utm = None
+        self.odom_utm = utm.UTMPoint()
+
+    def update_azimuth(self, msg):
+        self.azimuth = msg.data
+
+    def get_utm_odom_rot(self):
+        """ Get angle by how which to rotate utm frame to aline with odom frame, resp. rotation of odom frame in utm frame. """
+        q1 = quaternion_from_euler(0,0,deg2rad(self.azimuth)-(3./2.)*pi)   # how much to rotate utm frame to be alined with base_link frame
+        q2 = quaternion_inverse([0,
+                                0,
+                                self.odom_base_link_trans.transform.rotation.z,
+                                self.odom_base_link_trans.transform.rotation.w])    # how much to rotate base link frame to be alined with odom frame
+
+        q = quaternion_multiply(q2,q1)  # how much to rotate utm frame to be alined with odom frame
+        rospy.logwarn("Yaw of odom frame in utm frame: "+str(rad2deg(euler_from_quaternion(q)[2])))
+        return q
+
+    def update_tf(self, msg):
+        try:
+            self.odom_gps_trans = self.tfBuffer.lookup_transform('odom', 'gps', rospy.Time()) # coords of gps in odom frame
+        except:
+            pass
+        try:
+            self.odom_base_link_trans = self.tfBuffer2.lookup_transform('odom', 'base_link', rospy.Time())
+        except:
+            pass
+
+        rot = self.get_utm_odom_rot()   
+
+        self.tf_msg.transform.rotation.x = rot[0]
+        self.tf_msg.transform.rotation.y = rot[1]
+        self.tf_msg.transform.rotation.z = rot[2]
+        self.tf_msg.transform.rotation.w = rot[3]
+
+        self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
+
+        yaw = euler_from_quaternion(rot)[2]
+
+        odom_gps_x_rotated = self.odom_gps_trans.transform.translation.x*cos(yaw) - self.odom_gps_trans.transform.translation.y*sin(yaw)
+        odom_gps_y_rotated = self.odom_gps_trans.transform.translation.x*sin(yaw) + self.odom_gps_trans.transform.translation.y*cos(yaw) 
+
+        rospy.logwarn("Vector from odom to gps in utm frame: "+str(odom_gps_x_rotated)+', '+str(odom_gps_y_rotated))
+
+        self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
+        self.odom_utm.northing = self.gps_utm.northing - odom_gps_y_rotated
+        self.tf_msg.header.stamp = rospy.Time.now()
+        self.tf_msg.header.frame_id = "odom"
+        self.tf_msg.child_frame_id = "utm"
+
+        self.tf_msg.transform.translation.x = self.odom_utm.easting
+        self.tf_msg.transform.translation.y = self.odom_utm.northing
+        self.tf_msg.transform.translation.z = 0
+
+        self.broadcaster.sendTransform(self.tf_msg)
+    
+    def run(self):
+        """ Run loop of object. """
+        rate = rospy.Rate(10)
+
+        while not self.odom_gps_trans and self.odom_base_link_trans:
+            try:
+                self.odom_gps_trans = self.tfBuffer.lookup_transform('odom', 'gps', rospy.Time())
+                self.odom_base_link_trans = self.tfBuffer2.lookup_transform('odom', 'base_link', rospy.Time())
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                rate.sleep()
+                continue
+
+        rospy.spin()
+
+def main():
+    rospy.init_node('utm_odom_tf')
+
+    node = UtmBroadcaster()
+    node.run()
+
+if __name__ == '__main__':
+    main()

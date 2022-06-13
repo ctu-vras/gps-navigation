@@ -1,0 +1,38 @@
+<launch>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />         
+    
+    <!-- <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="nmea_serial_driver" output="screen">        
+        <param name="port" type="string" value="/dev/ttyACM0" />   
+        <param name="baud" type="int" value="115200" />
+    </node> -->
+
+    <node pkg="xsens_driver" type="fake_gps" name="fake_gps" />
+
+    <node pkg="xsens_driver" type="mtnode" name="mtnode">
+        <param name="frame_id" type="string" value="base_link" />
+        <param name="device" type="string" value="/dev/ttyUSB0" />  
+    </node>
+    
+    <rosparam command="load" file="$(find gps_to_path)/params/ekf.yaml" />
+
+    <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se_odom" clear_params="true"/>
+
+    <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se_map" clear_params="true">
+        <remap from="odometry/filtered" to="odometry/filtered_map"/>
+    </node>
+
+    <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform_node" output="screen">
+        <param name="magnetic_declination_radians" type="double" value="0.081"/>
+        <param name="broadcast_cartesian_transform" type="boolean" value="true" />
+        <param name="zero_altitude" type="boolean" value="true" />
+        <param name="base_link_frame_id" type="string" value="base_link" />
+        <param name="gps_frame_id" type="string" value="gps" />
+        <param name="world_frame_id" type="string" value="odom" />
+        <remap from="gps/fix" to="fix" />
+        <remap from="odometry/filtered" to="imu_odom" />
+    </node>
+
+    <node pkg="xsens_driver" type="gps_to_path" name="gps_to_path" output="screen">
+        <param name="target_coordinates" type="string" value="50.076336806750255, 14.41803953321581" />
+    </node>
+</launch>

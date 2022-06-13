@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+"""
+Node for converting gps to utm and publishing it as a Path for the path_follower node.
+"""
+"""
+When all nodes start (the launch file included), the navsat_transform takes in the yaw and the initial odometry and takes that point as 0,0,0,0,0,0.
+After that it only reads the GPS and depending on the initial orientation (which is static) the position in the odometry/gps output will change (e.g.
+initially facing south and GPS going north, then the odometry/gps reads -100,0,0,0,0,0). Also we use ENU not NED
+
+Frames:
+odom = same as map, it is static; 0,0,0 is in robots init location
+base_link = bound to robot, in time 0 it should probably be equal to odom
+gps = probably not important, but the gps messages have it set as frame_id
+utm = the transformation between base_link and utm lets us convert any gps latlong coords to the robots xy coords
+
+When testing all this, the base_link frame was identical to odom even when "moving" so that might be a source of mistakes.
+
+The published Path is in the base_link frame (see lookup_transform).
+"""
+import rospy
+import tf2_ros
+from nav_msgs.msg import Path
+import geometry_msgs.msg
+import std_msgs.msg
+import numpy as np
+from geodesy import utm
+
+from math import sqrt, sin, cos, pi
+from numpy import rad2deg
+from tf.transformations import euler_from_quaternion
+
+class GpsToPath():
+    def __init__(self, target_coordinates):
+        self.target_coordinates = target_coordinates
+        self.target_coordinates_utm = utm.fromLatLong(target_coordinates[0], target_coordinates[1])
+        self.trans = None
+
+        self.pub_path = rospy.Publisher('path', Path, queue_size=10)
+        self.path_msg = Path()
+
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tfBuffer)
+
+    def get_pose_stamped(self):
+        x = self.target_coordinates_utm.easting - self.trans.transform.translation.x
+        y = self.target_coordinates_utm.northing - self.trans.transform.translation.y
+
+        quat = self.trans.transform.rotation
+        quat = [quat.x, quat.y, quat.z, quat.w]
+        eul = euler_from_quaternion(quat)
+        yaw = eul[2]
+        x_rotated = x*cos(yaw) - y*sin(yaw)
+        y_rotated = x*sin(yaw) + y*cos(yaw)      
+        pose_stamped = geometry_msgs.msg.PoseStamped()
+        pose_stamped.pose.position.x = x_rotated
+        pose_stamped.pose.position.y = y_rotated
+        return pose_stamped
+
+    def set_path_msg(self):
+        pose_stamped = self.get_pose_stamped()
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "odom"
+
+
+        pose_stamped.header = header
+        self.path_msg.header = header
+
+        self.path_msg.poses = [pose_stamped]
+
+    def run(self):
+        """ Run loop of object. """
+        rate = rospy.Rate(10)
+
+        while not self.trans:
+	    #rospy.logwarn("No utm transform.")
+            try:
+                self.trans = self.tfBuffer.lookup_transform('odom', 'utm', rospy.Time())
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                rate.sleep()
+                continue
+	rospy.loginfo("utm transform obtained")
+        self.set_path_msg()
+
+        while not rospy.is_shutdown():
+            self.trans = self.tfBuffer.lookup_transform('odom', 'utm', rospy.Time())
+            self.set_path_msg()
+            self.pub_path.publish(self.path_msg)
+            rate.sleep()
+
+def main():
+    rospy.init_node('gps_to_path')
+
+    target_coordinates = rospy.get_param('~target_coordinates', "50.07619751597388, 14.418025739265849")
+    target_coordinates = target_coordinates.split(',')
+    target_coordinates = [float(coord) for coord in target_coordinates]
+    node = GpsToPath(target_coordinates)
+    node.run()
+
+if __name__ == '__main__':
+    main()

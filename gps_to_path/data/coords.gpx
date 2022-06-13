@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="https://mapy.cz/">
+	<wpt lat="50.076364" lon="14.417925">
+		<ele>205.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.076217" lon="14.417945">
+		<ele>205.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.076215" lon="14.418075">
+		<ele>205.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.076304" lon="14.418068">
+		<ele>205.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+</gpx>
+

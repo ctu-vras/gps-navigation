@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<launch>
+    <arg name="robot" default="X1"/>
+    <arg name="robot_type" default="x1"/>
+    <arg name="cmd_vel" default="priority_wrapper/nav/cmd_vel"
+         doc="Topic to which to publish velocity commands."/>
+    <arg name="path" default="path"
+         doc="Path topic to follow."/>
+    <arg name="points" default="points_slow_filtered"/>
+
+    <node name="path_follower" pkg="naex" type="path_follower"
+          respawn="true" respawn_delay="1.0" output="screen">
+
+        <rosparam subst_value="true">
+            map_frame: odom
+            odom_frame: odom
+            robot_frame: base_link
+            control_freq: 10.0
+            goal_reached_dist: 1.
+            goal_reached_angle: .inf
+            use_path_theta: none
+            max_age: 1.0
+            <!--
+            Max. path distances, tail is consumed first by reached goals.
+            A higher value is used in the beginning to traverse across
+            unobserved area around robot.
+            -->
+            max_path_dist: 100
+            look_ahead: 1.0
+            max_speed: 0.5
+            allow_backward: false
+            max_force_through_speed: 0.2
+            max_angular_rate: 0.5
+            keep_path: 0.18
+            keep_cloud_box: [[-3.0, 3.0], [-3.0, 3.0], [-2.0, 2.0]]
+            clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.6]]
+            show_clearance_pos: [-2, 2]
+            min_points_obstacle: 0
+
+            force_through_after: 10.
+            backtrack_after: .inf
+        </rosparam>
+
+        <rosparam if="$(eval robot_type == 'dtr')" subst_value="true">
+            clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.7]]
+        </rosparam>
+        <rosparam if="$(eval robot_type == 'jeanine')" subst_value="true">
+            max_path_dist: [0.8, 1.5, 1.5, 1.5]
+            max_speed: 1.0
+            max_angular_rate: 1.5
+            clearance_box: [[-0.4, 0.4], [-0.3, 0.3], [0.2, 0.6]]
+        </rosparam>
+        <rosparam if="$(eval robot_type == 'marv')" subst_value="true">
+            allow_backward: true
+            clearance_box: [[-0.55, 0.55], [-0.4, 0.4], [0.2, 0.7]]
+        </rosparam>
+        <rosparam if="$(eval robot_type == 'tradr')" subst_value="true">
+            clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.6]]
+        </rosparam>
+        <rosparam if="$(eval 'x1' in robot_type)" subst_value="true">
+            allow_backward: true
+            clearance_box: [[-0.6, 0.6], [-0.45, 0.45], [0.2, 0.7]]
+        </rosparam>
+        <rosparam if="$(eval robot_type == 'x2')" subst_value="true">
+            allow_backward: true
+            clearance_box: [[-0.4, 0.4], [-0.3, 0.3], [0.15, 0.5]]
+        </rosparam>
+
+        <!-- Inputs -->
+        <remap from="path" to="$(arg path)"/>
+        <remap from="cloud" to="$(arg points)"/>
+
+        <!-- Outputs -->
+        <remap from="clearance" to="clearance"/>
+        <remap from="cmd_vel" to="$(arg cmd_vel)"/>
+    </node>
+</launch>

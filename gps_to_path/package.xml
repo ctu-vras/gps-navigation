@@ -17,7 +17,8 @@
 
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
-  <!-- Optional attribute type can be: website, bugtracker, or repository -->
+  <!-- Optional attribute type can be: website, bugtracker, or re
+  pository -->
   <!-- Example: -->
   <!-- <url type="website">http://wiki.ros.org/gps_to_path</url> -->
 
@@ -55,7 +56,7 @@
   <build_export_depend>std_msgs</build_export_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-
+  <exec_depend>python-geopy</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

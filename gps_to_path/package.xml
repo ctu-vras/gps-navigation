@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
   <name>gps_to_path</name>
   <version>0.0.0</version>
   <description>The gps_to_path package</description>
@@ -56,7 +56,10 @@
   <build_export_depend>std_msgs</build_export_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-  <exec_depend>python-geopy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-geopy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-gpxpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-geopy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-gpxpy</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

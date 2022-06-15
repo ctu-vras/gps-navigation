@@ -1,0 +1,15 @@
+<launch>
+
+  <param name="/initial_lat" value="$(eval radians(50.0766700))" />
+  <param name="/initial_lon" value="$(eval radians(14.4175642))" />
+  <param name="/initial_heading" value="$(eval radians(85))" />
+
+  <include file="$(dirname)/gps.launch" pass_all_args="true">
+    <arg name="gpx_file" value="$(dirname)/../data/e228_hallway.gpx" />
+  </include>
+
+  <node name="fake_gps" pkg="gps_from_odom_updater" type="gps_from_odom_updater.py">
+    <remap from="gps_filtered" to="fix" />
+  </node>
+
+</launch>

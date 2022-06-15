@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="https://mapy.cz/">
+	<wpt lat="50.0766700" lon="14.4175642"> <!-- inside lab, on marker -->
+		<ele>215.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.0767200" lon="14.4175481"> <!-- Hallway before door -->
+		<ele>215.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.0766839" lon="14.4178297"> <!-- Far in the hallway -->
+		<ele>215.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<!--wpt lat="50.0767200" lon="14.4175481"> < ! - - Hallway before door - - >
+		<ele>215.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.0766700" lon="14.4175642"> < ! - - inside lab, on marker - - >
+		<ele>215.000000</ele>
+		<name>New  POI</name>
+	</wpt-->
+</gpx>
+

@@ -40,7 +40,9 @@ class GpsToPath():
         self.azimuth = 0.
 
         self.pub_path = rospy.Publisher('path', Path, queue_size=10)
+        self.pub_whole_path = rospy.Publisher('whole_path', Path, queue_size=10)
         self.path_msg = Path()
+        self.whole_path_msg = Path()
 
         self.pub_path_wgs = rospy.Publisher('wgs_path', WgsArray, queue_size=10)
 	self.wgs_msg = self.get_wgs_msg()
@@ -114,6 +116,7 @@ class GpsToPath():
 
             self.set_path_msg()
             self.pub_path.publish(self.path_msg)
+            self.pub_whole_path.publish(self.whole_path_msg)
 	    self.pub_path_wgs.publish(self.wgs_msg)
         else:
             self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
@@ -179,8 +182,16 @@ class GpsToPath():
             poses.append(pose_stamped)
 
         self.path_msg.header = header
-
         self.path_msg.poses = poses
+
+        poses = []
+        for point in self.path_arr[index:]:
+            pose_stamped = self.get_pose_stamped(point)
+            pose_stamped.header = header
+            poses.append(pose_stamped)
+
+        self.whole_path_msg.header = header
+        self.whole_path_msg.poses = poses
     
     def dist_from_point(self,point):
         return np.sqrt(np.sum(np.square(point-np.array([self.odom_gps_trans.transform.translation.x,self.odom_gps_trans.transform.translation.y]))))

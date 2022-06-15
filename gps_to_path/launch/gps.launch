@@ -4,6 +4,7 @@
     <arg name="reversed_path" default="false" />
     <arg name="repeat" default="false" />
     <arg name="start_from_nearest_point" default="true" />
+    <arg name="run_ntrip_relay" default="true" />
 
     <!-- STATIC TRANSFORMS -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />             
@@ -12,6 +13,12 @@
     <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
         <param name="port" type="string" value="/dev/ttyACM0" />   
         <param name="baud" type="int" value="115200" />
+    </node>
+
+    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
+        <param name="host" value="ntrip.pecny.cz" />
+        <param name="port" value="2101" />
+        <param name="num_threads" value="2" />
     </node>
 
    <!-- FAKE GPS -->

@@ -7,7 +7,8 @@
     <arg name="path" default="path"
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
-
+    <arg name="max_speed" default="0.5"/>
+    <arg name="allow_backward" default=False />
     <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
 
     <node name="path_follower" pkg="naex" type="path_follower"
@@ -29,8 +30,6 @@
             -->
             max_path_dist: 100
             look_ahead: 1.0
-            max_speed: 0.5
-            allow_backward: false
             max_force_through_speed: 0.2
             max_angular_rate: 0.5
             keep_path: 0.18
@@ -45,32 +44,7 @@
             turn_on_spot_angle: 2.5  <!-- Allow less turning on spot because of virtual bumper -->
         </rosparam>
 
-        <rosparam if="$(eval robot_type == 'dtr')" subst_value="true">
-            clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.7]]
-        </rosparam>
-        <rosparam if="$(eval robot_type == 'jeanine')" subst_value="true">
-            max_path_dist: [0.8, 1.5, 1.5, 1.5]
-            max_speed: 1.0
-            max_angular_rate: 1.5
-            clearance_box: [[-0.4, 0.4], [-0.3, 0.3], [0.2, 0.6]]
-        </rosparam>
-        <rosparam if="$(eval robot_type == 'marv')" subst_value="true">
-            allow_backward: true
-            clearance_box: [[-0.55, 0.55], [-0.4, 0.4], [0.2, 0.7]]
-        </rosparam>
-        <rosparam if="$(eval robot_type == 'tradr')" subst_value="true">
-            clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.6]]
-        </rosparam>
-        <rosparam if="$(eval 'x1' in robot_type)" subst_value="true">
-            allow_backward: true
-            clearance_box: [[-0.6, 0.6], [-0.45, 0.45], [0.2, 0.7]]
-        </rosparam>
-        <rosparam if="$(eval robot_type == 'x2')" subst_value="true">
-            allow_backward: true
-            clearance_box: [[-0.4, 0.4], [-0.3, 0.3], [0.15, 0.5]]
-        </rosparam>
-
-        <!-- Inputs -->
+        <-- Inputs -->
         <remap from="path" to="$(arg path)"/>
         <remap from="cloud" to="$(arg points)"/>
 

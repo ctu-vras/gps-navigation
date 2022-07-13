@@ -57,8 +57,8 @@ class LlhToFix():
 	self.fix_msg.status.status = 0
         self.fix_msg.status.service = 1
 
-        self.fix_msg.position_covariance = [self.gps_data.lat_cov, 0., 0.,
-                                            0., self.gps_data.long_cov, 0.,
+        self.fix_msg.position_covariance = [self.gps_data.long_cov, 0., 0.,
+                                            0., self.gps_data.lat_cov, 0.,
                                             0., 0., self.gps_data.alt_cov]        
     
     def date_to_timestamp(self,date):

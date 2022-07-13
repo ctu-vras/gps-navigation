@@ -7,7 +7,7 @@ from sensor_msgs.msg import NavSatFix
 class FakeGps():
 
     def __init__(self):
-        self.publisher = rospy.Publisher("fix/fake", NavSatFix, queue_size=10)
+        self.publisher = rospy.Publisher("fix", NavSatFix, queue_size=10)
         self.msg = NavSatFix()
         self.c = 0
         self.set_msg()

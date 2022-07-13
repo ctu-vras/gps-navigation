@@ -4,19 +4,15 @@ import rospy
 from stamped_msgs.msg import Float64
 from sensor_msgs.msg import MagneticField
 from sensor_msgs.msg import Imu
-from tf.transformations import euler_from_quaternion, quaternion_multiply
+from tf.transformations import euler_from_quaternion, quaternion_multiply, quaternion_from_euler
 import tf2_ros
+import math
 
 
 import json
 from numpy import deg2rad,rad2deg,NAN
 from math import sin,cos,atan2,floor,pi
 
-X_MAX = 0.28
-X_MIN = -0.22
-Y_MAX = -0.56
-Y_MIN = -1.08
-Z_MEAN = -0.06 
 
 class MagVec():
     """ Magnetic field vector. """
@@ -74,7 +70,7 @@ class Quaternion():
 
 class MagAzimuthCalc():
     """ Class containing publisher and two subscribers and related methods. """
-    def __init__(self):
+    def __init__(self,x_mean,y_mean,z_mean):
         self.mag_vec = MagVec()
         self.eul_vec = EulVec()
         self.q = Quaternion()
@@ -88,6 +84,10 @@ class MagAzimuthCalc():
         self.trans = None
         self.trans_eul_vec = EulVec()
 
+	self.x_mean = x_mean
+	self.y_mean = y_mean
+	self.z_mean = z_mean
+
         self.pub = rospy.Publisher('mag_azimuth', Float64, queue_size=10)
         self.sub_mag = rospy.Subscriber('/imu/mag', MagneticField, self.update_mag_vec)
         self.sub_eul = rospy.Subscriber('/imu/data', Imu, self.update_eul_vec)
@@ -95,9 +95,9 @@ class MagAzimuthCalc():
     def update_mag_vec(self, msg):
         """ Magnetic field vector sub callback. """
         if self.trans:
-            self.mag_vec.x = msg.magnetic_field.x - ((X_MAX+X_MIN)/2)
-            self.mag_vec.y = msg.magnetic_field.y - ((Y_MAX+Y_MIN)/2)
-            self.mag_vec.z = msg.magnetic_field.z -Z_MEAN
+            self.mag_vec.x = msg.magnetic_field.x - self.x_mean
+            self.mag_vec.y = msg.magnetic_field.y - self.y_mean
+            self.mag_vec.z = msg.magnetic_field.z - self.z_mean
 
             self.calculate_mag_azimuth()
 
@@ -138,6 +138,8 @@ class MagAzimuthCalc():
         mag_measurement_NED.y = self.mag_vec.y * cos(roll) - \
                             self.mag_vec.z * sin(roll)    
         
+        #mag_measurement_NED.x = self.mag_vec.x
+        #mag_measurement_NED.y = self.mag_vec.y
         #rospy.logwarn("{}\n,{}\n,{}\n,{}\n,{}\n".format(self.mag_vec.x,self.mag_vec.y,self.mag_vec.z,mag_measurement_NED.x,mag_measurement_NED.y))
 
         """ Coordinate z not used. """
@@ -145,6 +147,7 @@ class MagAzimuthCalc():
 
         """ Azimuth represented by a single value. """
         mag_azimuth_current = -rad2deg(atan2(mag_measurement_NED.y, mag_measurement_NED.x) + self.trans_eul_vec.yaw)
+        #mag_azimuth_current = -rad2deg(atan2(mag_measurement_NED.y, mag_measurement_NED.x))
 
         """ Detect the +-180 deg jump and correct. """
         if mag_azimuth_current - self.mag_azimuth > 180.:
@@ -187,7 +190,10 @@ class MagAzimuthCalc():
 
 def main():
     rospy.init_node('mag_azimuth')
-    mag_azimuth_calc = MagAzimuthCalc()
+    x_mean = rospy.get_param('~x_mean', 0.)
+    y_mean = rospy.get_param('~y_mean', 0.)
+    z_mean = rospy.get_param('~z_mean', 0.)
+    mag_azimuth_calc = MagAzimuthCalc(x_mean,y_mean,z_mean)
     mag_azimuth_calc.run()
 
 if __name__ == '__main__':

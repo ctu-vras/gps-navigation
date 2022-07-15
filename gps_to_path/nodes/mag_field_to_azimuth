@@ -4,6 +4,7 @@ import rospy
 from stamped_msgs.msg import Float64
 from sensor_msgs.msg import MagneticField
 from sensor_msgs.msg import Imu
+from gps_to_path.msg import MagShift
 from tf.transformations import euler_from_quaternion, quaternion_multiply, quaternion_from_euler
 import tf2_ros
 import math
@@ -69,7 +70,7 @@ class Quaternion():
 
 
 class MagAzimuthCalc():
-    """ Class containing publisher and two subscribers and related methods. """
+    """ Class containing publisher, subscribers and related methods. """
     def __init__(self,x_mean,y_mean,z_mean):
         self.mag_vec = MagVec()
         self.eul_vec = EulVec()
@@ -84,17 +85,25 @@ class MagAzimuthCalc():
         self.trans = None
         self.trans_eul_vec = EulVec()
 
-	self.x_mean = x_mean
-	self.y_mean = y_mean
-	self.z_mean = z_mean
+        self.x_mean = x_mean
+        self.y_mean = y_mean
+        self.z_mean = z_mean
 
         self.pub = rospy.Publisher('mag_azimuth', Float64, queue_size=10)
         self.sub_mag = rospy.Subscriber('/imu/mag', MagneticField, self.update_mag_vec)
         self.sub_eul = rospy.Subscriber('/imu/data', Imu, self.update_eul_vec)
+        
+        self.sub_mag_shift = rospy.Subscriber('mag_shift', MagShift, self.update_mag_shift)
+
+    def update_mag_shift(self, msg):
+        """ Magnetic field shift sub callback. """
+        self.x_mean = msg.x_mean
+        self.y_mean = msg.y_mean
+        self.z_mean = msg.z_mean
 
     def update_mag_vec(self, msg):
         """ Magnetic field vector sub callback. """
-        if self.trans:
+        if not None in [self.trans, self.x_mean, self.y_mean, self.z_mean]:
             self.mag_vec.x = msg.magnetic_field.x - self.x_mean
             self.mag_vec.y = msg.magnetic_field.y - self.y_mean
             self.mag_vec.z = msg.magnetic_field.z - self.z_mean
@@ -190,9 +199,9 @@ class MagAzimuthCalc():
 
 def main():
     rospy.init_node('mag_azimuth')
-    x_mean = rospy.get_param('~x_mean', 0.)
-    y_mean = rospy.get_param('~y_mean', 0.)
-    z_mean = rospy.get_param('~z_mean', 0.)
+    x_mean = rospy.get_param('~x_mean', None)
+    y_mean = rospy.get_param('~y_mean', None)
+    z_mean = rospy.get_param('~z_mean', None)
     mag_azimuth_calc = MagAzimuthCalc(x_mean,y_mean,z_mean)
     mag_azimuth_calc.run()
 

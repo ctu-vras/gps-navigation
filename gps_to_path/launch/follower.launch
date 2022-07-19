@@ -8,7 +8,7 @@
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
     <arg name="max_speed" default="0.5"/>
-    <arg name="allow_backward" default=False />
+    <arg name="allow_backward" default="False" />
     <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
 
     <node name="path_follower" pkg="naex" type="path_follower"
@@ -44,7 +44,7 @@
             turn_on_spot_angle: 2.5  <!-- Allow less turning on spot because of virtual bumper -->
         </rosparam>
 
-        <-- Inputs -->
+        <!-- Inputs -->
         <remap from="path" to="$(arg path)"/>
         <remap from="cloud" to="$(arg points)"/>
 

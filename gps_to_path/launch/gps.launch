@@ -1,8 +1,8 @@
 <launch>    
-    <arg name="gpx_file" default="$(find gps_to_path)/data/kn2.gpx" />
-    <arg name="circular_path" default="true" />
+    <arg name="gpx_file" default="$(find gps_to_path)/data/kn_g.gpx" />
+    <arg name="circular_path" default="false" />
     <arg name="reversed_path" default="false" />
-    <arg name="repeat" default="true" />
+    <arg name="repeat" default="false" />
     <arg name="start_from_nearest_point" default="true" />
     <arg name="run_ntrip_relay" default="true" />
 
@@ -25,8 +25,8 @@
 <!--  <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
 -->	
    <!-- AZIMUTH -->
-   <node pkg="gps_to_path" type="get_mag_shift" name=""get_mag_shift>
-	<param name="measuring_time" value=30 />
+   <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
+	<param name="measuring_time" value="30" />
    </node>
    <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
 	<!--param name="x_mean" value="-0.01" /-->
@@ -36,7 +36,7 @@
 
     <!-- PATH -->
     <node pkg="gps_to_path" type="gps_to_path" name="gps_to_path" output="screen">
-	<param name="num_published_path_points" type="int" value="50"/>
+	<param name="num_published_path_points" type="int" value="100"/>
 	<param name="gpx_file" type="string" value="$(arg gpx_file)"/>
 	<param name="circular" type="bool" value="$(arg circular_path)"/>	
 	<param name="reversed_path" type="bool" value="$(arg reversed_path)"/>

@@ -154,7 +154,7 @@ class GpsToPath():
         header.frame_id = "odom"
 
         index = self.nearest_waypoint_ind([self.gps_utm.easting,self.gps_utm.northing])
-	rospy.logwarn(self.dist_from_point(self.path_arr[0]))
+	#rospy.logwarn(self.dist_from_point(self.path_arr[0]))
         if not self.start_from_nearest_point and self.dist_from_point(self.path_arr[0]) < MAX_DIST_FROM_START:
             self.found_start = True
 	    rospy.loginfo_once("Arrived to start waypoint.")

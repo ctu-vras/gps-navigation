@@ -10,13 +10,13 @@ from sensor_msgs.msg import MagneticField
 class MagShiftCalc():
     def __init__(self,measuring_time):
         
-        self.x_min = None
-        self.y_min = None
-        self.z_min = None
+        self.x_min = 10000
+        self.y_min = 10000
+        self.z_min = 10000
 
-        self.x_max = None
-        self.y_max = None
-        self.z_max = None
+        self.x_max = -10000
+        self.y_max = -10000
+        self.z_max = -10000
         
         self.x_mean = None
         self.y_mean = None
@@ -25,33 +25,33 @@ class MagShiftCalc():
         self.msg = MagShift()
 
         self.measuring_time = measuring_time
-        self.finish_measuring_time = rospy.Time.now() + self.measuring_time
+        self.finish_measuring_time = rospy.Time.now().to_sec() + self.measuring_time
 
         self.pub = rospy.Publisher('mag_shift', MagShift, queue_size=10)
         self.sub = rospy.Subscriber('/imu/mag', MagneticField, self.mag_callback)
     
     def mag_callback(self,msg):
-        if rospy.Time.now() < self.finish_measuring_time:
+        if rospy.Time.now().to_sec() < self.finish_measuring_time:
             mag = msg.magnetic_field
 
-            if mag[0] > self.x_max:
-                self.x_max = mag[0]
-            elif mag[0] < self.x_min:
-                self.x_min = mag[0]
+            if mag.x > self.x_max:
+                self.x_max = mag.x
+            elif mag.x < self.x_min:
+                self.x_min = mag.x
 
-            if mag[1] > self.y_max:
-                self.y_max = mag[1]
-            elif mag[1] < self.y_min:
-                self.y_min = mag[1]
+            if mag.y > self.y_max:
+                self.y_max = mag.y
+            elif mag.y < self.y_min:
+                self.y_min = mag.y
 
-            if mag[2] > self.z_max:
-                self.z_max = mag[2]
-            elif mag[2] < self.z_min:
-                self.z_min = mag[2]
+            if mag.z > self.z_max:
+                self.z_max = mag.z
+            elif mag.z < self.z_min:
+                self.z_min = mag.z
         
             self.set_means()
         else:
-            rospy.loginfo_once("Finished measuring ")
+            rospy.logwarn_once("Finished measuring ")
 
         self.pub_msg()
         

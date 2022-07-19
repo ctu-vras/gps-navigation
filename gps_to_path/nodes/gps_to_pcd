@@ -56,6 +56,8 @@ class GpsToPcd():
         self.tf_msg = TransformStamped()
         self.broadcaster = tf2_ros.TransformBroadcaster()
 
+	self.odom_utm = utm.UTMPoint()
+
     def get_wgs_msg(self):
         msg = WgsArray()
 
@@ -125,7 +127,8 @@ class GpsToPcd():
             odom_gps_x_rotated = self.odom_gps_trans.transform.translation.x*cos(yaw) - self.odom_gps_trans.transform.translation.y*sin(yaw)
             odom_gps_y_rotated = self.odom_gps_trans.transform.translation.x*sin(yaw) + self.odom_gps_trans.transform.translation.y*cos(yaw) 
 
-            rospy.logwarn("Vector from odom to gps in utm frame: "+str(odom_gps_x_rotated)+', '+str(odom_gps_y_rotated))
+	    rospy.logwarn(odom_gps_x_rotated)
+	    rospy.logwarn(odom_gps_y_rotated)
 
             self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
             self.odom_utm.northing = self.gps_utm.northing - odom_gps_y_rotated
@@ -142,7 +145,8 @@ class GpsToPcd():
 
             self.set_pcd_msg()
             self.pub_pcd.publish(self.pcd_msg)
-            
+	    #pc = ros_numpy.numpify(self.pcd_msg).ravel()
+	    #rospy.logwarn(pc)
         else:
             self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
             rospy.logwarn_once("TF(odom,gps) or TF(odom,base_link) is missing.")
@@ -189,13 +193,13 @@ class GpsToPcd():
 
     def set_pcd_msg_data(self):
         self.pcd_data = np.zeros(len(self.waypoints_utm), dtype=[
-            ('x',np.float34),
-            ('y',np.float34),
-            ('z',np.float34)])
+            ('x',np.float32),
+            ('y',np.float32),
+            ('z',np.float32)])
 
         self.pcd_data['x'] = self.waypoints_utm[:,0]
         self.pcd_data['y'] = self.waypoints_utm[:,1]
-        self.pcd_data['z'] = self.waypoints_utm[:,2]
+        self.pcd_data['z'] = np.zeros((self.waypoints_utm[:,1].shape))
 
         self.pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
 
@@ -226,20 +230,16 @@ class GpsToPcd():
 def main():
     rospy.init_node('gps_to_path')
 
-    num_published_path_points = rospy.get_param('~num_published_path_points', 50)
     reversed_path = rospy.get_param('~reversed_path', False)
     gpx_file = rospy.get_param('~gpx_file', "$(find gps_to_path)/data/coords.gpx")
     circular = rospy.get_param('~circular', False)
-    repeat = rospy.get_param('~repeat', True)
-    start_from_nearest_point = rospy.get_param('~start_from_nearest_point', True)
     path_points_density = rospy.get_param('~path_points_density', 0.1)
     waypoints_fn = os.path.dirname(gpx_file)+"/waypoints.csv"
 
     gpx_to_waypoints(waypoints_density=path_points_density,
                      gpx_file=gpx_file, waypoints_file=waypoints_fn, circular=circular)
 
-    node = GpsToPath(num_published_path_points, waypoints_fn,
-                     reversed_path, repeat, start_from_nearest_point)
+    node = GpsToPcd(waypoints_fn,reversed_path)
 
     node.run()
 

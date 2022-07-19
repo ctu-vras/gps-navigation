@@ -12,7 +12,7 @@ from gps_to_path.msg import Wgs, WgsArray
 import std_msgs.msg
 from geodesy import utm
 from math import sqrt, sin, cos, pi
-from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion, quaternion_inverse
+from tf.transformations import quaternion_from_euler, quaternion_from_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse, inverse_matrix,quaternion_matrix
 from numpy import deg2rad, rad2deg, genfromtxt
 import numpy as np
 import os.path
@@ -57,6 +57,8 @@ class GpsToPcd():
         self.broadcaster = tf2_ros.TransformBroadcaster()
 
 	self.odom_utm = utm.UTMPoint()
+
+	self.tf_matrix = np.eye(4)
 
     def get_wgs_msg(self):
         msg = WgsArray()
@@ -113,12 +115,15 @@ class GpsToPcd():
             except:
                 pass
 
-            rot = self.get_utm_odom_rot()   
+            rot = self.get_utm_odom_rot()
 
-            self.tf_msg.transform.rotation.x = rot[0]
-            self.tf_msg.transform.rotation.y = rot[1]
-            self.tf_msg.transform.rotation.z = rot[2]
-            self.tf_msg.transform.rotation.w = rot[3]
+	    R = quaternion_matrix(rot)[:3,:3]
+	    self.tf_matrix[:3,:3] = R
+
+            #self.tf_msg.transform.rotation.x = rot[0]
+            #self.tf_msg.transform.rotation.y = rot[1]
+            #self.tf_msg.transform.rotation.z = rot[2]
+            #self.tf_msg.transform.rotation.w = rot[3]
 
             self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
 
@@ -127,18 +132,30 @@ class GpsToPcd():
             odom_gps_x_rotated = self.odom_gps_trans.transform.translation.x*cos(yaw) - self.odom_gps_trans.transform.translation.y*sin(yaw)
             odom_gps_y_rotated = self.odom_gps_trans.transform.translation.x*sin(yaw) + self.odom_gps_trans.transform.translation.y*cos(yaw) 
 
-	    rospy.logwarn(odom_gps_x_rotated)
-	    rospy.logwarn(odom_gps_y_rotated)
-
-            self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
+	    self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
             self.odom_utm.northing = self.gps_utm.northing - odom_gps_y_rotated
-            self.tf_msg.header.stamp = rospy.Time.now()
+
+	    self.tf_msg.header.stamp = rospy.Time.now()
             self.tf_msg.header.frame_id = "odom"    # in reality it is the other way around, but we cannot create a parent to odom...
             self.tf_msg.child_frame_id = "utm"
 
-            self.tf_msg.transform.translation.x = self.odom_utm.easting
-            self.tf_msg.transform.translation.y = self.odom_utm.northing
-            self.tf_msg.transform.translation.z = 0
+            #self.tf_msg.transform.translation.x = self.odom_utm.easting
+            #self.tf_msg.transform.translation.y = self.odom_utm.northing
+            #self.tf_msg.transform.translation.z = 0
+	    
+	    self.tf_matrix[0,3] = self.odom_utm.easting
+	    self.tf_matrix[1,3] = self.odom_utm.northing
+	    self.tf_matrix_inversed = inverse_matrix(self.tf_matrix)
+
+	    q = quaternion_from_matrix(self.tf_matrix_inversed)
+	    self.tf_msg.transform.rotation.x = q[0]
+	    self.tf_msg.transform.rotation.y = q[1]
+	    self.tf_msg.transform.rotation.z = q[2]
+	    self.tf_msg.transform.rotation.w = q[3]
+
+	    self.tf_msg.transform.translation.x = self.tf_matrix_inversed[0,3]
+	    self.tf_msg.transform.translation.y = self.tf_matrix_inversed[1,3]
+	    self.tf_msg.transform.translation.z = 0
 
             self.broadcaster.sendTransform(self.tf_msg)
             self.pub_path_wgs.publish(self.wgs_msg)

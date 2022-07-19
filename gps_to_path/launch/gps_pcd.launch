@@ -1,5 +1,5 @@
 <launch>    
-    <arg name="gpx_file" default="$(find gps_to_path)/data/cimicky_cesta.gpx" />
+    <arg name="gpx_file" default="$(find gps_to_path)/data/kn.gpx" />
     <arg name="circular_path" default="false" />
     <arg name="reversed_path" default="false" />
     <arg name="run_ntrip_relay" default="true" />

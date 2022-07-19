@@ -43,7 +43,7 @@ class GpsToPcd():
 
         self.pub_pcd = rospy.Publisher('waypoints', PointCloud2, queue_size=10)
         self.pcd_msg = PointCloud2()
-        #self.set_pcd_msg_data()
+        self.set_pcd_msg_data()
 
         self.pub_path_wgs = rospy.Publisher(
             'wgs_path', WgsArray, queue_size=10)
@@ -58,6 +58,13 @@ class GpsToPcd():
         self.listener_odom_base_link = tf2_ros.TransformListener(
             self.tfBuffer2)
         self.odom_base_link_trans = None
+
+        self.tf_msg = TransformStamped()
+        self.broadcaster = tf2_ros.TransformBroadcaster()
+
+        self.odom_utm = utm.UTMPoint()
+
+        self.tf_matrix = np.eye(4)
 
     def get_wgs_msg(self):
         msg = WgsArray()
@@ -117,15 +124,53 @@ class GpsToPcd():
             except:
                 pass
 
-            self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
-            # utm is not an actual tf trame, just an imaginary frame
-            self.gps_to_target_utm_frame = self.waypoints_utm - \
-                np.array([self.gps_utm.easting, self.gps_utm.northing])
-            self.gps_to_target_odom_frame = self.odom_to_utm_rotate(
-                self.gps_to_target_utm_frame)
+            rot = self.get_utm_odom_rot()
 
-            self.pcd_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
-                                      self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
+            R = quaternion_matrix(rot)[:3, :3]
+            self.tf_matrix[:3, :3] = R
+
+            #self.tf_msg.transform.rotation.x = rot[0]
+            #self.tf_msg.transform.rotation.y = rot[1]
+            #self.tf_msg.transform.rotation.z = rot[2]
+            #self.tf_msg.transform.rotation.w = rot[3]
+
+            self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
+
+            yaw = euler_from_quaternion(rot)[2]
+
+            odom_gps_x_rotated = self.odom_gps_trans.transform.translation.x * \
+                cos(yaw) - self.odom_gps_trans.transform.translation.y*sin(yaw)
+            odom_gps_y_rotated = self.odom_gps_trans.transform.translation.x * \
+                sin(yaw) + self.odom_gps_trans.transform.translation.y*cos(yaw)
+
+            self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
+            self.odom_utm.northing = self.gps_utm.northing - odom_gps_y_rotated
+
+            self.tf_msg.header.stamp = rospy.Time.now()
+            # in reality it is the other way around, but we cannot create a parent to odom...
+            self.tf_msg.header.frame_id = "odom"
+            self.tf_msg.child_frame_id = "utm"
+
+            #self.tf_msg.transform.translation.x = self.odom_utm.easting
+            #self.tf_msg.transform.translation.y = self.odom_utm.northing
+            #self.tf_msg.transform.translation.z = 0
+
+            self.tf_matrix[0, 3] = self.odom_utm.easting
+            self.tf_matrix[1, 3] = self.odom_utm.northing
+            self.tf_matrix_inversed = inverse_matrix(self.tf_matrix)
+
+            q = quaternion_from_matrix(self.tf_matrix_inversed)
+            self.tf_msg.transform.rotation.x = q[0]
+            self.tf_msg.transform.rotation.y = q[1]
+            self.tf_msg.transform.rotation.z = q[2]
+            self.tf_msg.transform.rotation.w = q[3]
+
+            self.tf_msg.transform.translation.x = self.tf_matrix_inversed[0, 3]
+            self.tf_msg.transform.translation.y = self.tf_matrix_inversed[1, 3]
+            self.tf_msg.transform.translation.z = 0
+
+            self.broadcaster.sendTransform(self.tf_msg)
+            self.pub_path_wgs.publish(self.wgs_msg)
 
             self.set_pcd_msg()
             self.pub_pcd.publish(self.pcd_msg)
@@ -163,22 +208,30 @@ class GpsToPcd():
 
     def set_pcd_msg(self):
 
-        self.pcd_data = np.zeros(len(self.pcd_arr), dtype=[
-            ('x', np.float32),
-            ('y', np.float32),
-            ('z', np.float32)])
-
-        self.pcd_data['x'] = self.pcd_arr[:, 0]
-        self.pcd_data['y'] = self.pcd_arr[:, 1]
-        self.pcd_data['z'] = np.zeros((self.pcd_arr[:, 1].shape))
-
-        self.pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
-
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
         header.frame_id = "utm"
 
-        self.pcd_msg.header = header        
+        self.pcd_msg.header = header
+
+        #self.pcd_msg.width = 1
+        #self.pcd_msg.height = len(self.waypoints_utm)
+
+        #point_field = PointField()
+        #point_field.name = "trav"
+        #point_field.datatype = 2
+
+    def set_pcd_msg_data(self):
+        self.pcd_data = np.zeros(len(self.waypoints_utm), dtype=[
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32)])
+
+        self.pcd_data['x'] = self.waypoints_utm[:, 0]
+        self.pcd_data['y'] = self.waypoints_utm[:, 1]
+        self.pcd_data['z'] = np.zeros((self.waypoints_utm[:, 1].shape))
+
+        self.pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
 
     def dist_from_point(self, point):
         return np.sqrt(np.sum(np.square(point-np.array([self.odom_gps_trans.transform.translation.x, self.odom_gps_trans.transform.translation.y]))))

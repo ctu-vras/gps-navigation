@@ -15,6 +15,7 @@ from math import sqrt, sin, cos
 
 from tf.transformations import euler_from_quaternion
 
+
 class GPSData():
     def __init__(self):
         self.time = 0.
@@ -24,8 +25,8 @@ class GPSData():
         self.satellites = 0
         self.lat_cov = 0.
         self.long_cov = 0.
-    
-    def from_array(self,data):
+
+    def from_array(self, data):
         self.time = data[0]
         self.lat = float(data[1])
         self.long = float(data[2])
@@ -36,8 +37,9 @@ class GPSData():
         self.long_cov = float(data[7])**2
         self.alt_cov = float(data[8])**2
 
+
 class LlhToFix():
-    def __init__(self,GPS):
+    def __init__(self, GPS):
         self.pub_path = rospy.Publisher('fix', NavSatFix, queue_size=10)
         self.fix_msg = NavSatFix()
         self.GPS = GPS
@@ -45,7 +47,7 @@ class LlhToFix():
 
     def set_fix_msg(self):
         header = std_msgs.msg.Header()
-        header.stamp = rospy.Time.now() #float(self.gps_data.time)
+        header.stamp = rospy.Time.now()  # float(self.gps_data.time)
         header.frame_id = "gps"
 
         self.fix_msg.header = header
@@ -54,29 +56,30 @@ class LlhToFix():
         self.fix_msg.longitude = self.gps_data.long
         self.fix_msg.altitude = self.gps_data.alt
 
-	self.fix_msg.status.status = 0
+        self.fix_msg.status.status = 0
         self.fix_msg.status.service = 1
 
         self.fix_msg.position_covariance = [self.gps_data.long_cov, 0., 0.,
                                             0., self.gps_data.lat_cov, 0.,
-                                            0., 0., self.gps_data.alt_cov]        
-    
-    def date_to_timestamp(self,date):
-        ts = time.mktime(datetime.datetime.strptime(date,"%Y/%m/%d,%H:%M:%S.%f").timetuple())
+                                            0., 0., self.gps_data.alt_cov]
+
+    def date_to_timestamp(self, date):
+        ts = time.mktime(datetime.datetime.strptime(
+            date, "%Y/%m/%d,%H:%M:%S.%f").timetuple())
         return ts
 
-    def parse_data(self,llh_sentence):
+    def parse_data(self, llh_sentence):
         llh_contents = re.sub(' +', ' ', llh_sentence).strip()
-        llh_commas = llh_contents.replace(' ',',')
+        llh_commas = llh_contents.replace(' ', ',')
         llh_arr = llh_commas.split(',')
-        
+
         date = llh_arr[0]+','+llh_arr[1]
         ts = self.date_to_timestamp(date)
         ts = str(ts)
         llh_arr.pop(0)
         llh_arr[0] = ts
         self.gps_data.from_array(llh_arr)
-     
+
     def run(self):
         rate = rospy.Rate(50)
         while not rospy.is_shutdown():
@@ -89,6 +92,7 @@ class LlhToFix():
             else:
                 rate.sleep()
 
+
 def main():
     rospy.init_node('llh_to_fix')
 
@@ -96,20 +100,21 @@ def main():
 
     rate = rospy.Rate(10)
 
-
     while not GPS:
         try:
             serial_port = rospy.get_param('~port', '/dev/ttyACM0')
             serial_baud = rospy.get_param('~baud', 115200)
-            GPS = serial.Serial(port=serial_port, baudrate=serial_baud, timeout=2)
+            GPS = serial.Serial(
+                port=serial_port, baudrate=serial_baud, timeout=2)
         except:
-            print("Serial port {} with baudrate {} cannot be opened.".format(serial_port, serial_baud))
+            print("Serial port {} with baudrate {} cannot be opened.".format(
+                serial_port, serial_baud))
         rate.sleep()
 
     node = LlhToFix(GPS)
-        
+
     node.run()
-    
+
 
 if __name__ == '__main__':
     main()

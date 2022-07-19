@@ -11,45 +11,50 @@ import math
 
 
 import json
-from numpy import deg2rad,rad2deg,NAN
-from math import sin,cos,atan2,floor,pi
+from numpy import deg2rad, rad2deg, NAN
+from math import sin, cos, atan2, floor, pi
 
 
 class MagVec():
     """ Magnetic field vector. """
-    def __init__(self,x=0,y=0,z=0):
+
+    def __init__(self, x=0, y=0, z=0):
         self.x = x
         self.y = y
         self.z = z
 
+
 class EulVec():
     """ Euler angles vector. """
-    def __init__(self,roll=0,pitch=0,yaw=0,rad=False):
+
+    def __init__(self, roll=0, pitch=0, yaw=0, rad=False):
         self.roll = roll
         self.pitch = pitch
         self.yaw = yaw
 
+
 class Quaternion():
     """ Quaternion vector. """
-    def __init__(self,x=0,y=0,z=0,w=0):
+
+    def __init__(self, x=0, y=0, z=0, w=0):
         self.x = x
         self.y = y
         self.z = z
         self.w = w
-    
+
     def __arr__(self):
         """ Represent quaternion as array. """
         return [self.x, self.y, self.z, self.w]
-    
-    def __mul__(self,other):
+
+    def __mul__(self, other):
         """ Quaternion multiplication. """
         new = quaternion_multiply(self.__arr__(), other.__arr__())
-        new = Quaternion(new[0],new[1],new[2],new[3])
+        new = Quaternion(new[0], new[1], new[2], new[3])
         return new
-    
+
     def get_eul(self):
         """ Returns (roll, pitch, yaw) in radians. """
-        return euler_from_quaternion(self.__arr__())        
+        return euler_from_quaternion(self.__arr__())
 
     def get_yaw(self):
         """ Returns yaw. """
@@ -65,13 +70,14 @@ class Quaternion():
         elif coordinates == "ned":
             return yaw % (2*pi)
         else:
-            raise ValueError("Coordinate system \"%s\" not supported. Supported coordinate systems are \"enu\" and \"ned\"." % coordinates)
-
+            raise ValueError(
+                "Coordinate system \"%s\" not supported. Supported coordinate systems are \"enu\" and \"ned\"." % coordinates)
 
 
 class MagAzimuthCalc():
     """ Class containing publisher, subscribers and related methods. """
-    def __init__(self,x_mean,y_mean,z_mean):
+
+    def __init__(self, x_mean, y_mean, z_mean):
         self.mag_vec = MagVec()
         self.eul_vec = EulVec()
         self.q = Quaternion()
@@ -90,10 +96,12 @@ class MagAzimuthCalc():
         self.z_mean = z_mean
 
         self.pub = rospy.Publisher('mag_azimuth', Float64, queue_size=10)
-        self.sub_mag = rospy.Subscriber('/imu/mag', MagneticField, self.update_mag_vec)
+        self.sub_mag = rospy.Subscriber(
+            '/imu/mag', MagneticField, self.update_mag_vec)
         self.sub_eul = rospy.Subscriber('/imu/data', Imu, self.update_eul_vec)
-        
-        self.sub_mag_shift = rospy.Subscriber('mag_shift', MagShift, self.update_mag_shift)
+
+        self.sub_mag_shift = rospy.Subscriber(
+            'mag_shift', MagShift, self.update_mag_shift)
 
     def update_mag_shift(self, msg):
         """ Magnetic field shift sub callback. """
@@ -113,9 +121,10 @@ class MagAzimuthCalc():
             azimuth = self.mag_azimuth_360
 
             pub_msg = Float64()
-            pub_msg.header = msg.header     # Copy header from IMU message (does not copy sequence).
+            # Copy header from IMU message (does not copy sequence).
+            pub_msg.header = msg.header
             pub_msg.data = azimuth
-        
+
             self.pub.publish(pub_msg)
 
     def update_eul_vec(self, msg):
@@ -136,26 +145,29 @@ class MagAzimuthCalc():
         mag_measurement_NED = MagVec()
         mag_azimuth_current = 0.
 
-        roll = self.eul_vec.roll #+ self.trans_eul_vec.roll     #NOT SURE IF WE SHOULD TAKE IN THE TRANSFORMATION ROLL AND PITCH
-        pitch = self.eul_vec.pitch #+ self.trans_eul_vec.pitch
+        # + self.trans_eul_vec.roll     #NOT SURE IF WE SHOULD TAKE IN THE TRANSFORMATION ROLL AND PITCH
+        roll = self.eul_vec.roll
+        pitch = self.eul_vec.pitch  # + self.trans_eul_vec.pitch
 
         """ Compensate tilt. """
         mag_measurement_NED.x = self.mag_vec.x * cos(pitch) + \
-                            self.mag_vec.y * sin(pitch) * sin(roll) + \
-                            self.mag_vec.z * sin(pitch) * cos(roll)    
-        
+            self.mag_vec.y * sin(pitch) * sin(roll) + \
+            self.mag_vec.z * sin(pitch) * cos(roll)
+
         mag_measurement_NED.y = self.mag_vec.y * cos(roll) - \
-                            self.mag_vec.z * sin(roll)    
-        
+            self.mag_vec.z * sin(roll)
+
         #mag_measurement_NED.x = self.mag_vec.x
         #mag_measurement_NED.y = self.mag_vec.y
-        #rospy.logwarn("{}\n,{}\n,{}\n,{}\n,{}\n".format(self.mag_vec.x,self.mag_vec.y,self.mag_vec.z,mag_measurement_NED.x,mag_measurement_NED.y))
+        # rospy.logwarn("{}\n,{}\n,{}\n,{}\n,{}\n".format(self.mag_vec.x,self.mag_vec.y,self.mag_vec.z,mag_measurement_NED.x,mag_measurement_NED.y))
 
         """ Coordinate z not used. """
         mag_measurement_NED.z = NAN
 
         """ Azimuth represented by a single value. """
-        mag_azimuth_current = -rad2deg(atan2(mag_measurement_NED.y, mag_measurement_NED.x) + self.trans_eul_vec.yaw)
+        mag_azimuth_current = - \
+            rad2deg(atan2(mag_measurement_NED.y,
+                          mag_measurement_NED.x) + self.trans_eul_vec.yaw)
         #mag_azimuth_current = -rad2deg(atan2(mag_measurement_NED.y, mag_measurement_NED.x))
 
         """ Detect the +-180 deg jump and correct. """
@@ -166,12 +178,13 @@ class MagAzimuthCalc():
                 mag_azimuth_current = mag_azimuth_current + 360.
 
         """ First-order low pass filter. """
-        self.mag_azimuth = self.mag_azimuth_filter * self.mag_azimuth + (1. - self.mag_azimuth_filter) * mag_azimuth_current
+        self.mag_azimuth = self.mag_azimuth_filter * self.mag_azimuth + \
+            (1. - self.mag_azimuth_filter) * mag_azimuth_current
 
         """ Set to (-180,180]. """
         while self.mag_azimuth > 180.:
             self.mag_azimuth = self.mag_azimuth - 360.
-        
+
         while self.mag_azimuth <= -180.:
             self.mag_azimuth = self.mag_azimuth + 360.
 
@@ -186,24 +199,27 @@ class MagAzimuthCalc():
         rate = rospy.Rate(10)
         while not self.trans:
             try:
-                self.trans = self.tfBuffer.lookup_transform('imu', 'base_link', rospy.Time())
-                q_baselink = Quaternion(self.trans.transform.rotation.x, \
-                                    self.trans.transform.rotation.y, \
-                                    self.trans.transform.rotation.z, \
-                                    self.trans.transform.rotation.w)
-                self.trans_eul_vec.roll, self.trans_eul_vec.pitch, self.trans_eul_vec.yaw = q_baselink.get_eul()  
+                self.trans = self.tfBuffer.lookup_transform(
+                    'imu', 'base_link', rospy.Time())
+                q_baselink = Quaternion(self.trans.transform.rotation.x,
+                                        self.trans.transform.rotation.y,
+                                        self.trans.transform.rotation.z,
+                                        self.trans.transform.rotation.w)
+                self.trans_eul_vec.roll, self.trans_eul_vec.pitch, self.trans_eul_vec.yaw = q_baselink.get_eul()
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()
                 continue
         rospy.spin()
+
 
 def main():
     rospy.init_node('mag_azimuth')
     x_mean = rospy.get_param('~x_mean', None)
     y_mean = rospy.get_param('~y_mean', None)
     z_mean = rospy.get_param('~z_mean', None)
-    mag_azimuth_calc = MagAzimuthCalc(x_mean,y_mean,z_mean)
+    mag_azimuth_calc = MagAzimuthCalc(x_mean, y_mean, z_mean)
     mag_azimuth_calc.run()
+
 
 if __name__ == '__main__':
     main()

@@ -12,7 +12,7 @@ from gps_to_path.msg import Wgs, WgsArray
 import std_msgs.msg
 from geodesy import utm
 from math import sqrt, sin, cos, pi
-from tf.transformations import quaternion_from_euler, quaternion_from_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse, inverse_matrix,quaternion_matrix
+from tf.transformations import quaternion_from_euler, quaternion_from_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse, inverse_matrix, quaternion_matrix
 from numpy import deg2rad, rad2deg, genfromtxt
 import numpy as np
 import os.path
@@ -27,21 +27,26 @@ class GpsToPcd():
         self.found_start = False
 
         self.waypoints = genfromtxt(waypoints_fn, delimiter=",")
-        self.waypoints_utm = [utm.fromLatLong(self.waypoints[i, 0], self.waypoints[i, 1]) for i in range(len(self.waypoints))]
-        self.waypoints_utm = np.array([[waypoint.easting, waypoint.northing] for waypoint in self.waypoints_utm])
+        self.waypoints_utm = [utm.fromLatLong(
+            self.waypoints[i, 0], self.waypoints[i, 1]) for i in range(len(self.waypoints))]
+        self.waypoints_utm = np.array(
+            [[waypoint.easting, waypoint.northing] for waypoint in self.waypoints_utm])
         if reversed_path:
             self.waypoints_utm = np.flip(self.waypoints_utm, 0)
 
-        self.sub_fix = rospy.Subscriber("fix", NavSatFix, self.main_cycle, queue_size=10)
+        self.sub_fix = rospy.Subscriber(
+            "fix", NavSatFix, self.main_cycle, queue_size=10)
 
-        self.sub_azimuth = rospy.Subscriber("mag_azimuth", Float64, self.update_azimuth, queue_size=10)
+        self.sub_azimuth = rospy.Subscriber(
+            "mag_azimuth", Float64, self.update_azimuth, queue_size=10)
         self.azimuth = 0.
 
         self.pub_pcd = rospy.Publisher('waypoints', PointCloud2, queue_size=10)
         self.pcd_msg = PointCloud2()
         self.set_pcd_msg_data()
 
-        self.pub_path_wgs = rospy.Publisher('wgs_path', WgsArray, queue_size=10)
+        self.pub_path_wgs = rospy.Publisher(
+            'wgs_path', WgsArray, queue_size=10)
         self.wgs_msg = self.get_wgs_msg()
         self.pub_path_wgs.publish(self.wgs_msg)
 
@@ -50,15 +55,16 @@ class GpsToPcd():
         self.odom_gps_trans = None
 
         self.tfBuffer2 = tf2_ros.Buffer()
-        self.listener_odom_base_link = tf2_ros.TransformListener(self.tfBuffer2)
+        self.listener_odom_base_link = tf2_ros.TransformListener(
+            self.tfBuffer2)
         self.odom_base_link_trans = None
 
         self.tf_msg = TransformStamped()
         self.broadcaster = tf2_ros.TransformBroadcaster()
 
-	self.odom_utm = utm.UTMPoint()
+        self.odom_utm = utm.UTMPoint()
 
-	self.tf_matrix = np.eye(4)
+        self.tf_matrix = np.eye(4)
 
     def get_wgs_msg(self):
         msg = WgsArray()
@@ -83,7 +89,8 @@ class GpsToPcd():
 
     def get_utm_odom_rot(self):
         """ Get angle by how much to rotate utm frame to align with odom frame, resp. rotation of odom frame in utm frame. """
-        q1 = quaternion_from_euler(0, 0, deg2rad(self.azimuth)-(3./2.)*pi)   # how much to rotate utm frame to be aligned with base_link frame
+        q1 = quaternion_from_euler(0, 0, deg2rad(
+            self.azimuth)-(3./2.)*pi)   # how much to rotate utm frame to be aligned with base_link frame
         q2 = quaternion_inverse([0,
                                  0,
                                  self.odom_base_link_trans.transform.rotation.z,
@@ -107,18 +114,20 @@ class GpsToPcd():
 
         if self.odom_gps_trans and self.odom_base_link_trans:
             try:
-                self.odom_gps_trans = self.tfBuffer.lookup_transform('odom', 'gps', rospy.Time())
+                self.odom_gps_trans = self.tfBuffer.lookup_transform(
+                    'odom', 'gps', rospy.Time())
             except:
                 pass
             try:
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform('odom', 'base_link', rospy.Time())
+                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                    'odom', 'base_link', rospy.Time())
             except:
                 pass
 
             rot = self.get_utm_odom_rot()
 
-	    R = quaternion_matrix(rot)[:3,:3]
-	    self.tf_matrix[:3,:3] = R
+            R = quaternion_matrix(rot)[:3, :3]
+            self.tf_matrix[:3, :3] = R
 
             #self.tf_msg.transform.rotation.x = rot[0]
             #self.tf_msg.transform.rotation.y = rot[1]
@@ -129,44 +138,48 @@ class GpsToPcd():
 
             yaw = euler_from_quaternion(rot)[2]
 
-            odom_gps_x_rotated = self.odom_gps_trans.transform.translation.x*cos(yaw) - self.odom_gps_trans.transform.translation.y*sin(yaw)
-            odom_gps_y_rotated = self.odom_gps_trans.transform.translation.x*sin(yaw) + self.odom_gps_trans.transform.translation.y*cos(yaw) 
+            odom_gps_x_rotated = self.odom_gps_trans.transform.translation.x * \
+                cos(yaw) - self.odom_gps_trans.transform.translation.y*sin(yaw)
+            odom_gps_y_rotated = self.odom_gps_trans.transform.translation.x * \
+                sin(yaw) + self.odom_gps_trans.transform.translation.y*cos(yaw)
 
-	    self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
+            self.odom_utm.easting = self.gps_utm.easting - odom_gps_x_rotated
             self.odom_utm.northing = self.gps_utm.northing - odom_gps_y_rotated
 
-	    self.tf_msg.header.stamp = rospy.Time.now()
-            self.tf_msg.header.frame_id = "odom"    # in reality it is the other way around, but we cannot create a parent to odom...
+            self.tf_msg.header.stamp = rospy.Time.now()
+            # in reality it is the other way around, but we cannot create a parent to odom...
+            self.tf_msg.header.frame_id = "odom"
             self.tf_msg.child_frame_id = "utm"
 
             #self.tf_msg.transform.translation.x = self.odom_utm.easting
             #self.tf_msg.transform.translation.y = self.odom_utm.northing
             #self.tf_msg.transform.translation.z = 0
-	    
-	    self.tf_matrix[0,3] = self.odom_utm.easting
-	    self.tf_matrix[1,3] = self.odom_utm.northing
-	    self.tf_matrix_inversed = inverse_matrix(self.tf_matrix)
 
-	    q = quaternion_from_matrix(self.tf_matrix_inversed)
-	    self.tf_msg.transform.rotation.x = q[0]
-	    self.tf_msg.transform.rotation.y = q[1]
-	    self.tf_msg.transform.rotation.z = q[2]
-	    self.tf_msg.transform.rotation.w = q[3]
+            self.tf_matrix[0, 3] = self.odom_utm.easting
+            self.tf_matrix[1, 3] = self.odom_utm.northing
+            self.tf_matrix_inversed = inverse_matrix(self.tf_matrix)
 
-	    self.tf_msg.transform.translation.x = self.tf_matrix_inversed[0,3]
-	    self.tf_msg.transform.translation.y = self.tf_matrix_inversed[1,3]
-	    self.tf_msg.transform.translation.z = 0
+            q = quaternion_from_matrix(self.tf_matrix_inversed)
+            self.tf_msg.transform.rotation.x = q[0]
+            self.tf_msg.transform.rotation.y = q[1]
+            self.tf_msg.transform.rotation.z = q[2]
+            self.tf_msg.transform.rotation.w = q[3]
+
+            self.tf_msg.transform.translation.x = self.tf_matrix_inversed[0, 3]
+            self.tf_msg.transform.translation.y = self.tf_matrix_inversed[1, 3]
+            self.tf_msg.transform.translation.z = 0
 
             self.broadcaster.sendTransform(self.tf_msg)
             self.pub_path_wgs.publish(self.wgs_msg)
 
             self.set_pcd_msg()
             self.pub_pcd.publish(self.pcd_msg)
-	    #pc = ros_numpy.numpify(self.pcd_msg).ravel()
-	    #rospy.logwarn(pc)
+            #pc = ros_numpy.numpify(self.pcd_msg).ravel()
+            # rospy.logwarn(pc)
         else:
             self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
-            rospy.logwarn_once("TF(odom,gps) or TF(odom,base_link) is missing.")
+            rospy.logwarn_once(
+                "TF(odom,gps) or TF(odom,base_link) is missing.")
 
     def get_pose(self, point):
         x = point[0]
@@ -210,13 +223,13 @@ class GpsToPcd():
 
     def set_pcd_msg_data(self):
         self.pcd_data = np.zeros(len(self.waypoints_utm), dtype=[
-            ('x',np.float32),
-            ('y',np.float32),
-            ('z',np.float32)])
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32)])
 
-        self.pcd_data['x'] = self.waypoints_utm[:,0]
-        self.pcd_data['y'] = self.waypoints_utm[:,1]
-        self.pcd_data['z'] = np.zeros((self.waypoints_utm[:,1].shape))
+        self.pcd_data['x'] = self.waypoints_utm[:, 0]
+        self.pcd_data['y'] = self.waypoints_utm[:, 1]
+        self.pcd_data['z'] = np.zeros((self.waypoints_utm[:, 1].shape))
 
         self.pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
 
@@ -235,8 +248,10 @@ class GpsToPcd():
 
         while (not self.odom_gps_trans) or (not self.odom_base_link_trans):
             try:
-                self.odom_gps_trans = self.tfBuffer.lookup_transform('odom', 'gps', rospy.Time())
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform('odom', 'base_link', rospy.Time())
+                self.odom_gps_trans = self.tfBuffer.lookup_transform(
+                    'odom', 'gps', rospy.Time())
+                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                    'odom', 'base_link', rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()
                 continue
@@ -248,7 +263,8 @@ def main():
     rospy.init_node('gps_to_path')
 
     reversed_path = rospy.get_param('~reversed_path', False)
-    gpx_file = rospy.get_param('~gpx_file', "$(find gps_to_path)/data/coords.gpx")
+    gpx_file = rospy.get_param(
+        '~gpx_file', "$(find gps_to_path)/data/coords.gpx")
     circular = rospy.get_param('~circular', False)
     path_points_density = rospy.get_param('~path_points_density', 0.1)
     waypoints_fn = os.path.dirname(gpx_file)+"/waypoints.csv"
@@ -256,7 +272,7 @@ def main():
     gpx_to_waypoints(waypoints_density=path_points_density,
                      gpx_file=gpx_file, waypoints_file=waypoints_fn, circular=circular)
 
-    node = GpsToPcd(waypoints_fn,reversed_path)
+    node = GpsToPcd(waypoints_fn, reversed_path)
 
     node.run()
 

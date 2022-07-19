@@ -4,14 +4,16 @@ import rospy
 
 from nav_msgs.msg import Odometry
 
+
 class FakeOdometry():
 
     def __init__(self):
-        self.publisher_odom = rospy.Publisher("odometry/fake", Odometry, queue_size=10)
+        self.publisher_odom = rospy.Publisher(
+            "odometry/fake", Odometry, queue_size=10)
         self.odom_msg = Odometry()
         self.c = 0
         self.set_odom_msg()
-    
+
     def set_odom_msg(self):
         self.odom_msg.pose.pose.position.x = 0
         self.odom_msg.pose.pose.position.y = 0
@@ -19,7 +21,7 @@ class FakeOdometry():
 
         self.odom_msg.pose.pose.orientation.x = 0
         self.odom_msg.pose.pose.orientation.y = 0
-        self.odom_msg.pose.pose.orientation.z = 0 
+        self.odom_msg.pose.pose.orientation.z = 0
         self.odom_msg.pose.pose.orientation.w = 1
 
         self.odom_msg.twist.twist.linear.x = 3
@@ -33,7 +35,7 @@ class FakeOdometry():
         self.odom_msg.pose.covariance[21] = 1
         self.odom_msg.pose.covariance[28] = 1
         self.odom_msg.pose.covariance[35] = 1
-        
+
         self.odom_msg.header.stamp = rospy.Time.now()
         self.odom_msg.header.frame_id = "base_link"
         self.odom_msg.child_frame_id = "imu"
@@ -42,10 +44,10 @@ class FakeOdometry():
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             self.publisher_odom.publish(self.odom_msg)
-            rate.sleep()        
+            rate.sleep()
+
 
 if __name__ == "__main__":
     rospy.init_node("fake_odometry")
     node = FakeOdometry()
     node.run()
-

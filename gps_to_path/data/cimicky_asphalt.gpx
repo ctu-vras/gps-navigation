@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="https://mapy.cz/">
+	<wpt lat="50.129245" lon="14.434969">
+		<ele>313.798035</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129310" lon="14.435189">
+		<ele>314.021423</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129362" lon="14.435382">
+		<ele>314.478668</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129417" lon="14.435564">
+		<ele>314.531219</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129483" lon="14.435790">
+		<ele>315.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129548" lon="14.435994">
+		<ele>315.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129603" lon="14.436208">
+		<ele>315.022308</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129654" lon="14.436433">
+		<ele>315.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+</gpx>
+

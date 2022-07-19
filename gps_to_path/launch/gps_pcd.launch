@@ -1,4 +1,5 @@
-<launch>    
+<launch>
+<group ns="gps">    
     <arg name="gpx_file" default="$(find gps_to_path)/data/kn.gpx" />
     <arg name="circular_path" default="false" />
     <arg name="reversed_path" default="false" />
@@ -8,11 +9,11 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />             
 
     <!-- LLH FROM GPS TO FIX -->
-<!--    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
-        <param name="port" type="string" value="/dev/ttyACM1" />   
+    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
+        <param name="port" type="string" value="/dev/ttyACM0" />   
         <param name="baud" type="int" value="115200" />
     </node>
--->
+
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />
@@ -20,8 +21,8 @@
     </node>
 
    <!-- FAKE GPS -->
-   <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
-
+<!--   <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+-->
 	
    <!-- AZIMUTH -->
    <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
@@ -39,5 +40,5 @@
         <param name="reversed_path" type="bool" value="$(arg reversed_path)"/>
         <param name="circular" type="bool" value="$(arg circular_path)"/>
     </node>
-
+</group>
 </launch>

@@ -16,7 +16,7 @@ if __name__ == '__main__':
     msg = Path()
 
     header = std_msgs.msg.Header()
-    
+
     poses = PoseStamped()
     poses.pose.position.x = 0.7
     poses.pose.position.y = 0.

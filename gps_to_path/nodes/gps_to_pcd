@@ -176,7 +176,7 @@ class GpsToPcd():
 
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
-        header.frame_id = "utm"
+        header.frame_id = "odom"
 
         self.pcd_msg.header = header        
 

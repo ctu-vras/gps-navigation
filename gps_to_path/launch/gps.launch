@@ -22,13 +22,13 @@
     </node>
 
    <!-- FAKE GPS -->
-<!--   <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
--->	
+   <!--node pkg="gps_to_path" type="fake_gps" name="fake_gps" /-->
+	
    <!-- AZIMUTH -->
    <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
-        <param name="x_mean" value="-0.01" />
-        <param name="y_mean" value="0.155" />
-        <param name="z_mean" value="0.24" />
+        <param name="x_mean" value="-0.15" />
+        <param name="y_mean" value="0.035" />
+        <param name="z_mean" value="0.87" />
    </node>
 
     <!-- PATH -->

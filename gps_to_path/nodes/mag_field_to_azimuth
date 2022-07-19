@@ -111,13 +111,11 @@ class MagAzimuthCalc():
 
     def update_eul_vec(self, msg):
         """ Euler angles sub callback. """
-        r, p, y = euler_from_quaternion((msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w))
-        q1, q2, q3, q4 = quaternion_from_euler(r + math.pi, p, y)
+        self.q.x = msg.orientation.x
+        self.q.y = msg.orientation.y
+        self.q.z = msg.orientation.z
+        self.q.w = msg.orientation.w
 
-        self.q.x = q1
-        self.q.y = q2
-        self.q.z = q3
-        self.q.w = q4
 
         self.eul_vec.roll = self.q.get_eul()[0]
         self.eul_vec.pitch = self.q.get_eul()[1]

@@ -42,6 +42,9 @@ def get_average_radius(road_network: geom.MultiLineString):
     road_network: shapely.geometry.MultiLineString
         All the roads in our area represented as MultiLineString.
     '''
+    names = ['radius', 'length', 'coords', 'curvature_level', 'curvature']
+    formats = ['f8', 'f8', '(2,2)f8', 'i1', 'f8']
+    curve_type = dict(names=names, formats=formats)
     segments = []
 
     for road in list(road_network.geoms):
@@ -50,7 +53,7 @@ def get_average_radius(road_network: geom.MultiLineString):
         if len(road_coords) < 3:  # we are not able to calculate circumcircle's radius
             avg_radius = 10000
             seg_len = geom.Point(road_coords[0]).distance(geom.Point(road_coords[1]))
-            segments.append([dict((("radius", avg_radius), ("length", seg_len), ("coords", (road_coords[0], road_coords[1]))))])
+            segments.append(np.array([tuple([avg_radius, seg_len, (road_coords[0], road_coords[1]), 0, 0])], dtype=curve_type))
             continue
         # Create individual circumcircles and calculate theirs radii
         for i in range(len(road_coords)-2):
@@ -65,8 +68,8 @@ def get_average_radius(road_network: geom.MultiLineString):
             else:
                 avg_radius = min(radius[i-1:i+1])
             seg_len = geom.Point(road_coords[i]).distance(geom.Point(road_coords[i+1]))
-            road_segments.append(dict((("radius", avg_radius), ("length", seg_len), ("coords", (road_coords[i], road_coords[i+1])))))
-        segments.append(road_segments)
+            road_segments.append(tuple([avg_radius, seg_len, (road_coords[i], road_coords[i+1]), 0, 0]))
+        segments.append(np.array(road_segments, dtype=curve_type))
 
     return segments
 
@@ -128,6 +131,6 @@ def road_cost_for_curve(segments: list, exploration_limit: int = 100):
                 if dist2 >= exploration_limit:
                     break
             seg_value /= (dist1+dist2)
-            ranked_segments[(ROAD_CURVATURE_RANKS-1) if seg_value >= (ROAD_CURVATURE_RANKS-1) else floor(seg_value)].append(road[i])
+            ranked_segments[(ROAD_CURVATURE_RANKS-1) if seg_value >= (ROAD_CURVATURE_RANKS-1) else floor(seg_value)].append(geom.LineString(road[i]["coords"]))
     print("INFO: Processed {} road segments.".format(count))
     return ranked_segments

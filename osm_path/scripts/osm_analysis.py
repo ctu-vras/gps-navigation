@@ -1,5 +1,5 @@
 from cmath import nan
-from math import inf
+from math import inf, floor
 #from matplotlib.patches import Polygon
 import overpy
 import OSMPythonTools.api as osm
@@ -98,7 +98,7 @@ RESERVE = 50 # meters
 class PathAnalysis:
     def __init__(self, coords_file):
         
-        self.api = overpy.Overpass()
+        self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
         #self.waypoints = np.genfromtxt(in_file, delimiter=',') # This works for .csv files...
 
@@ -406,13 +406,17 @@ class PathAnalysis:
         return valid
 
     def get_contain_mask(self, points, areas):
-
         #multi_polygon = geometry.MultiPolygon([(area.line.exterior.coords,[anti_area.line.exterior.coords for anti_area in anti_areas]) for area in areas])
-        multi_polygon = geometry.MultiPolygon([area.line for area in areas])
-        multi_polygon = multi_polygon.buffer(0)
-        multi_polygon = prep(multi_polygon)
-        contains = lambda p: multi_polygon.contains(p)
+        if len(areas) >= 1:
+            multi_polygon = geometry.MultiPolygon([area.line for area in areas] if type(areas[0]) is type(Way()) else areas)
+            multi_polygon = multi_polygon.buffer(0)
+            multi_polygon = prep(multi_polygon)
+            contains = lambda p: multi_polygon.contains(p)
+        else:
+            contains = lambda p: False
         mask = np.array(list(map(contains, points)))
+        #print(len(points))
+        #print(len(mask))
         return mask
     
     def mask_points(self, points, other_array, areas):
@@ -677,6 +681,8 @@ class PathAnalysis:
         ax.set_ylabel('Northing (m)')
         plt.show() """
 
+        road_polygons = self.get_road_crossing_cost()
+
         path = []
 
         while goal_points:              # Main cycle.
@@ -703,7 +709,10 @@ class PathAnalysis:
                 graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
                 dist_from_line = np.array(dist_from_line)
 
-                #road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
+                # TODO: Find a way to do this without the added for loop
+                road_points_mask = []
+                for i in range(len(road_polygons)):
+                    road_points_mask.append(self.get_contain_mask(graph_points, road_polygons[i]))
 
                 footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
 
@@ -725,12 +734,10 @@ class PathAnalysis:
                 edge_points_1 = graph_points[edges[:,0]]
                 edge_points_2 = graph_points[edges[:,1]]
 
-                #road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
-
-                road_polygons = self.get_road_crossing_cost()
+                # TODO: Here as well
                 road_points = []
-                for i in range(len(road_polygons)):
-                    road_points.append(self.get_contain_mask(graph_points, road_polygons[i]))
+                for i in range(ROAD_CROSSINGS_RANKS):
+                    road_points.append((road_points_mask[i][edges[:,0]] + road_points_mask[i][edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]))
 
                 dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
                 dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS)
@@ -862,6 +869,7 @@ class PathAnalysis:
     
     def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss):
         #return dist_cost
+        #return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + roads*road_loss + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
         return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + sum(roads[i]*list(range(1,ROAD_CROSSINGS_RANKS+1))[i] for i in range(ROAD_CROSSINGS_RANKS)) + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
 
     def sets_to_lists(self):
@@ -878,7 +886,9 @@ class PathAnalysis:
             self.parse_nodes()
         self.separate_ways()
         self.sets_to_lists()
+        start_t = time.time()
         self.graph_search_path()
+        print("Path took: %.5f" % (time.time()-start_t))
         self.save_path_as_gpx(gpx_fn)
     
     def run_queries(self):
@@ -945,8 +955,8 @@ class PathAnalysis:
 
     def get_road_crossing_cost(self):
         roads = rd_det.get_roads(self.osm_ways_data)
-        prices = rd_det.road_class_prices(roads)
-        self.road_network = rd_det.create_road_network(roads, False, True)
+        prices = rd_det.road_class_price(roads)
+        self.road_network = rd_det.create_road_network([road[0] for road in roads], False, True)
         intersections = rd_det.find_intersections(self.road_network)
         junctions = rd_det.find_junctions(intersections, self.road_network)
         self.road_network = rd_det.combine_road(junctions, intersections, self.road_network)
@@ -963,7 +973,7 @@ class PathAnalysis:
                         break
                 cost /= (CURVATURE_WEIGHT+CLASS_WEIGHT)
                 cost *= ROAD_CROSSINGS_RANKS
-                ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else np.floor(cost)].append(segment.buffer(7/2))
+                ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else floor(cost)].append(segment.buffer(7/2))
         return ranked_segments_2
         
         

@@ -28,7 +28,7 @@ def get_roads(data):
             road_nodes = []
             for node in way.nodes:
                 road_nodes.append((node.id, float(node.lat), float(node.lon)))
-            highway_nodes.append(road_nodes)
+            highway_nodes.append((road_nodes, way.tags.get("highway")))
     return highway_nodes
 
 

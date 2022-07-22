@@ -1,9 +1,9 @@
 <launch>    
-    <arg name="gpx_file" default="$(find gps_to_path)/data/kn_g.gpx" />
+    <arg name="gpx_file" default="$(find gps_to_path)/data/cimicky_cesta.gpx" />
     <arg name="circular_path" default="false" />
-    <arg name="reversed_path" default="false" />
-    <arg name="repeat" default="false" />
-    <arg name="start_from_nearest_point" default="true" />
+e="reversed_path" default="false" />
+    <arg name="repeat" default="true" />
+    <arg name="start_from_nearest_point" default="false" />
     <arg name="run_ntrip_relay" default="true" />
 
     <!-- STATIC TRANSFORMS -->
@@ -11,7 +11,7 @@
 
     <!-- LLH FROM GPS TO FIX -->
     <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
-        <param name="port" type="string" value="/dev/ttyACM0" />   
+        <param name="port" type="string" value="/dev/ttyACM1" />   
         <param name="baud" type="int" value="115200" />
     </node>
 
@@ -22,21 +22,15 @@
     </node>
 
    <!-- FAKE GPS -->
-<!--  <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+<!--   <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
 -->	
    <!-- AZIMUTH -->
-   <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
-	<param name="measuring_time" value="30" />
-   </node>
    <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
-	<!--param name="x_mean" value="-0.01" /-->
-        <!--param name="y_mean" value="0.155" /-->
-        <!--param name="z_mean" value="0.24" /-->
    </node>
 
     <!-- PATH -->
     <node pkg="gps_to_path" type="gps_to_path" name="gps_to_path" output="screen">
-	<param name="num_published_path_points" type="int" value="100"/>
+	<param name="num_published_path_points" type="int" value="50"/>
 	<param name="gpx_file" type="string" value="$(arg gpx_file)"/>
 	<param name="circular" type="bool" value="$(arg circular_path)"/>	
 	<param name="reversed_path" type="bool" value="$(arg reversed_path)"/>

@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 
 import rospy
+import ros_numpy
 import tf2_ros
 from nav_msgs.msg import Path
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, PointCloud2, PointField
 from stamped_msgs.msg import Float64, Float64MultiArray
-from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose
+from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose, TransformStamped
 from gpx_to_waypoints import gpx_to_waypoints
 from gps_to_path.msg import Wgs, WgsArray
 import std_msgs.msg
 from geodesy import utm
 from math import sqrt, sin, cos, pi
-from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion, quaternion_inverse
+from tf.transformations import quaternion_from_euler, quaternion_from_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse, inverse_matrix, quaternion_matrix
 from numpy import deg2rad, rad2deg, genfromtxt
 import numpy as np
 import os.path
@@ -20,11 +21,9 @@ from tf.transformations import euler_from_quaternion
 MAX_DIST_FROM_START = 3.
 
 
-class GpsToPath():
-    def __init__(self, num_published_path_points, waypoints_fn, reversed_path, repeat, start_from_nearest_point):
+class GpsToPcd():
+    def __init__(self, waypoints_fn, reversed_path):
 
-        self.repeat = repeat
-        self.start_from_nearest_point = start_from_nearest_point
         self.found_start = False
 
         self.waypoints = genfromtxt(waypoints_fn, delimiter=",")
@@ -35,9 +34,6 @@ class GpsToPath():
         if reversed_path:
             self.waypoints_utm = np.flip(self.waypoints_utm, 0)
 
-        self.num_published_path_points = min(
-            num_published_path_points, len(self.waypoints))
-
         self.sub_fix = rospy.Subscriber(
             "fix", NavSatFix, self.main_cycle, queue_size=10)
 
@@ -45,11 +41,9 @@ class GpsToPath():
             "mag_azimuth", Float64, self.update_azimuth, queue_size=10)
         self.azimuth = 0.
 
-        self.pub_path = rospy.Publisher('path', Path, queue_size=10)
-        self.pub_whole_path = rospy.Publisher(
-            'whole_path', Path, queue_size=10)
-        self.path_msg = Path()
-        self.whole_path_msg = Path()
+        self.pub_pcd = rospy.Publisher('waypoints', PointCloud2, queue_size=10)
+        self.pcd_msg = PointCloud2()
+        #self.set_pcd_msg_data()
 
         self.pub_path_wgs = rospy.Publisher(
             'wgs_path', WgsArray, queue_size=10)
@@ -122,6 +116,7 @@ class GpsToPath():
                     'odom', 'base_link', rospy.Time())
             except:
                 pass
+
             self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
             # utm is not an actual tf trame, just an imaginary frame
             self.gps_to_target_utm_frame = self.waypoints_utm - \
@@ -129,16 +124,17 @@ class GpsToPath():
             self.gps_to_target_odom_frame = self.odom_to_utm_rotate(
                 self.gps_to_target_utm_frame)
 
-            self.path_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
+            self.pcd_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
                                       self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
 
-            self.set_path_msg()
-            self.pub_path.publish(self.path_msg)
-            self.pub_whole_path.publish(self.whole_path_msg)
-            self.pub_path_wgs.publish(self.wgs_msg)
+            self.set_pcd_msg()
+            self.pub_pcd.publish(self.pcd_msg)
+            #pc = ros_numpy.numpify(self.pcd_msg).ravel()
+            # rospy.logwarn(pc)
         else:
             self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
-            rospy.logwarn("TF(odom,gps) or TF(odom,base_link) is missing.")
+            rospy.logwarn_once(
+                "TF(odom,gps) or TF(odom,base_link) is missing.")
 
     def get_pose(self, point):
         x = point[0]
@@ -165,55 +161,24 @@ class GpsToPath():
         pose_stamped.pose = pose
         return pose_stamped
 
-    def set_path_msg(self):
-        poses = []
+    def set_pcd_msg(self):
+
+        self.pcd_data = np.zeros(len(self.pcd_arr), dtype=[
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32)])
+
+        self.pcd_data['x'] = self.pcd_arr[:, 0]
+        self.pcd_data['y'] = self.pcd_arr[:, 1]
+        self.pcd_data['z'] = np.zeros((self.pcd_arr[:, 1].shape))
+
+        self.pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
 
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
         header.frame_id = "odom"
 
-        index = self.nearest_waypoint_ind(
-            [self.gps_utm.easting, self.gps_utm.northing])
-        # rospy.logwarn(self.dist_from_point(self.path_arr[0]))
-        if not self.start_from_nearest_point and self.dist_from_point(self.path_arr[0]) < MAX_DIST_FROM_START:
-            self.found_start = True
-            rospy.loginfo_once("Arrived to start waypoint.")
-
-        if not self.start_from_nearest_point and not self.found_start:
-            path_to_publish = self.path_arr[:1]
-            rospy.loginfo_once("Going to start waypoint.")
-
-        else:
-            if self.repeat:
-                if index + self.num_published_path_points > len(self.path_arr):
-                    path_to_publish = np.concatenate((self.path_arr[index:],
-                                                      self.path_arr[:index + self.num_published_path_points - len(self.path_arr)]))
-                else:
-                    path_to_publish = self.path_arr[index:index +
-                                                    self.num_published_path_points]
-            else:
-                if index + self.num_published_path_points > len(self.path_arr):
-                    path_to_publish = self.path_arr[index:]
-                else:
-                    path_to_publish = self.path_arr[index:index +
-                                                    self.num_published_path_points]
-
-        for point in path_to_publish:
-            pose_stamped = self.get_pose_stamped(point)
-            pose_stamped.header = header
-            poses.append(pose_stamped)
-
-        self.path_msg.header = header
-        self.path_msg.poses = poses
-
-        poses = []
-        for point in self.path_arr[index:]:
-            pose_stamped = self.get_pose_stamped(point)
-            pose_stamped.header = header
-            poses.append(pose_stamped)
-
-        self.whole_path_msg.header = header
-        self.whole_path_msg.poses = poses
+        self.pcd_msg.header = header        
 
     def dist_from_point(self, point):
         return np.sqrt(np.sum(np.square(point-np.array([self.odom_gps_trans.transform.translation.x, self.odom_gps_trans.transform.translation.y]))))
@@ -244,23 +209,17 @@ class GpsToPath():
 def main():
     rospy.init_node('gps_to_path')
 
-    num_published_path_points = rospy.get_param(
-        '~num_published_path_points', 50)
     reversed_path = rospy.get_param('~reversed_path', False)
     gpx_file = rospy.get_param(
         '~gpx_file', "$(find gps_to_path)/data/coords.gpx")
     circular = rospy.get_param('~circular', False)
-    repeat = rospy.get_param('~repeat', True)
-    start_from_nearest_point = rospy.get_param(
-        '~start_from_nearest_point', True)
     path_points_density = rospy.get_param('~path_points_density', 0.1)
     waypoints_fn = os.path.dirname(gpx_file)+"/waypoints.csv"
 
     gpx_to_waypoints(waypoints_density=path_points_density,
                      gpx_file=gpx_file, waypoints_file=waypoints_fn, circular=circular)
 
-    node = GpsToPath(num_published_path_points, waypoints_fn,
-                     reversed_path, repeat, start_from_nearest_point)
+    node = GpsToPcd(waypoints_fn, reversed_path)
 
     node.run()
 

@@ -4,6 +4,7 @@ import rospy
 
 from sensor_msgs.msg import NavSatFix
 
+
 class FakeGps():
 
     def __init__(self):
@@ -29,17 +30,16 @@ class FakeGps():
         self.msg.status.status = 0
         self.msg.status.service = 1
 
-
     def run(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             self.msg.header.stamp = rospy.Time.now()
-	    #self.msg.latitude += 0.0001
-	    self.publisher.publish(self.msg)
-            rate.sleep()        
+            #self.msg.latitude += 0.0001
+            self.publisher.publish(self.msg)
+            rate.sleep()
+
 
 if __name__ == "__main__":
     rospy.init_node("fake_gps")
     node = FakeGps()
     node.run()
-

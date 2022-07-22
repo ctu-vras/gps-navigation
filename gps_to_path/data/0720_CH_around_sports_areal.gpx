@@ -1,0 +1,828 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="https://mapy.cz/">
+	<wpt lat="50.129242" lon="14.434164">
+		<ele>311.237518</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129265" lon="14.434264">
+		<ele>311.800354</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129282" lon="14.434349">
+		<ele>311.936890</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129304" lon="14.434457">
+		<ele>312.006317</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129321" lon="14.434551">
+		<ele>312.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129349" lon="14.434642">
+		<ele>312.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129378" lon="14.434736">
+		<ele>312.125946</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129399" lon="14.434808">
+		<ele>312.547119</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129430" lon="14.434889">
+		<ele>312.046600</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129466" lon="14.434982">
+		<ele>312.367889</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129503" lon="14.435082">
+		<ele>312.985229</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129540" lon="14.435186">
+		<ele>313.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129576" lon="14.435296">
+		<ele>313.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129617" lon="14.435422">
+		<ele>313.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129652" lon="14.435532">
+		<ele>313.000275</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129686" lon="14.435637">
+		<ele>313.099274</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129720" lon="14.435750">
+		<ele>313.422638</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129760" lon="14.435876">
+		<ele>313.317657</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129792" lon="14.435983">
+		<ele>313.017578</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129820" lon="14.436077">
+		<ele>314.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129851" lon="14.436184">
+		<ele>313.734039</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129887" lon="14.436294">
+		<ele>313.535767</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129925" lon="14.436407">
+		<ele>313.453186</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129957" lon="14.436514">
+		<ele>313.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129994" lon="14.436635">
+		<ele>313.457611</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130028" lon="14.436750">
+		<ele>313.849365</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130064" lon="14.436865">
+		<ele>314.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130086" lon="14.436967">
+		<ele>314.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130119" lon="14.437085">
+		<ele>314.022095</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130141" lon="14.437195">
+		<ele>314.355377</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130159" lon="14.437313">
+		<ele>314.894501</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130162" lon="14.437429">
+		<ele>315.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130162" lon="14.437525">
+		<ele>315.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130159" lon="14.437635">
+		<ele>315.159729</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130155" lon="14.437745">
+		<ele>315.447540</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130152" lon="14.437834">
+		<ele>315.812073</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130159" lon="14.437944">
+		<ele>316.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130167" lon="14.438054">
+		<ele>316.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130186" lon="14.438161">
+		<ele>316.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130208" lon="14.438287">
+		<ele>316.351288</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130222" lon="14.438386">
+		<ele>316.835510</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130236" lon="14.438459">
+		<ele>317.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130310" lon="14.438509">
+		<ele>316.757690</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130394" lon="14.438579">
+		<ele>316.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130466" lon="14.438636">
+		<ele>316.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130542" lon="14.438695">
+		<ele>315.784119</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130631" lon="14.438756">
+		<ele>315.160400</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130709" lon="14.438794">
+		<ele>315.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130792" lon="14.438770">
+		<ele>314.421265</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130875" lon="14.438708">
+		<ele>314.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130946" lon="14.438649">
+		<ele>313.718750</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131020" lon="14.438595">
+		<ele>313.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131116" lon="14.438555">
+		<ele>312.495911</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131204" lon="14.438518">
+		<ele>312.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131281" lon="14.438485">
+		<ele>311.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131350" lon="14.438437">
+		<ele>310.697052</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131424" lon="14.438386">
+		<ele>310.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131505" lon="14.438341">
+		<ele>310.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131601" lon="14.438295">
+		<ele>309.258301</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131698" lon="14.438255">
+		<ele>308.768097</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131792" lon="14.438220">
+		<ele>308.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131892" lon="14.438185">
+		<ele>308.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131991" lon="14.438134">
+		<ele>307.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132081" lon="14.438086">
+		<ele>306.575409</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132176" lon="14.438048">
+		<ele>306.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132251" lon="14.438013">
+		<ele>305.046539</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132271" lon="14.437858">
+		<ele>305.394379</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132291" lon="14.437705">
+		<ele>304.718994</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132308" lon="14.437568">
+		<ele>304.136749</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132332" lon="14.437407">
+		<ele>304.082886</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132353" lon="14.437184">
+		<ele>304.288177</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132373" lon="14.437018">
+		<ele>303.854340</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132390" lon="14.436879">
+		<ele>303.272095</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132408" lon="14.436739">
+		<ele>302.666565</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132425" lon="14.436584">
+		<ele>302.061035</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132433" lon="14.436490">
+		<ele>301.890778</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132445" lon="14.436369">
+		<ele>301.463470</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132461" lon="14.436214">
+		<ele>300.655304</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132478" lon="14.436077">
+		<ele>300.110565</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132492" lon="14.435935">
+		<ele>300.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132502" lon="14.435835">
+		<ele>300.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132516" lon="14.435696">
+		<ele>300.081268</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132533" lon="14.435554">
+		<ele>300.155701</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132542" lon="14.435438">
+		<ele>299.004303</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132555" lon="14.435307">
+		<ele>298.771393</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132566" lon="14.435205">
+		<ele>298.209869</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132579" lon="14.435041">
+		<ele>297.352203</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132595" lon="14.434931">
+		<ele>297.026428</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132605" lon="14.434832">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132612" lon="14.434746">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132626" lon="14.434620">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132622" lon="14.434537">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132600" lon="14.434534">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132530" lon="14.434551">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132485" lon="14.434556">
+		<ele>297.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132444" lon="14.434556">
+		<ele>297.093689</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132396" lon="14.434551">
+		<ele>297.073303</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132335" lon="14.434537">
+		<ele>297.546021</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132291" lon="14.434532">
+		<ele>297.864288</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132234" lon="14.434521">
+		<ele>297.833984</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132179" lon="14.434508">
+		<ele>298.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132145" lon="14.434494">
+		<ele>298.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132110" lon="14.434483">
+		<ele>298.164612</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132066" lon="14.434478">
+		<ele>298.466583</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.132002" lon="14.434462">
+		<ele>299.033295</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131969" lon="14.434451">
+		<ele>298.968536</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131917" lon="14.434443">
+		<ele>299.724609</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131878" lon="14.434433">
+		<ele>299.759552</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131850" lon="14.434414">
+		<ele>299.560669</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131809" lon="14.434390">
+		<ele>300.002258</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131789" lon="14.434357">
+		<ele>299.923492</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131761" lon="14.434293">
+		<ele>299.206909</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131756" lon="14.434218">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131747" lon="14.434124">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131728" lon="14.434052">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131704" lon="14.433974">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131679" lon="14.433891">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131646" lon="14.433802">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131624" lon="14.433732">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131604" lon="14.433671">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131581" lon="14.433604">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131523" lon="14.433608">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131494" lon="14.433608">
+		<ele>299.205109</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131463" lon="14.433503">
+		<ele>299.306427</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131441" lon="14.433417">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131417" lon="14.433327">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131387" lon="14.433244">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131366" lon="14.433183">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131340" lon="14.433116">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131314" lon="14.433043">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131293" lon="14.432990">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131274" lon="14.432933">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131252" lon="14.432877">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131227" lon="14.432834">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131206" lon="14.432831">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131179" lon="14.432833">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131164" lon="14.432812">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131145" lon="14.432804">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131122" lon="14.432790">
+		<ele>299.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131095" lon="14.432791">
+		<ele>299.133667</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131073" lon="14.432803">
+		<ele>299.517914</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131048" lon="14.432821">
+		<ele>299.948792</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131025" lon="14.432835">
+		<ele>300.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.131008" lon="14.432854">
+		<ele>300.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130985" lon="14.432866">
+		<ele>300.013977</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130965" lon="14.432886">
+		<ele>300.208160</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130944" lon="14.432896">
+		<ele>300.482910</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130920" lon="14.432913">
+		<ele>300.869873</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130902" lon="14.432924">
+		<ele>300.981689</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130878" lon="14.432944">
+		<ele>301.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130862" lon="14.432961">
+		<ele>301.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130839" lon="14.432979">
+		<ele>301.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130820" lon="14.432992">
+		<ele>301.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130805" lon="14.433004">
+		<ele>301.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130784" lon="14.433019">
+		<ele>301.012726</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130766" lon="14.433026">
+		<ele>301.083038</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130749" lon="14.433036">
+		<ele>301.329529</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130733" lon="14.433043">
+		<ele>301.591125</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130716" lon="14.433051">
+		<ele>301.822693</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130686" lon="14.433071">
+		<ele>302.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130667" lon="14.433093">
+		<ele>302.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130644" lon="14.433109">
+		<ele>302.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130630" lon="14.433124">
+		<ele>302.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130612" lon="14.433134">
+		<ele>302.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130581" lon="14.433158">
+		<ele>302.053345</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130562" lon="14.433167">
+		<ele>302.391022</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130539" lon="14.433179">
+		<ele>302.786957</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130516" lon="14.433193">
+		<ele>303.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130498" lon="14.433208">
+		<ele>303.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130480" lon="14.433227">
+		<ele>303.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130460" lon="14.433242">
+		<ele>303.075043</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130444" lon="14.433256">
+		<ele>303.285889</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130420" lon="14.433274">
+		<ele>303.729950</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130374" lon="14.433310">
+		<ele>304.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130334" lon="14.433341">
+		<ele>304.205536</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130299" lon="14.433373">
+		<ele>304.922699</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130256" lon="14.433405">
+		<ele>305.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130211" lon="14.433435">
+		<ele>305.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130163" lon="14.433467">
+		<ele>305.010590</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130128" lon="14.433499">
+		<ele>305.368866</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130082" lon="14.433534">
+		<ele>305.931183</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130042" lon="14.433562">
+		<ele>306.029297</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.130006" lon="14.433590">
+		<ele>306.411285</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129955" lon="14.433624">
+		<ele>306.982819</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129908" lon="14.433663">
+		<ele>307.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129858" lon="14.433694">
+		<ele>307.329559</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129811" lon="14.433724">
+		<ele>307.928772</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129790" lon="14.433743">
+		<ele>308.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129756" lon="14.433765">
+		<ele>308.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129722" lon="14.433787">
+		<ele>308.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129697" lon="14.433812">
+		<ele>308.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129666" lon="14.433833">
+		<ele>308.081726</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129640" lon="14.433849">
+		<ele>308.552124</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129613" lon="14.433868">
+		<ele>308.924377</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129591" lon="14.433887">
+		<ele>309.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129566" lon="14.433908">
+		<ele>309.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129537" lon="14.433926">
+		<ele>309.116333</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129503" lon="14.433951">
+		<ele>309.399994</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129471" lon="14.433971">
+		<ele>309.623932</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129437" lon="14.433997">
+		<ele>309.907562</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129409" lon="14.434018">
+		<ele>310.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129378" lon="14.434037">
+		<ele>310.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129345" lon="14.434066">
+		<ele>310.351379</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129309" lon="14.434092">
+		<ele>310.972168</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129282" lon="14.434117">
+		<ele>311.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+	<wpt lat="50.129263" lon="14.434137">
+		<ele>311.000000</ele>
+		<name>New  POI</name>
+	</wpt>
+</gpx>
+

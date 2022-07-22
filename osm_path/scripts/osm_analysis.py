@@ -27,6 +27,10 @@ import gpxpy
 import gpxpy.gpx
 
 from graph_search_params import *
+import road_detection as rd_det
+import road_curvature as rd_cur
+import road_elevation as rd_ele
+from road_crossing_consts import *
 
 
 OSM_URL = "https://www.openstreetmap.org/api/0.6/way/{}/relations"
@@ -699,7 +703,7 @@ class PathAnalysis:
                 graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
                 dist_from_line = np.array(dist_from_line)
 
-                road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
+                #road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
 
                 footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
 
@@ -721,7 +725,12 @@ class PathAnalysis:
                 edge_points_1 = graph_points[edges[:,0]]
                 edge_points_2 = graph_points[edges[:,1]]
 
-                road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
+                #road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
+
+                road_polygons = self.get_road_crossing_cost()
+                road_points = []
+                for i in range(len(road_polygons)):
+                    road_points.append(self.get_contain_mask(graph_points, road_polygons[i]))
 
                 dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
                 dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS)
@@ -853,7 +862,7 @@ class PathAnalysis:
     
     def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss):
         #return dist_cost
-        return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + road_loss*roads + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
+        return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + sum(roads[i]*list(range(1,ROAD_CROSSINGS_RANKS+1))[i] for i in range(ROAD_CROSSINGS_RANKS)) + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
 
     def sets_to_lists(self):
         self.roads_list     = list(self.roads)
@@ -933,6 +942,30 @@ class PathAnalysis:
             f.close()
         
         print("Path saved to {}.".format(fn))
+
+    def get_road_crossing_cost(self):
+        roads = rd_det.get_roads(self.osm_ways_data)
+        prices = rd_det.road_class_prices(roads)
+        self.road_network = rd_det.create_road_network(roads, False, True)
+        intersections = rd_det.find_intersections(self.road_network)
+        junctions = rd_det.find_junctions(intersections, self.road_network)
+        self.road_network = rd_det.combine_road(junctions, intersections, self.road_network)
+        segments = rd_cur.get_average_radius(self.road_network)
+        rd_cur.rank_segments_curve(segments, junctions)
+        ranked_segments = rd_cur.road_cost_for_curve(segments)
+        ranked_segments_2 = [[] for i in range(ROAD_CROSSINGS_RANKS)]
+        for i in range(len(ranked_segments)):
+            for segment in ranked_segments[i]:
+                cost = (i+1)/ROAD_CURVATURE_RANKS * CURVATURE_WEIGHT
+                for road in prices:
+                    if segment.distance(road[0]) < 1e-9:
+                        cost += road[1]/ROAD_CLASS_RANKS * CLASS_WEIGHT
+                        break
+                cost /= (CURVATURE_WEIGHT+CLASS_WEIGHT)
+                cost *= ROAD_CROSSINGS_RANKS
+                ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else np.floor(cost)].append(segment.buffer(7/2))
+        return ranked_segments_2
+        
         
 # Useful links:
 # https://gis.stackexchange.com/questions/259422/how-to-get-a-multipolygon-object-from-overpass-ql

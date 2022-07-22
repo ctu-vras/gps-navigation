@@ -223,6 +223,15 @@ def combine_road(junctions: list, intersections: list, road_network: geom.MultiL
     return geom.MultiLineString(new_road_network)
 
 
+def road_class_price(roads):
+    costs = {"primary": 5, "secondary": 4, "tertiary": 3, "unclassified": 1, "residential": 2, "primary_link": 5, "secondary_link": 4, \
+                    "tertiary_link": 3, "service": 2, "track": 1, "cycleway": 1, "busway": 3, "road": 2, "living_street": 2}
+    prices = []
+    for road in roads:
+        prices.append((geom.LineString(gps_to_utm(road[0], True)), costs[road[1]]))
+    return prices
+
+
 def visualize_curves(segments: list, crossings: list, grid: bool = True):
     '''
     Show map of processed area, e.g. its road network and crossings. Roads are show in color depending on their curve

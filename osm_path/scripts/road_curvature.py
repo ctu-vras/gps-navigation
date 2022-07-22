@@ -2,6 +2,8 @@ import shapely.geometry as geom
 import numpy as np
 from math import floor
 
+from road_crossing_consts import *
+
 
 def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point):
     '''
@@ -80,40 +82,19 @@ def rank_segments_curve(segments: list, junctions: list):
     junctions: list
         List of shapely.geometry.Point where are junctions in our road network.
     '''
-    level_0_weight = 0.75
-    level_1_max_radius = 220
-    level_1_weight = 3
-    level_2_max_radius = 150
-    level_2_weight = 6
-    level_3_max_radius = 90
-    level_3_weight = 10
-    level_4_max_radius = 40
-    level_4_weight = 20
-    level_5_weight = 30
-
+    weights = np.array([LEVEL_0_WEIGHT, LEVEL_1_WEIGHT, LEVEL_2_WEIGHT, LEVEL_3_WEIGHT, LEVEL_4_WEIGHT, LEVEL_5_WEIGHT])
     junctions_coords = [(junction.x, junction.y) for junction in junctions]
 
     for road in segments:
-        for segment in road:
-            if segment["coords"][0] in junctions_coords or segment["coords"][1] in junctions_coords:
-                segment['curvature_level'] = 5
-                segment['curvature'] = segment['length'] * level_5_weight
-                segment['curvature'] = segment['curvature'] if segment['curvature'] > 400 else 400
-            elif segment['radius'] < level_4_max_radius:
-                segment['curvature_level'] = 4
-                segment['curvature'] = segment['length'] * level_4_weight
-            elif segment['radius'] < level_3_max_radius:
-                segment['curvature_level'] = 3
-                segment['curvature'] =  segment['length'] * level_3_weight
-            elif segment['radius'] < level_2_max_radius:
-                segment['curvature_level'] = 2
-                segment['curvature'] =  segment['length'] * level_2_weight
-            elif segment['radius'] < level_1_max_radius:
-                segment['curvature_level'] = 1
-                segment['curvature'] =  segment['length'] * level_1_weight
-            else:
-                segment['curvature_level'] = 0
-                segment['curvature'] =  segment["length"] * level_0_weight
+        # Check if x and y coordinates of at least one point are in junctions coords
+        road['curvature_level'][np.amin(np.isin(road['coords'][:], junctions_coords)[:,0], axis=1)+np.amin(np.isin(road['coords'][:], junctions_coords)[:,1], axis=1)] = 5
+        # If radius lower then treshold and curvature level not yet given
+        road['curvature_level'][(road['radius'] < LEVEL_4_MAX_RADIUS) & (road['curvature_level'] == 0)] = 4
+        road['curvature_level'][(road['radius'] < LEVEL_3_MAX_RADIUS) & (road['curvature_level'] == 0)] = 3
+        road['curvature_level'][(road['radius'] < LEVEL_2_MAX_RADIUS) & (road['curvature_level'] == 0)] = 2
+        road['curvature_level'][(road['radius'] < LEVEL_1_MAX_RADIUS) & (road['curvature_level'] == 0)] = 1
+
+        road['curvature'] = road['length'] * weights[road['curvature_level']]
 
 
 def road_cost_for_curve(segments: list, exploration_limit: int = 100):
@@ -127,7 +108,7 @@ def road_cost_for_curve(segments: list, exploration_limit: int = 100):
     exploration_limit: int, float
         Determines what distance in meters in both direction of road we will explore. Base value -> 100.
     '''
-    ranked_segments = [[] for i in range(15)]  # resolution -> 15 levels
+    ranked_segments = [[] for i in range(ROAD_CURVATURE_RANKS)]  # resolution -> 15 levels
     count = 0
 
     for road in segments:
@@ -147,6 +128,6 @@ def road_cost_for_curve(segments: list, exploration_limit: int = 100):
                 if dist2 >= exploration_limit:
                     break
             seg_value /= (dist1+dist2)
-            ranked_segments[14 if seg_value >= 14 else floor(seg_value)].append(road[i])
+            ranked_segments[(ROAD_CURVATURE_RANKS-1) if seg_value >= (ROAD_CURVATURE_RANKS-1) else floor(seg_value)].append(road[i])
     print("INFO: Processed {} road segments.".format(count))
     return ranked_segments

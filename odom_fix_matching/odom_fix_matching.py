@@ -7,6 +7,7 @@ from matplotlib.patches import Ellipse
 import numpy as np
 import math
 from scipy.spatial import KDTree
+from copy import copy
 import utm
 import warnings
 from PIL import Image
@@ -105,10 +106,15 @@ class OdomMatcher():
 
         self.first_odom_values = {}
 
-        for topic in self.odom_topics:
+        for topic in copy(self.odom_topics):
+            if topic[0] == '/':
+                self.odom_topics.append(topic[1:])
+                self.odometries[topic[1:]] = PositionsContainer()
+                print("Adding topic {}.".format(topic[1:]))
             self.odometries[topic] = PositionsContainer()
 
         # The fix topic sometimes shows itself as 'fix' instead of '/fix'.
+        # Apparently this also happens to odom topics...
         if self.fix_topic is not None and self.fix_topic[0] == '/':
             topics = self.odom_topics + [self.fix_topic, self.fix_topic[1:]]
         else:
@@ -148,15 +154,19 @@ class OdomMatcher():
                 position = Position(easting,northing,0,(msg.header.stamp).to_nsec(),msg.position_covariance[4],msg.position_covariance[0],None)
                 self.fixes.positions.append(position)
 
+        topics_to_remove = []
         for topic in self.odom_topics:
             if self.odometries[topic].positions == []: 
-                self.odom_topics.remove(topic)
-                self.odometries.pop(topic)
-                print("Odom topic {} has not occured in bag file {} and won't be used.".format(topic,self.bag_path))
-        
+                topics_to_remove.append(topic)
+                
+        for topic in topics_to_remove:
+            self.odom_topics.remove(topic)
+            self.odometries.pop(topic)
+            print("Odom topic {} has not occured in bag file {} and won't be used.".format(topic,self.bag_path))
+
         if self.fix_topic and self.fixes.positions == []:
-            self.fix_topic = None
             print("Fix topic {} has not occured in bag file {} and won't be used.".format(self.fix_topic,self.bag_path))
+            self.fix_topic = None
     
     def get_subsequent_distances(self,positions_container):
         """ For each point calculate the distances between two subsequent points. """
@@ -378,8 +388,8 @@ class OdomMatcher():
         return w
 
     def match_points(self):
-        """ For pairs of arrays of corresponding points find transformation minimising sum of
-        squared distances and transform the arrays. """
+        """ For pairs of arrays of corresponding points find transformation minimising lsq error
+        and transform the arrays. """
         self.matched_points = {}
         for odom_topic in self.correspondences.keys():
             self.matched_points[odom_topic] = {}

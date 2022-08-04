@@ -15,7 +15,8 @@ bags = {
 odom_topics = {
     'tradr':["/icp_odom","/imu_odom"],
     'spot': ["/icp_odom","/spot/odometry"],
-    'husky': ["/icp_odom","/imu_and_wheel_odom"]
+    'husky': ["/icp_odom","/imu_and_wheel_odom"],
+    'marv': ["/imu_odom"]
 }
 
 

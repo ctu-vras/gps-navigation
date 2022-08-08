@@ -1,5 +1,5 @@
 <launch>    
-    <arg name="gpx_file" default="$(find gps_to_path)/data/kn_g.gpx" />
+    <arg name="gpx_file" default="$(find gps_to_path)/data/0720_CH_tradr.gpx" />
     <arg name="circular_path" default="false" />
     <arg name="reversed_path" default="false" />
     <arg name="repeat" default="false" />
@@ -13,6 +13,7 @@
     <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
         <param name="port" type="string" value="/dev/ttyACM0" />   
         <param name="baud" type="int" value="115200" />
+	<param name="sound_period" type="int" value="10" />
     </node>
 
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
@@ -44,6 +45,5 @@
 	<param name="repeat" type="bool" value="$(arg repeat)" />
 	<param name="start_from_nearest_point" type="bool" value="$(arg start_from_nearest_point)" />
     </node>
-
 </launch>
 

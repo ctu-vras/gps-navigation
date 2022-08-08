@@ -48,13 +48,13 @@ class LlhToFix():
         self.fix_msg = NavSatFix()
         self.GPS = GPS
         self.gps_data = GPSData()
-        
-        rospy.init_node('soundplay_fix_cov', anonymous = True)
+
         self.sound_handle = SoundClient()
         self.last_sound_time = 0
         self.last_llh_msg_time = 0
         self.sound_period = sound_period
         self.sound_string = "Fix covariance is {}"
+	self.no_fix_msg_period = 1
 
     def set_fix_msg(self):
         header = std_msgs.msg.Header()

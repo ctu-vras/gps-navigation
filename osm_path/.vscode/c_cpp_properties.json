@@ -1,0 +1,28 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/robot/0804_gps/devel/include/**",
+        "/home/robot/reach_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/robot/reach_ws/src/geonav_transform/include/**",
+        "/home/robot/reach_ws/src/learning_tf2/include/**",
+        "/home/robot/reach_ws/src/naex/include/**",
+        "/home/robot/reach_ws/src/nav_utils/include/**",
+        "/home/robot/reach_ws/src/tf2_client/include/**",
+        "/home/robot/reach_ws/src/tf_remapper_cpp/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

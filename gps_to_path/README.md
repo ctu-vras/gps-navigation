@@ -1,3 +1,6 @@
+# Paths for experiment
+https://en.mapy.cz/s/bumegejeja
+
 # What is this package
 A package for the navigation of a robot using the Emlid Reach M+ GPS module and an IMU.
 

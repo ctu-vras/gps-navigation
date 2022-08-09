@@ -60,8 +60,17 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-geopy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-gpxpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-overpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-shapely</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-utm</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-numpy</exec_depend>
+
   <exec_depend condition="$ROS_DISTRO == noetic">python3-geopy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-gpxpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-overpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-shapely</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-utm</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-numpy</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

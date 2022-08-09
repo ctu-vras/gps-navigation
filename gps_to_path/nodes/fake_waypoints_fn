@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+from re import S
+from tokenize import String
+import rospy
+
+from sensor_msgs.msg import NavSatFix
+import std_msgs.msg
+
+
+class FakeWaypointsFn():
+
+    def __init__(self):
+        pub_waypoints_fn = rospy.Publisher('waypoints_fn', std_msgs.msg.String, queue_size=10)
+        waypoints_fn_msg = std_msgs.msg.String()
+        waypoints_fn_msg.data = "/home/robot/0804_gps/src/gps-navigation/gps_to_path/data/waypoints.gpx"
+        rate = rospy.Rate(100)
+        while not rospy.is_shutdown():
+            pub_waypoints_fn.publish(waypoints_fn_msg)
+            rate.sleep()
+
+if __name__ == "__main__":
+    rospy.init_node("fake_waypoints_fn")
+    node = FakeWaypointsFn()

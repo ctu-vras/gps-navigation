@@ -1,0 +1,604 @@
+#!/usr/bin/env python
+
+import rospy
+import overpy
+import shapely.geometry as geometry
+from shapely.prepared import prep
+from shapely.ops import linemerge
+import os
+import utm
+import numpy as np
+from random import random
+import time
+import gpx_to_waypoints
+
+import gpxpy
+import gpxpy.gpx
+
+import ros_numpy
+import tf2_ros
+from nav_msgs.msg import Path
+from sensor_msgs.msg import NavSatFix, PointCloud2, PointField
+from stamped_msgs.msg import Float64, Float64MultiArray
+from std_msgs.msg import String
+from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose, TransformStamped
+from gpx_to_waypoints import gpx_to_waypoints
+import std_msgs.msg
+from math import sqrt, sin, cos, pi
+from tf.transformations import quaternion_from_euler, quaternion_from_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse, inverse_matrix, quaternion_matrix
+from numpy import deg2rad, rad2deg, genfromtxt
+import os.path
+from tf.transformations import euler_from_quaternion
+
+OSM_URL = "https://www.openstreetmap.org/api/0.6/way/{}/relations"
+FOOTWAY_VALUES = ['living_street','pedestrian','footway','bridleway','corridor','track','steps', 'cycleway', 'path'] # living_street,pedestrian,track,crossing can be accessed by cars
+
+MAX_ROAD_DIST = 10
+MAX_FOOTWAY_DIST = 5
+MAX_BARRIER_DIST = 10
+MAX_OBSTACLE_DIST = 10
+
+MAX_REL_MEMBERS = 1000
+OBSTACLE_RADIUS = 2
+
+RESERVE = 50 # meters
+
+class PointInformation():
+    def __init__(self,x=0,y=0):
+        self.x = x
+        self.y = y
+        self.altitude = 0
+    
+class Way():
+    def __init__(self,id=-1,is_area=False,nodes=[],tags=None,line=None,in_out=""):
+        self.id = id
+        self.is_area = is_area
+        self.nodes = nodes
+        self.tags = tags
+        self.line = line
+        self.in_out = in_out
+
+        self.pcd_points = None
+    
+    def is_road(self):
+        if self.tags.get('highway', None) and not self.tags.get('highway', None) in FOOTWAY_VALUES:
+            return True
+
+    def is_footway(self):
+        if self.tags.get('highway', None) and self.tags.get('highway', None) in FOOTWAY_VALUES:
+            return True
+        
+    def is_terrain(self):
+        #if any(tag in TERRAIN_TAGS+TERRAIN_OR_BARRIER_TAGS for tag in self.tags) and not any(tag in BARRIER_TAGS for tag in self.tags):
+        return True
+    
+    def is_barrier(self, yes_tags, not_tags, anti_tags):
+        if any(key in yes_tags and (self.tags[key] in yes_tags[key] or ('*' in yes_tags[key] and not self.tags[key] in not_tags.get(key,[]))) for key in self.tags) and not any(key in anti_tags and (self.tags[key] in anti_tags[key]) for key in self.tags):
+            return True
+
+    def to_pcd_points(self, density=5):
+        # https://stackoverflow.com/questions/44399749/get-all-lattice-points-lying-inside-a-shapely-polygon
+        if self.pcd_points is None:
+            xmin, ymin, xmax, ymax = self.line.bounds
+            x = np.arange(np.floor(xmin * density) / density, np.ceil(xmax * density) / density, 1 / density) 
+            y = np.arange(np.floor(ymin * density) / density, np.ceil(ymax * density) / density, 1 / density)
+            xv,yv = np.meshgrid(x,y)
+            xv = xv.ravel()
+            yv = yv.ravel()
+            points = geometry.MultiPoint(np.array([xv,yv]).T).geoms
+    
+            points = self.mask_points(points,self.line)
+            self.pcd_points = list(points)
+            self.pcd_points = np.array(list(geometry.LineString(self.pcd_points).xy)).T
+        
+        return self.pcd_points
+    
+    def mask_points(self, points, polygon):
+        polygon = prep(polygon)
+
+        contains = lambda p: polygon.contains(p)
+
+        ret = filter(contains, points)
+
+        return ret
+
+
+class PathAnalysis:
+    def __init__(self, coords_file):
+        
+        self.api = overpy.Overpass()
+
+        # Gpx file to numpy array.
+        gpx_f = open(coords_file, 'r')
+        gpx_object = gpxpy.parse(gpx_f)
+        self.waypoints = np.array([[point.latitude,point.longitude] for point in gpx_object.waypoints])
+
+        self.waypoints, self.zone_number, self.zone_letter = self.waypoints_to_utm()
+        self.max_x = np.max(self.waypoints[:,0]) + RESERVE
+        self.min_x = np.min(self.waypoints[:,0]) - RESERVE
+        self.max_y = np.max(self.waypoints[:,1]) + RESERVE
+        self.min_y = np.min(self.waypoints[:,1]) - RESERVE
+
+        self.max_lat = utm.to_latlon(self.max_x, self.max_y, self.zone_number, self.zone_letter)[0]
+        self.max_long = utm.to_latlon(self.max_x, self.max_y, self.zone_number, self.zone_letter)[1]
+        self.min_lat = utm.to_latlon(self.min_x, self.min_y, self.zone_number, self.zone_letter)[0]
+        self.min_long = utm.to_latlon(self.min_x, self.min_y, self.zone_number, self.zone_letter)[1]
+
+        self.points = list(map(geometry.Point, zip(self.waypoints[:,0], self.waypoints[:,1])))
+
+        self.points_information = []
+        self.way_node_ids = set() 
+        
+        self.roads = set()
+        self.footways = set()
+        self.barriers = set()
+
+        self.roads_list = None
+        self.footways_list = None
+        self.barriers_list = None
+
+        self.ways = dict()
+
+        self.BARRIER_TAGS = self.csv_to_dict(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'parameters/barrier_tags.csv'))
+        self.NOT_BARRIER_TAGS = self.csv_to_dict(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'parameters/not_barrier_tags.csv'))
+        self.ANTI_BARRIER_TAGS = self.csv_to_dict(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'parameters/anti_barrier_tags.csv'))
+
+        self.OBSTACLE_TAGS = self.csv_to_dict(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'parameters/obstacle_tags.csv'))
+        self.NOT_OBSTACLE_TAGS = self.csv_to_dict(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'parameters/not_obstacle_tags.csv'))
+
+        self.path = []
+    
+    def csv_to_dict(self,f):
+        arr = np.genfromtxt(f, dtype=str, delimiter=',')
+        dic = dict()
+        for row in arr:
+            if row[0] in dic:
+                dic[row[0]].append(row[1])
+            else:
+                dic[row[0]] = [row[1]]
+        return dic
+    
+    def waypoints_to_utm(self):
+        a = self.waypoints[:,0]
+        b = self.waypoints[:,1]
+        utm_arr = utm.from_latlon(self.waypoints[:,0],self.waypoints[:,1])
+        utm_coords = np.concatenate((utm_arr[0].reshape(-1,1), utm_arr[1].reshape(-1,1)),axis=1)
+        zone_number = utm_arr[2]
+        zone_letter = utm_arr[3]
+        return utm_coords,zone_number,zone_letter
+
+
+    def get_way_query(self):
+        query = """(way({}, {}, {}, {});
+                    >;
+                    );
+                    out;""".format(self.min_lat,self.min_long,self.max_lat,self.max_long)
+
+        return query
+    
+    def get_rel_query(self):
+        query = """(way({}, {}, {}, {});
+                    <;
+                    );
+                    out;""".format(self.min_lat,self.min_long,self.max_lat,self.max_long)
+
+        return query
+    
+    def get_node_query(self):
+        query = """(node({}, {}, {}, {});
+                    );
+                    out;""".format(self.min_lat,self.min_long,self.max_lat,self.max_long)
+
+        return query
+
+    def parse_ways(self):
+        """ 1. Fill self.ways, a dictionary of id:way pairs, from all the ways from the query."""
+
+        for way in self.osm_ways_data.ways:
+            way_to_store = Way()
+            coords = []
+            is_area = False
+
+            # Convert WGS -> UTM.
+            lats = np.array([float(node.lat) for node in way.nodes])
+            lons = np.array([float(node.lon) for node in way.nodes])
+            utm_coords = utm.from_latlon(lats,lons)
+            coords = list(zip(utm_coords[0], utm_coords[1]))
+
+            # Keep track of IDs of each node, so that in parse_nodes we can distinguish them from solitary nodes.
+            ids = [node.id for node in way.nodes]
+            self.way_node_ids.update(ids)              
+            
+            # Distinguish areas and non-areas (we use a single class for both cases).
+            if coords[0] == coords[-1]:
+                is_area = True
+            
+            way_to_store.id = way.id
+            way_to_store.is_area = is_area
+            way_to_store.nodes = way.nodes
+            way_to_store.tags = way.tags
+
+            if is_area:
+                way_to_store.line = geometry.Polygon(coords)
+            else:
+                way_to_store.line = geometry.LineString(coords)
+            
+            self.ways[way.id] = way_to_store
+
+
+    def combine_ways(self,ids):
+        ways = []
+        for id in ids:
+            ways.append(self.ways[id])
+        i = 0
+        while i < len(ways):
+            j = 0
+            while j < len(ways):
+                if i != j:
+                    if (ways[i].nodes[0].id == ways[j].nodes[0].id) and (not ways[i].is_area and not ways[j].is_area):
+                        ways[i].nodes.reverse()
+                    elif (ways[i].nodes[-1].id == ways[j].nodes[-1].id) and (not ways[i].is_area and not ways[j].is_area):
+                        ways[j].nodes.reverse()
+
+                    if ways[i].nodes[-1].id == ways[j].nodes[0].id and (not ways[i].is_area and not ways[j].is_area):
+                        
+                        combined_line = linemerge([ways[i].line, ways[j].line])
+
+                        new_way = Way()
+                        new_way.id = int(-10**15*random())
+                        while new_way.id in self.ways.keys():
+                            new_way.id = int(-10**15*random())
+                        new_way.nodes = ways[i].nodes + ways[j].nodes[1:] 
+                        new_way.tags = {**ways[i].tags, **ways[j].tags}
+                        new_way.line = combined_line
+  
+                        if new_way.nodes[0].id == new_way.nodes[-1].id:
+                            new_way.is_area = True
+                            new_way.line = geometry.Polygon(new_way.line.coords)
+                        self.ways[new_way.id] = new_way
+                        ways[j] = new_way
+                        ids[j] = new_way.id
+                        ids.pop(i)
+                        ways.pop(i)
+                        i -= 1
+                        j -= 1
+                        break
+                j += 1
+            i += 1
+        
+        return ids
+
+    def parse_rels(self):
+        """ 2. Needs self.ways DICTIONARY (key is id) with a self.is_area parameter, which is obtained from parse_ways.
+            Use relations to alter ways - combine neighbor ways, add tags...
+        """
+
+        for rel in self.osm_rels_data.relations:
+            if len(rel.members) <= MAX_REL_MEMBERS:   # A lot of members is very likely some relation we are not interested in.
+                inner_ids = []
+                outer_ids = []
+                keys = self.ways.keys()
+
+                # Separate inner and outer ways of relation.
+                for member in rel.members:
+                    if member._type_value == "way":
+                        if int(member.ref) in keys:
+                            if member.role == "outer":
+                                outer_ids.append(int(member.ref))
+                            else:
+                                inner_ids.append(int(member.ref))
+
+                # If two ways are "connected" (they share a node), combine them into one.
+                outer_ids = self.combine_ways(outer_ids)
+
+                for id in outer_ids:
+                    way = self.ways[id]
+
+                    # We do not make holes right now. E.g. if a building has a courtyard, we still cannot get there with a robot...
+                    #if way.is_area:  # If area than make holes in the way's polygon.
+                    #    way.line = geometry.Polygon(way.line.exterior.coords, [self.ways[inner_id].line.exterior.coords for inner_id in inner_ids if self.ways[inner_id].is_area])
+
+                    way.in_out = "outer"
+                    way.tags.update(rel.tags)
+                    self.ways[id] = way
+
+                for id in inner_ids:
+                    way = self.ways[id]
+                    way.in_out = "inner"
+                    # Inner ways do not share the relation tags. E.g. a building inside a field is not a field...
+                    # way.tags.update(rel.tags)
+                    self.ways[id] = way
+            else:
+                rospy.loginfo("relation with {} members not used: {}".format(len(rel.members), rel.tags))
+
+
+    def parse_nodes(self):
+        """ Convert solitary nodes (not part of a way) to barrier areas. """
+
+        for node in self.osm_nodes_data.nodes:
+            if not node.id in self.way_node_ids:
+                # Check if node is a obstacle.
+                if any(key in self.OBSTACLE_TAGS and (node.tags[key] in self.OBSTACLE_TAGS[key] or ('*' in self.OBSTACLE_TAGS[key] and not node.tags[key]  in self.NOT_OBSTACLE_TAGS.get(key,[]))) for key in node.tags):
+                    obstacle = Way()
+                    obstacle.id = node.id
+                    obstacle.is_area = True
+                    obstacle.tags = node.tags
+
+                    coords = utm.from_latlon(float(node.lat),float(node.lon))
+                    point = geometry.Point([coords[0], coords[1]])
+                    polygon = self.point_to_polygon(point,OBSTACLE_RADIUS)
+                    obstacle.line = polygon
+
+                    self.barriers.add(obstacle)
+
+    def point_to_polygon(self, point, r):
+        """ Convert a node (= a point) to a circle area, with a given radius."""
+
+        polygon = point.buffer(r)
+        return polygon
+
+    def line_to_polygon(self, way, width=4):
+        """ The width of the buffer should depend on,
+            the type of way (river x fence, highway x path)... """
+        polygon = way.line.buffer(width/2)
+        way.line = polygon
+        way.is_area = True
+        return way
+
+    
+    def separate_ways(self):
+        """ Separate ways (dict) into roads, footways and barriers (lists). """
+
+        for way in self.ways.values():
+            if way.is_road():
+                way = self.line_to_polygon(way,width=7)
+                self.roads.add(way)
+            
+            elif way.is_footway():
+                way = self.line_to_polygon(way,width=3)
+                self.footways.add(way)
+
+            elif way.is_barrier(self.BARRIER_TAGS, self.NOT_BARRIER_TAGS, self.ANTI_BARRIER_TAGS):
+                if not way.is_area:
+                    way = self.line_to_polygon(way,width=4)
+                self.barriers.add(way)
+
+    def sets_to_lists(self):
+        self.roads_list     = list(self.roads)
+        self.footways_list  = list(self.footways)
+        self.barriers_list  = list(self.barriers)
+
+    def run(self):
+        """ Run to get the complete graph search. """
+        rospy.loginfo("Running analysis.")
+        self.parse_ways()
+        self.parse_rels()
+        if self.osm_nodes_data:
+            self.parse_nodes()
+        self.separate_ways()
+        self.sets_to_lists()
+    
+    def run_queries(self):
+        rospy.loginfo("Running 1/3 OSM query.")
+        way_query = self.get_way_query()
+        osm_ways_data = self.api.query(way_query)
+        self.way_query = way_query
+        self.osm_ways_data = osm_ways_data
+
+        rospy.loginfo("Running 2/3 OSM query.")
+        rel_query = self.get_rel_query()
+        osm_rels_data = self.api.query(rel_query)
+        self.rel_query = rel_query
+        self.osm_rels_data = osm_rels_data
+
+        tries = 1
+        while tries < 4:
+            rospy.loginfo("Running 3/3 OSM query.")
+            try:  
+                node_query = self.get_node_query()  # Query sometimes times out...
+                osm_nodes_data = self.api.query(node_query)
+                self.node_query = node_query
+                self.osm_nodes_data = osm_nodes_data
+                break
+            except Exception as e:
+                break_time = 5
+                rospy.loginfo(e)
+                rospy.loginfo("--------------\nQuery failed.\nRerunning the query after {} s.".format(break_time))
+                time.sleep(break_time)
+                tries += 1
+
+        rospy.loginfo("Queries finished.")
+
+    def run_standalone(self):
+        rospy.loginfo("Running path analysis.")
+        self.run_queries()
+        self.run()
+        rospy.loginfo("Finished path analysis.")
+
+class OsmToPcd:
+    def __init__(self):
+        self.waypoints_fn = None
+        self.sub_waypoints_fn = rospy.Subscriber("waypoints_fn", String, self.handle_waypoints_fn, queue_size=10)
+        
+    def handle_waypoints_fn(self, msg):
+        self.waypoints_fn = msg.data
+
+    def extract_objects(self, path_analysis):
+        self.roads    =  np.array(list(path_analysis.roads))
+        self.footways =  np.array(list(path_analysis.footways))
+        self.untraversables =  np.array(list(path_analysis.barriers))
+
+    def publish_pcd(self):
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
+        self.odom_gps_trans = None
+
+        self.tfBuffer2 = tf2_ros.Buffer()
+        self.listener_odom_base_link = tf2_ros.TransformListener(self.tfBuffer2)
+        self.odom_base_link_trans = None
+
+        rate = rospy.Rate(10)
+
+        while (not self.odom_gps_trans) or (not self.odom_base_link_trans):
+            try:
+                self.odom_gps_trans = self.tfBuffer.lookup_transform(
+                    'odom', 'gps', rospy.Time())
+                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                    'odom', 'base_link', rospy.Time())
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                rate.sleep()
+                continue
+        
+        self.untraversables_points = None
+
+        """ Publish osm objects as pcd. """
+        self.sub_fix = rospy.Subscriber(
+            "fix", NavSatFix, self.main_cycle, queue_size=10)
+
+        self.sub_azimuth = rospy.Subscriber(
+            "mag_azimuth", Float64, self.update_azimuth, queue_size=10)
+        self.azimuth = 0.
+
+        self.pub_roads = rospy.Publisher('osm_roads', PointCloud2, queue_size=10)
+        self.roads_msg = PointCloud2()
+
+        self.pub_untraversable = rospy.Publisher('osm_untraversable', PointCloud2, queue_size=10)
+        self.untraversable_msg = PointCloud2()
+        
+        rospy.loginfo("Transformations obtained.")
+        rospy.spin()
+    
+    def update_azimuth(self, msg):
+        self.azimuth = msg.data
+
+    def get_utm_odom_rot(self):
+        """ Get angle by how much to rotate utm frame to align with odom frame, resp. rotation of odom frame in utm frame. """
+        q1 = quaternion_from_euler(0, 0, deg2rad(
+            self.azimuth)-(3./2.)*pi)   # how much to rotate utm frame to be aligned with base_link frame
+        q2 = quaternion_inverse([0,
+                                 0,
+                                 self.odom_base_link_trans.transform.rotation.z,
+                                 self.odom_base_link_trans.transform.rotation.w])    # how much to rotate base link frame to be aligned with odom frame
+
+        # how much to rotate utm frame to be aligned with odom frame
+        q = quaternion_multiply(q2, q1)
+        return q
+
+    def odom_to_utm_rotate(self, arr):
+        utm_to_odom_q = self.get_utm_odom_rot()
+        odom_to_utm_q = quaternion_inverse(utm_to_odom_q)
+        odom_to_utm_angle = euler_from_quaternion(odom_to_utm_q)[2]
+        x_rot = arr[:, 0]*cos(odom_to_utm_angle) - \
+            arr[:, 1]*sin(odom_to_utm_angle)
+        y_rot = arr[:, 0]*sin(odom_to_utm_angle) + \
+            arr[:, 1]*cos(odom_to_utm_angle)
+        return np.array([x_rot, y_rot]).T
+
+    def main_cycle(self, msg):
+
+        if self.odom_gps_trans and self.odom_base_link_trans:
+            try:
+                self.odom_gps_trans = self.tfBuffer.lookup_transform(
+                    'odom', 'gps', rospy.Time())
+            except:
+                pass
+            try:
+                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                    'odom', 'base_link', rospy.Time())
+            except:
+                pass
+
+            self.gps_utm = utm.from_latlon(msg.latitude, msg.longitude)
+
+            if self.untraversables_points is None:
+                self.untraversables_points = np.array([]).reshape((0,2))
+                for untraversable in self.untraversables:
+                    points = untraversable.to_pcd_points()
+                    self.untraversables_points = np.concatenate([
+                        self.untraversables_points,
+                        points
+                    ])
+
+            # utm is not an actual tf trame, just an imaginary frame
+            self.gps_to_target_utm_frame = self.untraversables_points - \
+                np.array([self.gps_utm[0], self.gps_utm[1]])
+            self.gps_to_target_odom_frame = self.odom_to_utm_rotate(
+                self.gps_to_target_utm_frame)
+
+            self.untraversables_pcd = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
+                self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
+
+            self.set_pcd_msg()
+            self.pub_untraversable.publish(self.untraversable_msg)
+            #pc = ros_numpy.numpify(self.pcd_msg).ravel()
+            # rospy.logwarn(pc)
+        else:
+            self.gps_utm = utm.from_latlon(msg.latitude, msg.longitude)
+            rospy.logwarn_once(
+                "TF(odom,gps) or TF(odom,base_link) is missing.")
+
+    def get_pose(self, point):
+        x = point[0]
+        y = point[1]
+
+        point = Point()
+        quat = Quaternion()
+        pose_ob = Pose()
+        point.x = x
+        point.y = y
+        # set height equal to base_link, so that it is effectively ignored by path follower
+        point.z = self.odom_base_link_trans.transform.translation.z
+        quat.x = 0.
+        quat.y = 0.
+        quat.z = 0.
+        quat.w = 1.
+        pose_ob.position = point
+        pose_ob.orientation = quat
+        return pose_ob
+
+    def get_pose_stamped(self, point):
+        pose = self.get_pose(point)
+        pose_stamped = PoseStamped()
+        pose_stamped.pose = pose
+        return pose_stamped
+
+    def set_pcd_msg(self):
+
+        self.pcd_data = np.zeros(len(self.untraversables_pcd), dtype=[
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32)])
+
+        self.pcd_data['x'] = self.untraversables_pcd[:, 0]
+        self.pcd_data['y'] = self.untraversables_pcd[:, 1]
+        self.pcd_data['z'] = np.zeros((self.untraversables_pcd[:, 1].shape))
+
+        self.untraversable_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "odom"
+
+        self.untraversable_msg.header = header
+
+
+def main():
+    rospy.logwarn("starting running")
+    rospy.init_node('osm_to_pcd')
+    osm_to_pcd = OsmToPcd()
+    rate = rospy.Rate(20)
+
+    while osm_to_pcd.waypoints_fn is None:
+        rospy.logwarn("waiting for waypoints fn")
+        rate.sleep()
+
+    path_analysis = PathAnalysis(osm_to_pcd.waypoints_fn)
+    path_analysis.run_standalone()
+
+    # Extract variables.
+    osm_to_pcd.extract_objects(path_analysis)
+    osm_to_pcd.publish_pcd()
+    
+
+if __name__ == '__main__':
+    main()

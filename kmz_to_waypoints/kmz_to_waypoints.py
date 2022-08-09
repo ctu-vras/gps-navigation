@@ -48,7 +48,7 @@ class KmzParser:
         self.visualize()
 
 if __name__ == "__main__":
-    kmz_fn = "/home/adam/cras/kmz_to_waypoints/001_p.kmz"
+    kmz_fn = "/home/robot/0804_gps/gps-navigation/kmz_to_waypoints/001_p(1).kmz"
     kml_fn = "doc.kml"
     parser = KmzParser(kml_fn = kml_fn, kmz_fn = kmz_fn)
     parser.run()

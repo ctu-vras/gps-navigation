@@ -31,12 +31,25 @@ def gpx_to_waypoints(waypoints_density=0.1, gpx_file="coords.gpx", waypoints_fil
 
     waypoints.append(c2)    # The final point has to be added manually.
 
-    np.savetxt(waypoints_file, waypoints, delimiter=',')
+    if waypoints_file[-3:] == "gpx":
+        save_path_as_gpx(waypoints_file, waypoints)
+    else:
+        np.savetxt(waypoints_file, waypoints, delimiter=',')
 
     print("Generated {} waypoints from {} coordinate pairs.".format(
         len(waypoints), len(coords)))
 
+def save_path_as_gpx(fn,waypoints):
+    gpx = gpxpy.gpx.GPX()
+
+    for point in waypoints:
+        gpx.waypoints.append(gpxpy.gpx.GPXWaypoint(point[0], point[1]))
+
+    xml = gpx.to_xml()
+    with open(fn, "w") as f:
+        f.write(xml)
+        f.close()
 
 if __name__ == "__main__":
-    gpx_to_waypoints(waypoints_density=0.1, gpx_file="test.gpx",
-                     waypoints_file="waypoints.csv", circular=True)
+    gpx_to_waypoints(waypoints_density=0.1, gpx_file="/home/robot/0804_gps/src/gps-navigation/gps_to_path/data/kn.gpx",
+                     waypoints_file="/home/robot/0804_gps/src/gps-navigation/gps_to_path/data/waypoints.gpx", circular=True)

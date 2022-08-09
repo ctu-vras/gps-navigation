@@ -54,7 +54,7 @@ class LlhToFix():
         self.last_llh_msg_time = 0
         self.sound_period = sound_period
         self.sound_string = "Fix covariance is {}"
-	self.no_fix_msg_period = 1
+        self.no_fix_msg_period = 1
 
     def set_fix_msg(self):
         header = std_msgs.msg.Header()

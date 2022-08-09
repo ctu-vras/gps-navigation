@@ -8,6 +8,8 @@ from stamped_msgs.msg import Float64, Float64MultiArray
 from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose
 from gpx_to_waypoints import gpx_to_waypoints
 from gps_to_path.msg import Wgs, WgsArray
+import gpxpy
+import gpxpy.gpx
 import std_msgs.msg
 from geodesy import utm
 from math import sqrt, sin, cos, pi
@@ -27,7 +29,11 @@ class GpsToPath():
         self.start_from_nearest_point = start_from_nearest_point
         self.found_start = False
 
-        self.waypoints = genfromtxt(waypoints_fn, delimiter=",")
+        #self.waypoints = genfromtxt(waypoints_fn, delimiter=",")
+        gpx_f = open(waypoints_fn, 'r')
+        gpx_object = gpxpy.parse(gpx_f)
+        self.waypoints = np.array([[point.latitude,point.longitude] for point in gpx_object.waypoints])
+
         self.waypoints_utm = [utm.fromLatLong(
             self.waypoints[i, 0], self.waypoints[i, 1]) for i in range(len(self.waypoints))]
         self.waypoints_utm = np.array(
@@ -254,7 +260,7 @@ def main():
     start_from_nearest_point = rospy.get_param(
         '~start_from_nearest_point', True)
     path_points_density = rospy.get_param('~path_points_density', 0.1)
-    waypoints_fn = os.path.dirname(gpx_file)+"/waypoints.csv"
+    waypoints_fn = os.path.dirname(gpx_file)+"/waypoints.gpx"
 
     gpx_to_waypoints(waypoints_density=path_points_density,
                      gpx_file=gpx_file, waypoints_file=waypoints_fn, circular=circular)

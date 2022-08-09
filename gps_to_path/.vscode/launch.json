@@ -1,0 +1,10 @@
+{
+    "version": "0.2.0",
+    "configurations": [{
+        "name": "ROS: Launch",
+        "type": "ros",
+        "request": "launch",
+        "target": "/home/robot/0804_gps/src/gps-navigation/gps_to_path/launch/fake.launch"
+    }],
+    "compounds": []
+}

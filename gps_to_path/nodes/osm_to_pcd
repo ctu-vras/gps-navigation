@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+from __future__ import division
 import rospy
 import overpy
 import shapely.geometry as geometry
@@ -223,7 +223,10 @@ class PathAnalysis:
                 way_to_store.line = geometry.LineString(coords)
             
             self.ways[way.id] = way_to_store
-
+    def merge_dicts(a, b):
+        m = a.copy()
+        m.update(b)
+        return m
 
     def combine_ways(self,ids):
         ways = []
@@ -248,7 +251,7 @@ class PathAnalysis:
                         while new_way.id in self.ways.keys():
                             new_way.id = int(-10**15*random())
                         new_way.nodes = ways[i].nodes + ways[j].nodes[1:] 
-                        new_way.tags = {**ways[i].tags, **ways[j].tags}
+                        new_way.tags = self.merge_dicts(ways[i].tags, ways[j].tags)
                         new_way.line = combined_line
   
                         if new_way.nodes[0].id == new_way.nodes[-1].id:
@@ -307,9 +310,6 @@ class PathAnalysis:
                     # Inner ways do not share the relation tags. E.g. a building inside a field is not a field...
                     # way.tags.update(rel.tags)
                     self.ways[id] = way
-            else:
-                rospy.loginfo("relation with {} members not used: {}".format(len(rel.members), rel.tags))
-
 
     def parse_nodes(self):
         """ Convert solitary nodes (not part of a way) to barrier areas. """
@@ -483,7 +483,7 @@ class OsmToPcd:
                             'footways':[0,0.9,0]
                             }
 
-        self.trav = {   'roads':4,
+        self.trav = {   'roads':5,
                         'untraversables':4,
                         'footways':1
                         }

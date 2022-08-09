@@ -8,6 +8,7 @@ from stamped_msgs.msg import Float64, Float64MultiArray
 from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose
 from gpx_to_waypoints import gpx_to_waypoints
 from gps_to_path.msg import Wgs, WgsArray
+from std_msgs.msg import String
 import gpxpy
 import gpxpy.gpx
 import std_msgs.msg
@@ -264,6 +265,11 @@ def main():
 
     gpx_to_waypoints(waypoints_density=path_points_density,
                      gpx_file=gpx_file, waypoints_file=waypoints_fn, circular=circular)
+
+    pub_waypoints_fn = rospy.Publisher('waypoints_fn', String, queue_size=10, latch=True)
+    waypoints_fn_msg = String()
+    waypoints_fn_msg.data = waypoints_fn
+    pub_waypoints_fn.publish(waypoints_fn_msg)
 
     node = GpsToPath(num_published_path_points, waypoints_fn,
                      reversed_path, repeat, start_from_nearest_point)

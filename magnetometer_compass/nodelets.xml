@@ -1,0 +1,6 @@
+<library path="lib/libmagnetometer_compass_nodelet">
+    <class name="magnetometer_compass/Compass" type="cras::MagnetometerCompassNodelet"
+           base_class_type="nodelet::Nodelet">
+        <description>Compass based on a 3-axis magnetometer and odometry pose readings.</description>
+    </class>
+</library>

@@ -3,6 +3,9 @@ Header header
 # The represented azimuth angle (angular difference between a given direction and north/east)
 float64 azimuth
 
+# Variance of the measurement (i.e. standard deviation squared)
+float64 variance
+
 # Unit of measurement:
 #  RAD: radians, default
 #  DEG: degrees (not suggested by REP-103, but are more human-friendly)

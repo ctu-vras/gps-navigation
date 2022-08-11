@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import time
 
 import rospy
 from std_msgs.msg import String
@@ -7,7 +8,7 @@ from sensor_msgs.msg import MagneticField
 
 
 class MagShiftCalc:
-    def __init__(self, measuring_time):
+    def __init__(self):
 
         self.x_min = 10000
         self.y_min = 10000
@@ -27,12 +28,25 @@ class MagShiftCalc:
         self.frame_id = "imu"
         self.started = False
 
-        self.measuring_time = measuring_time
+        self.measuring_time = rospy.Duration(rospy.get_param('~measuring_time', 30))
+        self.load_from_params = rospy.get_param("~load_from_params", False)
+        self.load_from_params = self.load_from_params and rospy.has_param("magnetometer_bias_x")
+        self.load_from_params = self.load_from_params and rospy.has_param("magnetometer_bias_y")
+        self.load_from_params = self.load_from_params and rospy.has_param("magnetometer_bias_z")
 
         self.pub = rospy.Publisher('mag_shift', MagShift, latch=True, queue_size=1)  # deprecated
         self.pub2 = rospy.Publisher('imu/mag_bias', MagneticField, latch=True, queue_size=1)
         self.speak_pub = rospy.Publisher('speak/warn', String, queue_size=1)
-        self.sub = rospy.Subscriber('imu/mag', MagneticField, self.mag_callback)
+
+        if not self.load_from_params:
+            self.sub = rospy.Subscriber('imu/mag', MagneticField, self.mag_callback)
+        else:
+            self.x_mean = float(rospy.get_param("magnetometer_bias_x"))
+            self.y_mean = float(rospy.get_param("magnetometer_bias_y"))
+            self.z_mean = float(rospy.get_param("magnetometer_bias_z"))
+            time.sleep(0.01)  # give the publishers some time to get set up
+            self.pub_msg()
+            rospy.logwarn("Magnetometer calibration loaded from parameters.")
 
     def speak(self, message):
         msg = String()
@@ -97,15 +111,17 @@ class MagShiftCalc:
         self.pub.publish(self.msg)
         self.pub2.publish(self.msg2)
 
+        rospy.set_param("magnetometer_bias_x", self.x_mean)
+        rospy.set_param("magnetometer_bias_y", self.y_mean)
+        rospy.set_param("magnetometer_bias_z", self.z_mean)
+
     def run(self):
         rospy.spin()
 
 
 def main():
     rospy.init_node('mag_shift')
-
-    measuring_time = rospy.Duration(rospy.get_param('~measuring_time', 30))
-    node = MagShiftCalc(measuring_time)
+    node = MagShiftCalc()
     node.run()
 
 

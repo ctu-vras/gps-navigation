@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Czech Technical University in Prague
+
+"""
+This node imposes a minimum limit on the covariance of GPS measurements. This can be used to limit jitter of a fused
+odometry caused by the very accurate, but still jumping measurements.
+"""
+
+import rospy
+from sensor_msgs.msg import NavSatFix
+
+rospy.init_node("limit_fix_accuracy")
+
+min_lat_cov = rospy.get_param("~min_lat_cov", 1e-3)
+min_lon_cov = rospy.get_param("~min_lon_cov", 1e-3)
+min_alt_cov = rospy.get_param("~min_alt_cov", 1e-3)
+
+pub = rospy.Publisher("gps/fix_limited_accuracy", NavSatFix, queue_size=10)
+
+
+def cb(msg):
+    assert isinstance(msg, NavSatFix)
+    cov = list(msg.position_covariance)
+    cov[0] = max(cov[0], min_lat_cov)
+    cov[4] = max(cov[4], min_lon_cov)
+    cov[8] = max(cov[8], min_alt_cov)
+    msg.position_covariance = tuple(cov)
+
+    pub.publish(msg)
+
+
+sub = rospy.Subscriber("gps/fix", NavSatFix, cb, queue_size=10)
+
+rospy.spin()

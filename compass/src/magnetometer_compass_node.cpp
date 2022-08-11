@@ -13,7 +13,7 @@
 #include <nodelet/detail/callback_queue.h>
 #include <nodelet/detail/callback_queue_manager.h>
 
-#include <magnetometer_compass/compass_nodelet.h>
+#include <compass/magnetometer_compass_nodelet.h>
 
 
 int main(int argc, char** argv)
@@ -29,7 +29,7 @@ int main(int argc, char** argv)
   nodelet::detail::CallbackQueueManager manager(pnh.param("num_worker_threads", 1));
 
   // Declaration order of these variables is important to make sure they can be properly stopped and destroyed.
-  auto nodelet = boost::make_shared<cras::MagnetometerCompassNodelet>();
+  auto nodelet = boost::make_shared<compass::MagnetometerCompassNodelet>();
   auto stQueue = boost::make_shared<nodelet::detail::CallbackQueue>(&manager, nodelet);
   auto mtQueue = boost::make_shared<nodelet::detail::CallbackQueue>(&manager, nodelet);
   manager.addQueue(stQueue, false);

@@ -15,7 +15,7 @@
 #include <GeographicLib/UTMUPS.hpp>
 
 #include <angles/angles.h>
-#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/QuaternionStamped.h>
 #include <imu_transformer/tf2_sensor_msgs.h>
 #include <message_filters/subscriber.h>
@@ -34,13 +34,14 @@
 
 #include <compass_msgs/Azimuth.h>
 
-#include <magnetometer_compass/compass_nodelet.h>
+#include <compass/magnetometer_compass_nodelet.h>
+#include <compass/transform_imu.h>
 
 #define WMM2010 "wmm2010"
 #define WMM2015 "wmm2015v2"
 #define WMM2020 "wmm2020"
 
-namespace cras
+namespace compass
 {
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Imu, sensor_msgs::MagneticField> SyncPolicy;
@@ -67,7 +68,7 @@ struct AzimuthPublishersConfigForOrientation
   geometry_msgs::QuaternionStamped quatMsg;
   compass_msgs::Azimuth azimuthMsg;
   sensor_msgs::Imu imuMsg;
-  geometry_msgs::PoseStamped poseMsg;
+  geometry_msgs::PoseWithCovarianceStamped poseMsg;
 
   tf2::Matrix3x3 rotMatrix;
   double roll {}, pitch {}, yaw {};
@@ -76,7 +77,8 @@ struct AzimuthPublishersConfigForOrientation
     const std::string& topicPrefix, uint8_t reference, uint8_t orientation,
     const std::string& referenceStr, const std::string& orientationStr);
 
-  void publishAzimuths(const tf2::Quaternion& azimuth, const ros::Time& stamp);
+  void publishAzimuths(const tf2::Quaternion& azimuth, double variance, const ros::Time& stamp,
+    const sensor_msgs::Imu& imuInBody);
 };
 
 struct AzimuthPublishersConfig
@@ -88,12 +90,14 @@ struct AzimuthPublishersConfig
 
   bool publish {false};
 
-  tf2::Quaternion nedToEnu {-M_SQRT2/2, -M_SQRT2/2, 0, 0};
+  const tf2::Quaternion nedToEnu {-M_SQRT2/2, -M_SQRT2/2, 0, 0};
+  const tf2::Quaternion enuToNed {this->nedToEnu.inverse()};
   
   void init(ros::NodeHandle& nh, ros::NodeHandle& pnh, const std::string& frameId,
     const std::string& paramPrefix, const std::string& topicPrefix, uint8_t reference, const std::string& referenceStr);
 
-  void publishAzimuths(const tf2::Quaternion& nedAzimuth, const ros::Time& stamp);
+  void publishAzimuths(const tf2::Quaternion& nedAzimuth, double variance, const ros::Time& stamp,
+    const sensor_msgs::Imu& imuInBody);
 };
 
 struct MagnetometerCompassNodeletPrivate
@@ -130,18 +134,29 @@ void MagnetometerCompassNodelet::onInit()
   this->frame = pnh.param("frame", std::string("base_link"));
   this->magAzimuthLowPass = pnh.param("low_pass_ratio", this->magAzimuthLowPass);
   this->magneticModelsPath = pnh.param(
-    "magnetic_models_path", ros::package::getPath("magnetometer_compass") + "/data/magnetic");
+    "magnetic_models_path", ros::package::getPath("compass") + "/data/magnetic");
   this->forcedMagneticModelName = pnh.param("magnetic_model", std::string());
+  
+  this->variance = pnh.param("initial_variance", this->variance);
 
   if (pnh.hasParam("initial_mag_bias_x") || pnh.hasParam("initial_mag_bias_y") || pnh.hasParam("initial_mag_bias_z"))
   {
     sensor_msgs::MagneticField msg;
-    msg.magnetic_field.x = pnh.param("initial_mag_bias_x", this->lastMagBias.x);
-    msg.magnetic_field.y = pnh.param("initial_mag_bias_y", this->lastMagBias.y);
-    msg.magnetic_field.z = pnh.param("initial_mag_bias_z", this->lastMagBias.z);
+    msg.magnetic_field.x = pnh.param("initial_mag_bias_x", this->lastMagBias.x());
+    msg.magnetic_field.y = pnh.param("initial_mag_bias_y", this->lastMagBias.y());
+    msg.magnetic_field.z = pnh.param("initial_mag_bias_z", this->lastMagBias.z());
 
-    ROS_INFO("Initial magnetometer bias is %0.3f %0.3f %0.3f",
-      msg.magnetic_field.x, msg.magnetic_field.y, msg.magnetic_field.z);
+    const auto scalingMatrix = pnh.param("initial_mag_scaling_matrix", std::vector<double>({}));
+    if (scalingMatrix.size() == 9)
+      std::copy(scalingMatrix.begin(), scalingMatrix.end(), msg.magnetic_field_covariance.begin());
+    else if (!scalingMatrix.empty())
+      ROS_ERROR("Parameter initial_mag_scaling_matrix has to have either 0 or 9 values.");
+
+    Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > covMatrix(msg.magnetic_field_covariance.data());
+    const auto hasScale = covMatrix.cwiseAbs().sum() > 1e-10;
+    
+    ROS_INFO("Initial magnetometer bias is %0.3f %0.3f %0.3f %s scaling factor",
+      msg.magnetic_field.x, msg.magnetic_field.y, msg.magnetic_field.z, hasScale ? "with" : "without");
     
     this->magBiasCb(msg);
   }
@@ -294,16 +309,20 @@ void AzimuthPublishersConfig::init(ros::NodeHandle& nh, ros::NodeHandle& pnh, co
 
 void MagnetometerCompassNodelet::imuMagCb(const sensor_msgs::Imu& imu, const sensor_msgs::MagneticField& mag)
 {
+  this->lastImu = imu;
+  this->lastMag = mag;
+
   if (!this->hasMagBias)
   {
     ROS_ERROR_DELAYED_THROTTLE(10.0, "Magnetometer bias not available, compass cannot work. Waiting...");
     return;
   }
 
-  sensor_msgs::Imu imuInBody;
   try
   {
-    imuInBody = this->tf.transform(imu, this->frame, ros::Duration(0.1));
+    // do not use tf2::doTransform(Imu), it's buggy!
+    auto transform = this->tf.lookupTransform(this->frame, imu.header.frame_id, imu.header.stamp, ros::Duration(0.1));
+    compass::doTransform(imu, this->lastImuInBody, transform);
   }
   catch (const tf2::TransformException& e)
   {
@@ -311,18 +330,19 @@ void MagnetometerCompassNodelet::imuMagCb(const sensor_msgs::Imu& imu, const sen
     return;
   }
 
+  tf2::Vector3 field;
+  tf2::convert(mag.magnetic_field, field);
+  field = this->lastMagScale * (field - this->lastMagBias);
+  
   sensor_msgs::MagneticField magUnbiased = mag;
-  magUnbiased.magnetic_field.x -= this->lastMagBias.x;
-  magUnbiased.magnetic_field.y -= this->lastMagBias.y;
-  magUnbiased.magnetic_field.z -= this->lastMagBias.z;
+  tf2::convert(field, magUnbiased.magnetic_field);
   
   if (this->data->publishMagUnbiased)
     this->data->magUnbiasedPub.publish(magUnbiased);
   
-  sensor_msgs::MagneticField magInBody;
   try
   {
-    magInBody = this->tf.transform(magUnbiased, this->frame, ros::Duration(0.1));
+    this->lastMagUnbiasedInBody = this->tf.transform(magUnbiased, this->frame, ros::Duration(0.1));
   }
   catch (const tf2::TransformException& e)
   {
@@ -330,25 +350,37 @@ void MagnetometerCompassNodelet::imuMagCb(const sensor_msgs::Imu& imu, const sen
       this->frame.c_str(), e.what());
     return;
   }
-  
+
+  // Compensate attitude in the magnetometer measurements
+
   tf2::Quaternion rot;
-  tf2::convert(imuInBody.orientation, rot);
+  tf2::convert(this->lastImuInBody.orientation, rot);
   tf2::Matrix3x3 rotMatrix(rot);
   double roll, pitch, yaw;
   rotMatrix.getRPY(roll, pitch, yaw);
 
-  // compensate tilt, no need to evaluate z component
+#if 0
+  rot.setRPY(roll, pitch, 0);
+  tf2::Vector3 magNoAttitude;
+  tf2::convert(this->lastMagUnbiasedInBody.magnetic_field, magNoAttitude);
+  magNoAttitude = tf2::quatRotate(rot, magNoAttitude);
+  
+  const auto magNorth = magNoAttitude.x();
+  const auto magEast = magNoAttitude.y();
+#else
+  // Copied from INSO, not sure where do the numbers come from
   const auto magNorth =
-    magInBody.magnetic_field.x * cos(pitch) +
-    magInBody.magnetic_field.y * sin(pitch) * sin(roll) +
-    magInBody.magnetic_field.z * sin(pitch) * cos(roll);
+    this->lastMagUnbiasedInBody.magnetic_field.x * cos(pitch) +
+    this->lastMagUnbiasedInBody.magnetic_field.y * sin(pitch) * sin(roll) +
+    this->lastMagUnbiasedInBody.magnetic_field.z * sin(pitch) * cos(roll);
 
   const auto magEast =
-    magInBody.magnetic_field.y * cos(roll) -
-    magInBody.magnetic_field.z * sin(roll);
+    this->lastMagUnbiasedInBody.magnetic_field.y * cos(roll) -
+    this->lastMagUnbiasedInBody.magnetic_field.z * sin(roll);
+#endif
 
-  // This formula gives north-referenced clockwise-increasing azimuthMsg
-  const auto magAzimuthNow = -atan2(magEast, magNorth);
+  // This formula gives north-referenced clockwise-increasing azimuth
+  const auto magAzimuthNow = atan2(magEast, magNorth);
   tf2::Quaternion magAzimuthNowQuat;
   magAzimuthNowQuat.setRPY(0, 0, magAzimuthNow);
   
@@ -356,13 +388,15 @@ void MagnetometerCompassNodelet::imuMagCb(const sensor_msgs::Imu& imu, const sen
     this->magAzimuth = magAzimuthNowQuat;
   else  // low-pass filter
     this->magAzimuth = this->magAzimuth.slerp(magAzimuthNowQuat, 1 - this->magAzimuthLowPass);
-  this->data->magPublishers.publishAzimuths(this->magAzimuth, mag.header.stamp);
+  this->updateVariance();
+  
+  this->data->magPublishers.publishAzimuths(this->magAzimuth, this->variance, mag.header.stamp, this->lastImuInBody);
   
   if ((this->data->truePublishers.publish || this->data->utmPublishers.publish) &&
     this->lastMagneticDeclination.w() != 0.0)
   {
     const auto trueAzimuth = this->lastMagneticDeclination * this->magAzimuth;
-    this->data->truePublishers.publishAzimuths(trueAzimuth, mag.header.stamp);
+    this->data->truePublishers.publishAzimuths(trueAzimuth, this->variance, mag.header.stamp, this->lastImuInBody);
     
     if (this->data->utmPublishers.publish && this->lastFix.header.stamp != ros::Time(0))
     {
@@ -377,34 +411,48 @@ void MagnetometerCompassNodelet::imuMagCb(const sensor_msgs::Imu& imu, const sen
       utmGridConvergenceQuat.setRPY(0, 0, utmGridConvergence);
       
       const auto utmHeading = utmGridConvergenceQuat * trueAzimuth;
-      this->data->utmPublishers.publishAzimuths(utmHeading, mag.header.stamp);
+      this->data->utmPublishers.publishAzimuths(utmHeading, this->variance, mag.header.stamp, this->lastImuInBody);
     }
   }
 }
 
-void AzimuthPublishersConfig::publishAzimuths(const tf2::Quaternion& nedAzimuth, const ros::Time& stamp)
+void AzimuthPublishersConfig::publishAzimuths(
+  const tf2::Quaternion& nedAzimuth, const double variance, const ros::Time& stamp, const sensor_msgs::Imu& imuInBody)
 {
   if (!this->publish)
     return;
 
   if (this->ned.publish)
-    this->ned.publishAzimuths(nedAzimuth, stamp);
+  {
+    auto imuNed = imuInBody;  // If IMU message should not be published, we fake it here with the ENU-referenced one
+    if (this->ned.publishImu)
+    {
+      geometry_msgs::TransformStamped tf;
+      tf.header.stamp = imuInBody.header.stamp;
+      tf.header.frame_id = imuInBody.header.frame_id + "_ned";
+      // do not use tf2::doTransform(Imu), it's buggy!
+      tf2::convert(this->enuToNed, tf.transform.rotation);
+      compass::doTransform(imuInBody, imuNed, tf);
+    }
+    this->ned.publishAzimuths(nedAzimuth, variance, stamp, imuNed);
+  }
 
   if (this->enu.publish)
   {
     // Rotate to ENU
     auto enuAzimuth = this->nedToEnu * nedAzimuth;
     
-    // Cancel out all non-yaw parts of the rotation
+    // Cancel out all non-yaw parts of the quaterion
     this->enu.rotMatrix = static_cast<tf2::Matrix3x3>(enuAzimuth);
     this->enu.rotMatrix.getRPY(this->enu.roll, this->enu.pitch, this->enu.yaw);
     enuAzimuth.setRPY(0, 0, this->enu.yaw);
 
-    this->enu.publishAzimuths(enuAzimuth, stamp);
+    this->enu.publishAzimuths(enuAzimuth, variance, stamp, imuInBody);
   }
 }
 
-void AzimuthPublishersConfigForOrientation::publishAzimuths(const tf2::Quaternion& azimuth, const ros::Time& stamp)
+void AzimuthPublishersConfigForOrientation::publishAzimuths(
+  const tf2::Quaternion& azimuth, const double variance, const ros::Time& stamp, const sensor_msgs::Imu& imuInBody)
 {
   if (this->publishQuat || this->publishImu || this->publishPose)
   {
@@ -418,15 +466,37 @@ void AzimuthPublishersConfigForOrientation::publishAzimuths(const tf2::Quaternio
     
     if (this->publishImu)
     {
-      this->imuMsg.header.stamp = stamp;
-      this->imuMsg.orientation = this->quatMsg.quaternion;
+      // The IMU message comes in an arbitrarily-referenced frame, and we adjust its yaw to become georeferenced.
+      double azimuthYaw;
+      this->rotMatrix = static_cast<tf2::Matrix3x3>(azimuth);
+      this->rotMatrix.getRPY(this->roll, this->pitch, azimuthYaw);
+      
+      tf2::Quaternion imuRot;
+      tf2::convert(imuInBody.orientation, imuRot);
+      this->rotMatrix = static_cast<tf2::Matrix3x3>(imuRot);
+      this->rotMatrix.getRPY(this->roll, this->pitch, this->yaw);
+
+      tf2::Quaternion desiredRot;
+      desiredRot.setRPY(this->roll, this->pitch, azimuthYaw);
+      
+      const auto diffRot = desiredRot * imuRot.inverse();
+
+      geometry_msgs::TransformStamped tf;
+      tf.header = imuInBody.header;
+      // do not use tf2::doTransform(Imu), it's buggy!
+      tf2::convert(diffRot, tf.transform.rotation);
+      compass::doTransform(imuInBody, this->imuMsg, tf);
+      
+      this->imuMsg.orientation_covariance[8] = variance;
+      
       this->imuPub.publish(this->imuMsg);
     }
     
     if (this->publishPose)
     {
       this->poseMsg.header.stamp = stamp;
-      this->poseMsg.pose.orientation = this->quatMsg.quaternion;
+      this->poseMsg.pose.pose.orientation = this->quatMsg.quaternion;
+      this->poseMsg.pose.covariance[35] = variance;
       this->posePub.publish(this->poseMsg);
     }
   }
@@ -434,6 +504,8 @@ void AzimuthPublishersConfigForOrientation::publishAzimuths(const tf2::Quaternio
   if (this->publishDeg || this->publishRad)
   {
     this->azimuthMsg.header.stamp = stamp;
+    this->azimuthMsg.variance = variance;
+
     this->rotMatrix = static_cast<tf2::Matrix3x3>(azimuth);
     this->rotMatrix.getRPY(this->roll, this->pitch, this->yaw);
 
@@ -534,10 +606,19 @@ void MagnetometerCompassNodelet::fixCb(const sensor_msgs::NavSatFix& fix)
 
 void MagnetometerCompassNodelet::magBiasCb(const sensor_msgs::MagneticField& bias)
 {
-  this->lastMagBias = bias.magnetic_field;
+  tf2::convert(bias.magnetic_field, this->lastMagBias);
+  Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > covMatrix(bias.magnetic_field_covariance.data());
+  if (covMatrix.cwiseAbs().sum() > 1e-10)
+    this->lastMagScale.setFromOpenGLSubMatrix(covMatrix.transpose().data());
   this->hasMagBias = true;
 }
 
+void MagnetometerCompassNodelet::updateVariance()
+{
+  // TODO: measure consistency of IMU rotation and azimuth increase similar to
+  //  https://www.sciencedirect.com/science/article/pii/S2405959519302929
 }
 
-PLUGINLIB_EXPORT_CLASS(cras::MagnetometerCompassNodelet, nodelet::Nodelet)
+}
+
+PLUGINLIB_EXPORT_CLASS(compass::MagnetometerCompassNodelet, nodelet::Nodelet)

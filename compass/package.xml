@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>magnetometer_compass</name>
+  <name>compass</name>
   <version>1.0.0</version>
   <description>Compass based on a 3-axis magnetometer, attitude readings and possibly also GPS.</description>
 

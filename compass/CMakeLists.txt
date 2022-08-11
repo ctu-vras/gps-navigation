@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(magnetometer_compass)
+project(compass)
 
 find_package(catkin REQUIRED COMPONENTS
   angles
@@ -28,19 +28,19 @@ include_directories(
   ${GeographicLib_INCLUDE_DIRS}
 )
 
-add_library(${PROJECT_NAME}_nodelet src/compass_nodelet.cpp)
-add_dependencies(${PROJECT_NAME}_nodelet ${catkin_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME}_nodelet ${catkin_LIBRARIES} ${GeographicLib_LIBRARIES})
+add_library(magnetometer_compass_nodelet src/magnetometer_compass_nodelet.cpp)
+add_dependencies(magnetometer_compass_nodelet ${catkin_EXPORTED_TARGETS})
+target_link_libraries(magnetometer_compass_nodelet ${catkin_LIBRARIES} ${GeographicLib_LIBRARIES})
 
-add_executable(${PROJECT_NAME} src/compass_node.cpp)
-add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_nodelet ${catkin_LIBRARIES})
+add_executable(magnetometer_compass src/magnetometer_compass_node.cpp)
+add_dependencies(magnetometer_compass ${catkin_EXPORTED_TARGETS})
+target_link_libraries(magnetometer_compass magnetometer_compass_nodelet ${catkin_LIBRARIES})
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS magnetometer_compass
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(TARGETS ${PROJECT_NAME}_nodelet
+install(TARGETS magnetometer_compass_nodelet
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}

@@ -17,10 +17,11 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/MagneticField.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/buffer.h>
 
-namespace cras
+namespace compass
 {
 
 struct MagnetometerCompassNodeletPrivate;
@@ -63,7 +64,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `imu/data` (`sensor_msgs/Imu`): Output from an IMU or an orientation filtering algorithm. It should have valid
  *                                   contents of `orientation` and at least roll and pitch should be estimated as
  *                                   well as possible (relative to the gravity vector). These messages should come at
- *                                   the same rate as the magnetometer data (or faster).
+ *                                   the same rate as the magnetometer data (or faster). Make sure the orientation
+ *                                   is reported in ENU frame (use imu_transformer package to transform it from NED).
  * - `imu/mag` (`sensor_msgs/MagneticField`): 3-axis magnetometer measurements (bias not removed).
  * - `imu/mag_bias` (`sensor_msgs/MagneticField`): Bias of the magnetometer. This value will be subtracted from the
  *                                                 incoming magnetometer measurements (only the `magnetic_field` field
@@ -86,8 +88,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `compass/mag/ned/quat` (`geometry_msgs/QuaternionStamped`, enabled by param `~publish_mag_azimuth_ned_quat`, off by default):
  *     Magnetic azimuth in NED as a quaternion.
  * - `compass/mag/ned/imu` (`sensor_msgs/Imu`, enabled by param `~publish_mag_azimuth_ned_imu`, off by default):
- *     Magnetic azimuth in NED inside an IMU message (only `orientation` and `header` fields are valid).
- * - `compass/mag/ned/pose` (`geometry_msgs/PoseStamped`, enabled by param `~publish_mag_azimuth_ned_pose`, off by default):
+ *     The incoming IMU message rotated in yaw such that its frame becomes georeferenced towards magnetic NED frame.
+ * - `compass/mag/ned/pose` (`geometry_msgs/PoseWithCovarianceStamped`, enabled by param `~publish_mag_azimuth_ned_pose`, off by default):
  *     Magnetic azimuth in NED as a pose (translation will always be zero).
  * 
  * - `compass/mag/enu/deg` (`compass_msgs/Azimuth`, enabled by param `~publish_mag_azimuth_enu_deg`, off by default):
@@ -97,8 +99,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `compass/mag/enu/quat` (`geometry_msgs/QuaternionStamped`, enabled by param `~publish_mag_azimuth_enu_quat`, off by default):
  *     Magnetic azimuth in ENU as a quaternion.
  * - `compass/mag/enu/imu` (`sensor_msgs/Imu`, enabled by param `~publish_mag_azimuth_enu_imu`, off by default):
- *     Magnetic azimuth in ENU inside an IMU message (only `orientation` and `header` fields are valid).
- * - `compass/mag/enu/pose` (`geometry_msgs/PoseStamped`, enabled by param `~publish_mag_azimuth_enu_pose`, off by default):
+ *     The incoming IMU message rotated in yaw such that its frame becomes georeferenced towards magnetic ENU frame.
+ * - `compass/mag/enu/pose` (`geometry_msgs/PoseWithCovarianceStamped`, enabled by param `~publish_mag_azimuth_enu_pose`, off by default):
  *     Magnetic azimuth in ENU as a pose (translation will always be zero).
  * 
  * - `compass/true/ned/deg` (`compass_msgs/Azimuth`, enabled by param `~publish_true_azimuth_ned_deg`, off by default):
@@ -108,8 +110,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `compass/true/ned/quat` (`geometry_msgs/QuaternionStamped`, enabled by param `~publish_true_azimuth_ned_quat`, off by default):
  *     Geographic ("true") azimuth in NED as a quaternion.
  * - `compass/true/ned/imu` (`sensor_msgs/Imu`, enabled by param `~publish_true_azimuth_ned_imu`, off by default):
- *     Geographic ("true") azimuth in NED inside an IMU message (only `orientation` and `header` fields are valid).
- * - `compass/true/ned/pose` (`geometry_msgs/PoseStamped`, enabled by param `~publish_true_azimuth_ned_pose`, off by default):
+ *     The incoming IMU message rotated in yaw such that its frame becomes georeferenced towards geographic ("true") NED frame.
+ * - `compass/true/ned/pose` (`geometry_msgs/PoseWithCovarianceStamped`, enabled by param `~publish_true_azimuth_ned_pose`, off by default):
  *     Geographic ("true") azimuth in NED as a pose (translation will always be zero).
  * 
  * - `compass/true/enu/deg` (`compass_msgs/Azimuth`, enabled by param `~publish_true_azimuth_enu_deg`, off by default):
@@ -119,8 +121,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `compass/true/enu/quat` (`geometry_msgs/QuaternionStamped`, enabled by param `~publish_true_azimuth_enu_quat`, off by default):
  *     Geographic ("true") azimuth in ENU as a quaternion.
  * - `compass/true/enu/imu` (`sensor_msgs/Imu`, enabled by param `~publish_true_azimuth_enu_imu`, off by default):
- *     Geographic ("true") azimuth in ENU inside an IMU message (only `orientation` and `header` fields are valid).
- * - `compass/true/enu/pose` (`geometry_msgs/PoseStamped`, enabled by param `~publish_true_azimuth_enu_pose`, off by default):
+ *     The incoming IMU message rotated in yaw such that its frame becomes georeferenced towards geographic ("true") ENU frame.
+ * - `compass/true/enu/pose` (`geometry_msgs/PoseWithCovarianceStamped`, enabled by param `~publish_true_azimuth_enu_pose`, off by default):
  *     Geographic ("true") azimuth in ENU as a pose (translation will always be zero).
  * 
  * - `compass/utm/ned/deg` (`compass_msgs/Azimuth`, enabled by param `~publish_utm_azimuth_ned_deg`, off by default):
@@ -130,8 +132,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `compass/utm/ned/quat` (`geometry_msgs/QuaternionStamped`, enabled by param `~publish_utm_azimuth_ned_quat`, off by default):
  *     UTM heading in NED as a quaternion.
  * - `compass/utm/ned/imu` (`sensor_msgs/Imu`, enabled by param `~publish_utm_azimuth_ned_imu`, off by default):
- *     UTM heading in NED inside an IMU message (only `orientation` and `header` fields are valid).
- * - `compass/utm/ned/pose` (`geometry_msgs/PoseStamped`, enabled by param `~publish_utm_azimuth_ned_pose`, off by default):
+ *     The incoming IMU message rotated in yaw such that its frame becomes georeferenced towards UTM NED frame.
+ * - `compass/utm/ned/pose` (`geometry_msgs/PoseWithCovarianceStamped`, enabled by param `~publish_utm_azimuth_ned_pose`, off by default):
  *     UTM heading in NED as a pose (translation will always be zero).
  * 
  * - `compass/utm/enu/deg` (`compass_msgs/Azimuth`, enabled by param `~publish_utm_azimuth_enu_deg`, off by default):
@@ -141,8 +143,8 @@ struct MagnetometerCompassNodeletPrivate;
  * - `compass/utm/enu/quat` (`geometry_msgs/QuaternionStamped`, enabled by param `~publish_utm_azimuth_enu_quat`, off by default):
  *     UTM heading in ENU as a quaternion.
  * - `compass/utm/enu/imu` (`sensor_msgs/Imu`, enabled by param `~publish_utm_azimuth_enu_imu`, off by default):
- *     UTM heading in ENU inside an IMU message (only `orientation` and `header` fields are valid).
- * - `compass/utm/enu/pose` (`geometry_msgs/PoseStamped`, enabled by param `~publish_utm_azimuth_enu_pose`, off by default):
+ *     The incoming IMU message rotated in yaw such that its frame becomes georeferenced towards UTM ENU frame.
+ * - `compass/utm/enu/pose` (`geometry_msgs/PoseWithCovarianceStamped`, enabled by param `~publish_utm_azimuth_enu_pose`, off by default):
  *     UTM heading in ENU as a pose (translation will always be zero).
  * 
  * Parameters:
@@ -159,6 +161,7 @@ struct MagnetometerCompassNodeletPrivate;
  *   - If you specify both `~initial_lat` and `~initial_lon`, the node does not need to receive the GPS fix messages.
  * - `~initial_alt` (double, default 0): Altitude in meters (it is usually okay to omit it and use the default).
  * - `~initial_year` (int, no default, optional): If set, overrides the current time for declination computation.
+ * - `~initial_variance` (double, default 0): Variance of the measurement used at startup (in rad^2).
  * - `~magnetic_models_path` (string, defaults to the pre-installed directory): Directory with WMM magnetic field
  *      models. You usually do not need to use other than the preinstalled models. But if you do, specify the path to
  *      the custom models directory here.
@@ -201,6 +204,11 @@ protected:
    * \return The magnetic declination in radians. Zero if something fails.
    */
   virtual double getMagneticDeclination(const sensor_msgs::NavSatFix& fix) const;
+  
+  /**
+   * \brief Update the `variance` variable that tells uncertainty of the azimuth measurement.
+   */
+  virtual void updateVariance();
 
   /**
    * \brief Convert the ROS stamp to a calendar year.
@@ -215,6 +223,21 @@ protected:
   //! \brief Current azimuth in NED. If invalid, no azimuth has been determined yet.
   tf2::Quaternion magAzimuth {0, 0, 0, 0};
   
+  //! \brief Variance of the current azimuth (i.e. stddev squared).
+  double variance {0};
+  
+  //! \brief Last received IMU message.
+  sensor_msgs::Imu lastImu;
+  
+  //! \brief Last received IMU message transformed to `frame`.
+  sensor_msgs::Imu lastImuInBody;
+  
+  //! \brief Last received magnetic field message.
+  sensor_msgs::MagneticField lastMag;
+  
+  //! \brief Last received magnetic field message with bias removed and transformed to `frame`.
+  sensor_msgs::MagneticField lastMagUnbiasedInBody;
+  
   //! \brief Last computed magnetic declination. If invalid, no declination has been computed yet.
   tf2::Quaternion lastMagneticDeclination {0, 0, 0, 0};
   
@@ -225,7 +248,10 @@ protected:
   bool hasMagBias{false};
   
   //! \brief Last received value of magnetometer bias.
-  geometry_msgs::Vector3 lastMagBias;
+  tf2::Vector3 lastMagBias {0, 0, 0};
+  
+  //! \brief Scaling factor of magnetometer measurements (optional).
+  tf2::Matrix3x3 lastMagScale {1, 0, 0, 0, 1, 0, 0, 0, 1};
   
   //! \brief Aggresivity of the azimuth low-pass filter. 0 means raw measurements, 1 means no updates.
   double magAzimuthLowPass{0.95};

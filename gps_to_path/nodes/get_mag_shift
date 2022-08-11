@@ -1,5 +1,7 @@
 #!/usr/bin/env python
+import os
 import time
+import yaml
 
 import rospy
 from std_msgs.msg import String
@@ -29,24 +31,44 @@ class MagShiftCalc:
         self.started = False
 
         self.measuring_time = rospy.Duration(rospy.get_param('~measuring_time', 30))
-        self.load_from_params = rospy.get_param("~load_from_params", False)
-        self.load_from_params = self.load_from_params and rospy.has_param("magnetometer_bias_x")
-        self.load_from_params = self.load_from_params and rospy.has_param("magnetometer_bias_y")
-        self.load_from_params = self.load_from_params and rospy.has_param("magnetometer_bias_z")
+        load_from_params = rospy.get_param("~load_from_params", False)
+        load_from_params = load_from_params and rospy.has_param("magnetometer_bias_x")
+        load_from_params = load_from_params and rospy.has_param("magnetometer_bias_y")
+        load_from_params = load_from_params and rospy.has_param("magnetometer_bias_z")
+
+        default_file = os.path.join(os.environ.get("HOME", ""), ".ros", "magnetometer_calib.yaml")
+        self.calibration_file = rospy.get_param("~calibration_file_path", default_file)
+
+        load_from_file = rospy.get_param("~load_from_file", True)
+        load_from_file = load_from_file and len(self.calibration_file) > 0 and os.path.exists(self.calibration_file)
+
+        self.save_to_file = rospy.get_param("~save_to_file", True)
 
         self.pub = rospy.Publisher('mag_shift', MagShift, latch=True, queue_size=1)  # deprecated
         self.pub2 = rospy.Publisher('imu/mag_bias', MagneticField, latch=True, queue_size=1)
         self.speak_pub = rospy.Publisher('speak/warn', String, queue_size=1)
 
-        if not self.load_from_params:
-            self.sub = rospy.Subscriber('imu/mag', MagneticField, self.mag_callback)
-        else:
+        if load_from_file:
+            with open(self.calibration_file, 'r') as f:
+                data = yaml.safe_load(f)
+            self.x_mean = float(data.get("magnetometer_bias_x", 0.0))
+            self.y_mean = float(data.get("magnetometer_bias_y", 0.0))
+            self.z_mean = float(data.get("magnetometer_bias_z", 0.0))
+            time.sleep(0.01)  # give the publishers some time to get set up
+            rospy.logwarn("Magnetometer calibration loaded from file {}.".format(self.calibration_file))
+            self.pub_msg(allow_save=False)
+        elif load_from_params:
             self.x_mean = float(rospy.get_param("magnetometer_bias_x"))
             self.y_mean = float(rospy.get_param("magnetometer_bias_y"))
             self.z_mean = float(rospy.get_param("magnetometer_bias_z"))
             time.sleep(0.01)  # give the publishers some time to get set up
-            self.pub_msg()
             rospy.logwarn("Magnetometer calibration loaded from parameters.")
+            self.pub_msg()
+        else:
+            self.subscribe()
+
+    def subscribe(self):
+        self.sub = rospy.Subscriber('imu/mag', MagneticField, self.mag_callback)
 
     def speak(self, message):
         msg = String()
@@ -98,7 +120,7 @@ class MagShiftCalc:
         self.y_mean = (self.y_min + self.y_max)/2
         self.z_mean = (self.z_min + self.z_max)/2
 
-    def pub_msg(self):
+    def pub_msg(self, allow_save=True):
         self.msg.header.stamp = rospy.Time.now()
         self.msg.header.frame_id = self.frame_id
 
@@ -114,6 +136,31 @@ class MagShiftCalc:
         rospy.set_param("magnetometer_bias_x", self.x_mean)
         rospy.set_param("magnetometer_bias_y", self.y_mean)
         rospy.set_param("magnetometer_bias_z", self.z_mean)
+
+        if self.save_to_file and allow_save:
+            dir = os.path.dirname(self.calibration_file)
+            if not os.path.exists(dir):
+                try:
+                    os.makedirs(dir)
+                except:
+                    rospy.logerr("Could not create folder for storing calibration " + dir)
+
+            if os.path.exists(dir):
+                data = {
+                    "magnetometer_bias_x": self.x_mean,
+                    "magnetometer_bias_y": self.y_mean,
+                    "magnetometer_bias_z": self.z_mean,
+                }
+                try:
+                    with open(self.calibration_file, 'w') as f:
+                        yaml.safe_dump(data, f)
+                    rospy.logwarn("Saved magnetometer calibration to file " + self.calibration_file)
+                except Exception as e:
+                    rospy.logerr("An error occured while saving magnetometer calibration to file " +
+                        self.calibration_file)
+            else:
+                rospy.logerr("Could not store magnetometer calibration to file {}. Cannot create the file.".format(
+                    self.calibration_file))
 
     def run(self):
         rospy.spin()

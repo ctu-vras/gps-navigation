@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 import rospy
-import std_msgs
+from std_msgs.msg import String
 from gps_to_path.msg import MagShift
 from sensor_msgs.msg import MagneticField
 
 
-class MagShiftCalc():
+class MagShiftCalc:
     def __init__(self, measuring_time):
 
         self.x_min = 10000
@@ -22,16 +22,39 @@ class MagShiftCalc():
         self.z_mean = None
 
         self.msg = MagShift()
+        self.msg2 = MagneticField()
+
+        self.frame_id = "imu"
+        self.started = False
 
         self.measuring_time = measuring_time
-        self.finish_measuring_time = rospy.Time.now().to_sec() + self.measuring_time
 
-        self.pub = rospy.Publisher('mag_shift', MagShift, queue_size=10)
-        self.sub = rospy.Subscriber(
-            '/imu/mag', MagneticField, self.mag_callback)
+        self.pub = rospy.Publisher('mag_shift', MagShift, latch=True, queue_size=1)  # deprecated
+        self.pub2 = rospy.Publisher('imu/mag_bias', MagneticField, latch=True, queue_size=1)
+        self.speak_pub = rospy.Publisher('speak/warn', String, queue_size=1)
+        self.sub = rospy.Subscriber('imu/mag', MagneticField, self.mag_callback)
+
+    def speak(self, message):
+        msg = String()
+        msg.data = message
+        self.speak_pub.publish(msg)
 
     def mag_callback(self, msg):
-        if rospy.Time.now().to_sec() < self.finish_measuring_time:
+        self.frame_id = msg.header.frame_id
+
+        if not self.started and rospy.Time.now().is_zero():
+            return
+
+        if not self.started:
+            self.started = True
+            self.finish_measuring_time = rospy.Time.now() + self.measuring_time
+
+            log = "Started magnetometer calibration, rotate the robot several times in the following %i seconds." % \
+                (self.measuring_time.secs,)
+            rospy.logwarn(log)
+            self.speak(log)
+
+        if rospy.Time.now() < self.finish_measuring_time:
             mag = msg.magnetic_field
 
             if mag.x > self.x_max:
@@ -48,12 +71,13 @@ class MagShiftCalc():
                 self.z_max = mag.z
             elif mag.z < self.z_min:
                 self.z_min = mag.z
+        else:
+            rospy.logwarn("Magnetometer calibrated")
+            self.speak("Magnetometer calibrated")
+            self.sub.unregister()  # unsubscribe the mag messages
 
             self.set_means()
-        else:
-            rospy.logwarn_once("Finished measuring ")
-
-        self.pub_msg()
+            self.pub_msg()
 
     def set_means(self):
         self.x_mean = (self.x_min + self.x_max)/2
@@ -61,17 +85,17 @@ class MagShiftCalc():
         self.z_mean = (self.z_min + self.z_max)/2
 
     def pub_msg(self):
-        header = std_msgs.msg.Header()
-        header.stamp = rospy.Time.now()
-        header.frame_id = "imu"
+        self.msg.header.stamp = rospy.Time.now()
+        self.msg.header.frame_id = self.frame_id
 
-        self.msg.header = header
+        self.msg2.header = self.msg.header
 
-        self.msg.x_mean = self.x_mean
-        self.msg.y_mean = self.y_mean
-        self.msg.z_mean = self.z_mean
+        self.msg.x_mean = self.msg2.magnetic_field.x = self.x_mean
+        self.msg.y_mean = self.msg2.magnetic_field.y = self.y_mean
+        self.msg.z_mean = self.msg2.magnetic_field.z = self.z_mean
 
         self.pub.publish(self.msg)
+        self.pub2.publish(self.msg2)
 
     def run(self):
         rospy.spin()
@@ -80,7 +104,7 @@ class MagShiftCalc():
 def main():
     rospy.init_node('mag_shift')
 
-    measuring_time = rospy.get_param('~measuring_time', 30)
+    measuring_time = rospy.Duration(rospy.get_param('~measuring_time', 30))
     node = MagShiftCalc(measuring_time)
     node.run()
 

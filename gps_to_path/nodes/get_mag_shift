@@ -7,6 +7,7 @@ import rospy
 from std_msgs.msg import String
 from gps_to_path.msg import MagShift
 from sensor_msgs.msg import MagneticField
+from std_srvs.srv import Trigger
 
 
 class MagShiftCalc:
@@ -31,6 +32,8 @@ class MagShiftCalc:
         self.started = False
 
         self.measuring_time = rospy.Duration(rospy.get_param('~measuring_time', 30))
+        self.finish_measuring_time = rospy.Time(0)
+
         load_from_params = rospy.get_param("~load_from_params", False)
         load_from_params = load_from_params and rospy.has_param("magnetometer_bias_x")
         load_from_params = load_from_params and rospy.has_param("magnetometer_bias_y")
@@ -47,6 +50,10 @@ class MagShiftCalc:
         self.pub = rospy.Publisher('mag_shift', MagShift, latch=True, queue_size=1)  # deprecated
         self.pub2 = rospy.Publisher('imu/mag_bias', MagneticField, latch=True, queue_size=1)
         self.speak_pub = rospy.Publisher('speak/warn', String, queue_size=1)
+
+        self.sub = None  # will be initialized in subscribe()
+
+        self.calibrate_server = rospy.Service("calibrate_magnetometer", Trigger, self.calibrate_service_cb)
 
         if load_from_file:
             with open(self.calibration_file, 'r') as f:
@@ -68,7 +75,16 @@ class MagShiftCalc:
             self.subscribe()
 
     def subscribe(self):
+        self.started = False
         self.sub = rospy.Subscriber('imu/mag', MagneticField, self.mag_callback)
+
+    def calibrate_service_cb(self, _):
+        if self.sub or rospy.Time.now() < self.finish_measuring_time:
+            rospy.logwarn("Calibration in progress, ignoring another request")
+            return False, "Calibration already running"
+
+        self.subscribe()
+        return True, "Calibration started, rotate the robot for the following %i seconds" % (self.measuring_time.secs,)
 
     def speak(self, message):
         msg = String()
@@ -111,6 +127,7 @@ class MagShiftCalc:
             rospy.logwarn("Magnetometer calibrated")
             self.speak("Magnetometer calibrated")
             self.sub.unregister()  # unsubscribe the mag messages
+            self.sub = None
 
             self.set_means()
             self.pub_msg()

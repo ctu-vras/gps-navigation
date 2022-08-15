@@ -54,6 +54,8 @@ void doTransform(const sensor_msgs::Imu &imu_in, sensor_msgs::Imu &imu_out, cons
 
   tf2::transformCovariance(imu_in.linear_acceleration_covariance, imu_out.linear_acceleration_covariance, r);
 
+  // Orientation expresses attitude of the new frame_id in a fixed world frame. This is why the transform here applies
+  // in the opposite direction.
   Eigen::Quaternion<double> orientation = Eigen::Quaternion<double>(
     imu_in.orientation.w, imu_in.orientation.x, imu_in.orientation.y, imu_in.orientation.z) * r.inverse();
 
@@ -62,7 +64,9 @@ void doTransform(const sensor_msgs::Imu &imu_in, sensor_msgs::Imu &imu_out, cons
   imu_out.orientation.y = orientation.y();
   imu_out.orientation.z = orientation.z();
 
-  tf2::transformCovariance(imu_in.orientation_covariance, imu_out.orientation_covariance, r);
+  // Orientation is measured relative to the fixed world frame, so it doesn't change when applying a static
+  // transform to the sensor frame.
+  imu_out.orientation_covariance = imu_in.orientation_covariance;
 
 }
 

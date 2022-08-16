@@ -46,7 +46,7 @@ class GpsToPath():
             num_published_path_points, len(self.waypoints))
 
         self.sub_fix = rospy.Subscriber(
-            "fix", NavSatFix, self.update_fix, queue_size=10)
+            "fix", NavSatFix, self.main_cycle, queue_size=10)
 
         self.sub_azimuth = rospy.Subscriber(
             "mag_azimuth", Float64, self.update_azimuth, queue_size=10)
@@ -116,10 +116,7 @@ class GpsToPath():
             arr[:, 1]*cos(odom_to_utm_angle)
         return np.array([x_rot, y_rot]).T
 
-    def update_fix(self, msg):
-        self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
-
-    def main_cycle(self):
+    def main_cycle(self, msg):
 
         if self.odom_gps_trans and self.odom_base_link_trans:
             try:
@@ -132,6 +129,7 @@ class GpsToPath():
                     'odom', 'base_link', rospy.Time())
             except:
                 pass
+            self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
             # utm is not an actual tf trame, just an imaginary frame
             self.gps_to_target_utm_frame = self.waypoints_utm - \
                 np.array([self.gps_utm.easting, self.gps_utm.northing])
@@ -146,6 +144,7 @@ class GpsToPath():
             self.pub_whole_path.publish(self.whole_path_msg)
             self.pub_path_wgs.publish(self.wgs_msg)
         else:
+            self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
             rospy.logwarn("TF(odom,gps) or TF(odom,base_link) is missing.")
 
     def get_pose(self, point):
@@ -246,10 +245,7 @@ class GpsToPath():
                 rate.sleep()
                 continue
         rospy.loginfo("Transformations obtained.")
-        
-        while not rospy.is_shutdown():
-            self.main_cycle()
-            rate.sleep()
+        rospy.spin()
 
 
 def main():

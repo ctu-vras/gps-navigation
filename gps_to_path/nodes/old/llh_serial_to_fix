@@ -43,12 +43,11 @@ class GPSData():
 
 
 class LlhToFix():
-    def __init__(self, sound_period):
-        self.pub_path = rospy.Publisher('fix', NavSatFix, queue_size=10)    
+    def __init__(self, GPS, sound_period):
+        self.pub_path = rospy.Publisher('fix', NavSatFix, queue_size=10)
         self.fix_msg = NavSatFix()
+        self.GPS = GPS
         self.gps_data = GPSData()
-
-        self.sub_llh = rospy.Subscriber('llh', std_msgs.msg.String, self.llh_handle, queue_size=10)
 
         self.sound_handle = SoundClient()
         self.last_sound_time = 0
@@ -56,20 +55,6 @@ class LlhToFix():
         self.sound_period = sound_period
         self.sound_string = "Fix covariance is {}"
         self.no_fix_msg_period = 1
-
-    def llh_handle(self,msg):
-        llh_string = msg.data
-        llh_arr = llh_string.split(',')
-
-        date = llh_arr[0]+','+llh_arr[1]
-        ts = self.date_to_timestamp(date)
-        ts = str(ts)
-        llh_arr.pop(0)
-        llh_arr[0] = ts
-        self.gps_data.from_array(llh_arr)
-
-        self.set_fix_msg()
-        self.pub_path.publish(self.fix_msg)
 
     def set_fix_msg(self):
         header = std_msgs.msg.Header()
@@ -120,14 +105,51 @@ class LlhToFix():
         self.gps_data.from_array(llh_arr)
 
     def run(self):
-        rospy.spin()
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            llh_sentence = self.GPS.readline().strip()
+            if llh_sentence:
+                llh_sentence = llh_sentence.decode('ascii')
+                self.parse_data(llh_sentence)
+                self.set_fix_msg()
+                self.pub_path.publish(self.fix_msg)
+
+                self.last_llh_msg_time = rospy.Time.now().to_sec()
+                self.no_fix_msg_period = 1
+            else:
+                if rospy.Time.now().to_sec() - self.last_llh_msg_time >= self.no_fix_msg_period:
+                    self.last_llh_msg_time = rospy.Time.now().to_sec()
+                    self.no_fix_msg_period = 5
+
+                    voice_msg = self.sound_handle.voiceSound("No fix.")
+                    rospy.loginfo("No fix.")
+                    voice_msg.play()
+
+                rate.sleep()
+
 
 def main():
     rospy.init_node('llh_to_fix')
 
+    GPS = None
+
+    rate = rospy.Rate(10)
+
     sound_period = rospy.get_param('~sound_period', 10)
-    
-    node = LlhToFix(sound_period)
+
+    while not GPS:
+        try:
+            serial_port = rospy.get_param('~port', '/dev/ttyACM0')
+            serial_baud = rospy.get_param('~baud', 115200)
+            GPS = serial.Serial(
+                port=serial_port, baudrate=serial_baud, timeout=2)
+        except:
+            print("Serial port {} with baudrate {} cannot be opened.".format(
+                serial_port, serial_baud))
+        rate.sleep()
+
+    node = LlhToFix(GPS,sound_period)
+
     node.run()
 
 

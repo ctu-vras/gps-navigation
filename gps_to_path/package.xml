@@ -63,7 +63,7 @@
   <exec_depend condition="$ROS_DISTRO != noetic">python-gpxpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-overpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-shapely</exec_depend>
-  <exec_depend condition="$ROS_DISTRO != noetic">python-utm</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-utm-pip</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-numpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-OSMPythonTools</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-igraph</exec_depend>

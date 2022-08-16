@@ -334,6 +334,9 @@ class OdomMatcher():
             w[zero_indices] = 0.000001
             w = np.reciprocal(w)
             w = np.minimum(w,np.ones(w.shape))
+            w = w.astype('float32')
+            x = x.astype('float32')
+            y = y.astype('float32')
             W = np.diag(w)
             M = np.matmul(x, W)
             M = np.matmul(M, y.T)
@@ -835,6 +838,66 @@ class OdomMatcher():
         fig_fn ="{}.png".format(self.fn)
         plt.savefig(fig_fn,dpi=800,bbox_inches='tight')
         print("Figure saved to {}.".format(fig_fn))
+    
+    def visualise_fix(self):
+        points = self.fixes.positions_arr()
+        trimmer = max([1,round(len(points[:,0])/NUM_TRIMMED_POINTS)])
+
+        fig, ax = plt.subplots(figsize=(8,8), dpi=400)
+
+        x = points[::trimmer,0]
+        y = points[::trimmer,1]
+
+        covs = self.fixes.covs_arr()
+        covs = covs.astype('float')
+        covs = covs[::trimmer]
+        covs_mean = np.mean(covs,axis=1)
+        
+        c = np.clip(covs_mean, MIN_COV, MAX_COV)
+        c = np.log(c)
+        
+        cmap = plt.cm.cool
+
+        y_lim,x_lim = self.plot_background_map(ax,self.min_long,self.max_long,self.min_lat,self.max_lat)
+
+        norm=mpl.colors.Normalize(vmin=np.log(MIN_COV), vmax=np.log(MAX_COV))
+        
+        ax.scatter(x,y,s=6+15,marker="x",c=c,cmap=cmap,lw=1,zorder=21,alpha=1, norm=norm)
+
+        for i in range(len(covs)):
+            cov = covs[i]
+
+            width = 2 * ELIPSE_SIGMA * math.sqrt(cov[0])
+            height = 2 * ELIPSE_SIGMA * math.sqrt(cov[1])
+
+            if self.switch_w_h:
+                old_w = np.copy(width)
+                width = height
+                height = old_w
+
+            ellipse = Ellipse((x[i],y[i]),width=width, height=height, alpha=0.3,zorder=5,fill=False,ec=cmap(norm(c[i])), label='_nolegend_')
+            ax.add_patch(ellipse)
+
+        ax.set_title("Visualisation of fix")
+        ax.axis('equal')
+        ax.grid(zorder=0)
+
+        ax.set_xlim(x_lim)
+        ax.set_ylim(y_lim)
+
+        plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+        ax.set_xlabel("x [m]")
+        ax.set_ylabel("y [m]")
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        
+        lognorm = mpl.colors.LogNorm(MIN_COV,MAX_COV)
+        fig.colorbar(mpl.cm.ScalarMappable(norm=lognorm, cmap=plt.cm.cool),cax=cax, orientation='vertical', label='Covariance [$m^2$]')   
+
+        fig_fn ="{}.png".format(self.fn)
+        plt.savefig(fig_fn,dpi=800,bbox_inches='tight')
+        print("Figure saved to {}.".format(fig_fn))
 
     def run(self):
         print("Parsing topics.")
@@ -851,6 +914,11 @@ class OdomMatcher():
         if len(self.odom_topics)==1 and self.fix_topic is None:
             print("No fix and only one odometry.")
             self.visualise_single()
+            return
+        
+        if len(self.odom_topics)==0 and self.fix_topic is not None:
+            print("Only fix; no odometry.")
+            self.visualise_fix()
             return
 
         print("Matching points.")

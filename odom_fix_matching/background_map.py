@@ -40,6 +40,11 @@ def get_background_image(min_long,max_long,min_lat,max_lat, x_margin, y_margin):
         width = int(width*0.9)
         height = int(width * ratio)
 
+    if width < 10:
+        width = 10
+    if height < 10:
+        height = 10
+
     corners = [min_long - x_margin, max_lat + y_margin, max_long + x_margin, min_lat - y_margin]
     url = get_url(width, height, corners)
     #print(url)

@@ -45,6 +45,11 @@ A package for the navigation of a robot using the Emlid Reach M+ GPS module and 
 ## (optional) ICP
 **getIcp**
 
+## (optional) OSM data to PCD (osm visualisation)
+**roslaunch gps_to_path osm.launch**<br />
+Also has a parameter points_density -- set this inside the osm.launch file (set lower for faster performance -- might be necessary for long paths).<br />
+The topic to which the pointcloud is published is **osm_pcd**.
+
 ## (optional) Path follower
 **roslaunch gps_to_path follower.launch<br /> cmd_vel:=___ <br /> max_speed:=___ <br /> allow_backward:=___ <br />**
 

@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+import rospy
+import tf2_ros
+
+from std_msgs.msg import String,Header
+from sound_play.msg import SoundRequest
+from sound_play.libsoundplay import SoundClient
+
+import re
+import serial
+
+class LlhPublisher():
+    def __init__(self, GPS, no_fix_sound_period):
+        self.GPS = GPS
+        self.pub_llh = rospy.Publisher('llh', String, queue_size=10)
+        self.llh_msg = String()
+        self.llh_string = ""
+
+        self.sound_handle = SoundClient()
+        self.no_fix_sound_period = no_fix_sound_period
+
+    def set_llh_msg(self):
+        header = Header()
+        header.stamp = rospy.Time.now()  # float(self.gps_data.time)
+        header.frame_id = "gps"
+
+        self.llh_msg.header = header
+        self.llh_msg.data = self.llh_string
+
+    def parse_data(self, llh_sentence):
+        llh_contents = re.sub(' +', ' ', llh_sentence).strip()
+        llh_commas = llh_contents.replace(' ', ',')
+        self.llh_string = llh_commas
+
+    def run(self):
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            llh_sentence = self.GPS.readline().strip()
+            if llh_sentence:
+                llh_sentence = llh_sentence.decode('ascii')
+                self.parse_data(llh_sentence)
+                self.set_llh_msg()
+                self.pub_llh.publish(self.llh_msg)
+
+                self.last_llh_msg_time = rospy.Time.now().to_sec()
+                self.no_fix_msg_period = 1
+            else:
+                if rospy.Time.now().to_sec() - self.last_llh_msg_time >= self.no_fix_msg_period:
+                    self.last_llh_msg_time = rospy.Time.now().to_sec()
+                    self.no_fix_msg_period = self.no_fix_sound_period
+
+                    voice_msg = self.sound_handle.voiceSound("No fix.")
+                    rospy.loginfo("No fix.")
+                    voice_msg.play()
+
+                rate.sleep()
+
+
+def main():
+    rospy.init_node('llh_publisher')
+
+    GPS = None
+
+    rate = rospy.Rate(10)
+
+    no_fix_sound_period = rospy.get_param('~no_fix_sound_period', 10)
+
+    while not GPS:
+        try:
+            serial_port = rospy.get_param('~port', '/dev/ttyACM0')
+            serial_baud = rospy.get_param('~baud', 115200)
+            GPS = serial.Serial(
+                port=serial_port, baudrate=serial_baud, timeout=2)
+        except:
+            print("Serial port {} with baudrate {} cannot be opened.".format(
+                serial_port, serial_baud))
+        rate.sleep()
+
+    node = LlhPublisher(GPS,no_fix_sound_period)
+
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

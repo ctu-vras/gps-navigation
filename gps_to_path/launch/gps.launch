@@ -7,7 +7,7 @@
     <arg name="run_ntrip_relay" default="true" />
 
     <!-- STATIC TRANSFORMS -->
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />             
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
 
     <!-- LLH FROM GPS TO FIX -->
     <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        

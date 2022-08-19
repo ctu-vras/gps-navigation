@@ -11,7 +11,6 @@ import shapely.geometry as geometry
 from shapely.prepared import prep
 from shapely.ops import nearest_points
 from shapely.ops import linemerge, unary_union, polygonize
-import matplotlib.pyplot as plt
 import sys
 import os
 from itertools import compress

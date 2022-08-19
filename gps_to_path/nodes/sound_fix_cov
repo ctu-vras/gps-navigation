@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+
+import rospy
+import tf2_ros
+
+from nav_msgs.msg import Path
+from gps_to_path.msg import LlhFix
+import geometry_msgs.msg
+import std_msgs.msg
+from sensor_msgs.msg import NavSatFix
+from sound_play.msg import SoundRequest
+from sound_play.libsoundplay import SoundClient
+
+from geodesy import utm
+import datetime
+import time
+import re
+import serial
+from math import sqrt, sin, cos
+
+from tf.transformations import euler_from_quaternion
+
+class SoundFixCov():
+    def __init__(self, sound_period):
+        self.sub_llh = rospy.Subscriber('fix', NavSatFix, self.fix_handle, queue_size=10)
+
+        self.sound_handle = SoundClient()
+        self.last_sound_time = 0
+        self.last_msg_time = rospy.Time.now().to_sec()
+        self.sound_period = sound_period
+        self.sound_string = "Fix covariance is {}"
+        self.no_fix_msg_period = 1
+
+    def fix_handle(self,msg):
+        if rospy.Time.now().to_sec() - self.last_sound_time >= self.sound_period:
+            self.last_sound_time = rospy.Time.now().to_sec()
+
+            long_cov = msg.position_covariance[0]
+            lat_cov = msg.position_covariance[4]
+
+            pdop = (long_cov**2 + lat_cov**2)**(1/2)
+
+            if pdop < 1:
+                pdop_str = "under one meter."
+            else:
+                pdop_str = str(round(pdop))
+
+            voice_msg = self.sound_handle.voiceSound(self.sound_string.format(pdop_str))
+            rospy.loginfo(self.sound_string.format(pdop_str))
+            voice_msg.play()
+
+        self.last_msg_time = rospy.Time.now().to_sec()
+
+    def run(self):
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            if rospy.Time.now().to_sec() - self.last_msg_time >= self.no_fix_msg_period:
+                self.last_msg_time = rospy.Time.now().to_sec()
+                self.no_fix_msg_period = self.sound_period
+
+                voice_msg = self.sound_handle.voiceSound("No fix.")
+                rospy.loginfo("No fix.")
+                voice_msg.play()
+        rate.sleep()
+
+def main():
+    rospy.init_node('sound_fix_cov')
+
+    sound_period = rospy.get_param('~sound_period', 10)
+    
+    node = SoundFixCov(sound_period)
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

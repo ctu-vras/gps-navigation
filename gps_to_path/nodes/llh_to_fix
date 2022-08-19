@@ -4,6 +4,7 @@ import rospy
 import tf2_ros
 
 from nav_msgs.msg import Path
+from gps_to_path.msg import LlhFix
 import geometry_msgs.msg
 import std_msgs.msg
 from sensor_msgs.msg import NavSatFix
@@ -43,30 +44,16 @@ class GPSData():
 
 
 class LlhToFix():
-    def __init__(self, sound_period):
+    def __init__(self):
         self.pub_path = rospy.Publisher('fix', NavSatFix, queue_size=10)    
         self.fix_msg = NavSatFix()
         self.gps_data = GPSData()
 
-        self.sub_llh = rospy.Subscriber('llh', std_msgs.msg.String, self.llh_handle, queue_size=10)
-
-        self.sound_handle = SoundClient()
-        self.last_sound_time = 0
-        self.last_llh_msg_time = 0
-        self.sound_period = sound_period
-        self.sound_string = "Fix covariance is {}"
-        self.no_fix_msg_period = 1
+        self.sub_llh = rospy.Subscriber('llh', LlhFix, self.llh_handle, queue_size=10)
 
     def llh_handle(self,msg):
-        llh_string = msg.data
-        llh_arr = llh_string.split(',')
-
-        date = llh_arr[0]+','+llh_arr[1]
-        ts = self.date_to_timestamp(date)
-        ts = str(ts)
-        llh_arr.pop(0)
-        llh_arr[0] = ts
-        self.gps_data.from_array(llh_arr)
+        llh_sentence = msg.data
+        self.parse_data(llh_sentence)
 
         self.set_fix_msg()
         self.pub_path.publish(self.fix_msg)
@@ -88,19 +75,6 @@ class LlhToFix():
         self.fix_msg.position_covariance = [self.gps_data.long_cov, 0., 0.,
                                             0., self.gps_data.lat_cov, 0.,
                                             0., 0., self.gps_data.alt_cov]
-
-        if rospy.Time.now().to_sec() - self.last_sound_time >= self.sound_period:
-            self.last_sound_time = rospy.Time.now().to_sec()
-
-            fix_cov = (self.gps_data.long_cov + self.gps_data.lat_cov)/2
-            if fix_cov < 1:
-                cov_str = "under one meter."
-            else:
-                cov_str = str(round(fix_cov))
-
-            voice_msg = self.sound_handle.voiceSound(self.sound_string.format(cov_str))
-            rospy.loginfo(self.sound_string.format(cov_str))
-            voice_msg.play()
 
     def date_to_timestamp(self, date):
         ts = time.mktime(datetime.datetime.strptime(
@@ -124,10 +98,8 @@ class LlhToFix():
 
 def main():
     rospy.init_node('llh_to_fix')
-
-    sound_period = rospy.get_param('~sound_period', 10)
     
-    node = LlhToFix(sound_period)
+    node = LlhToFix()
     node.run()
 
 

@@ -3,6 +3,7 @@
 import rospy
 import tf2_ros
 
+from gps_to_path.msg import LlhFix
 from std_msgs.msg import String,Header
 from sound_play.msg import SoundRequest
 from sound_play.libsoundplay import SoundClient
@@ -13,8 +14,8 @@ import serial
 class LlhPublisher():
     def __init__(self, GPS, no_fix_sound_period):
         self.GPS = GPS
-        self.pub_llh = rospy.Publisher('llh', String, queue_size=10)
-        self.llh_msg = String()
+        self.pub_llh = rospy.Publisher('llh', LlhFix, queue_size=10)
+        self.llh_msg = LlhFix()
         self.llh_string = ""
 
         self.sound_handle = SoundClient()

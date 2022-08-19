@@ -45,6 +45,7 @@ class GpsToPath():
         self.num_published_path_points = min(
             num_published_path_points, len(self.waypoints))
 
+        self.gps_utm = None
         self.sub_fix = rospy.Subscriber(
             "fix", NavSatFix, self.update_fix, queue_size=10)
 
@@ -132,19 +133,23 @@ class GpsToPath():
                     'odom', 'base_link', rospy.Time())
             except:
                 pass
-            # utm is not an actual tf trame, just an imaginary frame
-            self.gps_to_target_utm_frame = self.waypoints_utm - \
-                np.array([self.gps_utm.easting, self.gps_utm.northing])
-            self.gps_to_target_odom_frame = self.odom_to_utm_rotate(
-                self.gps_to_target_utm_frame)
 
-            self.path_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
-                                      self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
+            if self.gps_utm is not None:
+                # utm is not an actual tf trame, just an imaginary frame
+                self.gps_to_target_utm_frame = self.waypoints_utm - \
+                    np.array([self.gps_utm.easting, self.gps_utm.northing])
+                self.gps_to_target_odom_frame = self.odom_to_utm_rotate(
+                    self.gps_to_target_utm_frame)
 
-            self.set_path_msg()
-            self.pub_path.publish(self.path_msg)
-            self.pub_whole_path.publish(self.whole_path_msg)
-            self.pub_path_wgs.publish(self.wgs_msg)
+                self.path_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
+                                        self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
+
+                self.set_path_msg()
+                self.pub_path.publish(self.path_msg)
+                self.pub_whole_path.publish(self.whole_path_msg)
+                self.pub_path_wgs.publish(self.wgs_msg)
+            else:
+                rospy.logwarn_once("No fix yet.")
         else:
             rospy.logwarn("TF(odom,gps) or TF(odom,base_link) is missing.")
 

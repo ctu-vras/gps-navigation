@@ -4,6 +4,8 @@ import rospy
 
 from sensor_msgs.msg import NavSatFix
 
+import random
+
 
 class FakeGps():
 
@@ -34,7 +36,8 @@ class FakeGps():
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             self.msg.header.stamp = rospy.Time.now()
-            #self.msg.latitude += 0.0001
+            #self.msg.latitude += 0.000001 * random.random()
+            #self.msg.longitude += 0.000001 * random.random()
             self.publisher.publish(self.msg)
             rate.sleep()
 

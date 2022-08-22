@@ -8,7 +8,7 @@
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
     <arg name="max_speed" default="0.5"/>
-    <arg name="allow_backward" default="False" />
+    <arg name="allow_backward" default="false"/>
     <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
 
     <node name="path_follower" pkg="naex" type="path_follower"
@@ -30,6 +30,8 @@
             -->
             max_path_dist: 100
             look_ahead: 1.0
+            max_speed: $(arg max_speed)
+            allow_backward: $(arg allow_backward)
             max_force_through_speed: 0.2
             max_angular_rate: 0.5
             keep_path: 0.18

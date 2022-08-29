@@ -8,7 +8,7 @@
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
     <arg name="max_speed" default="0.5"/>
-    <arg name="allow_backward" default="False" />
+    <arg name="allow_backward" default="false"/>
     <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
 
     <node name="path_follower" pkg="naex" type="path_follower"
@@ -30,6 +30,10 @@
             -->
             max_path_dist: 100
             look_ahead: 1.0
+            <!-- Allow increasing only waypoint index, to avoid oscillations. -->
+            increasing_waypoint_index: true
+            max_speed: $(arg max_speed)
+            allow_backward: $(arg allow_backward)
             max_force_through_speed: 0.2
             max_angular_rate: 0.5
             keep_path: 0.18
@@ -37,11 +41,10 @@
             clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.6]]
             show_clearance_pos: [-2, 2]
             min_points_obstacle: 0
-
             force_through_after: 10.
             backtrack_after: .inf
-
-            turn_on_spot_angle: 2.5  <!-- Allow less turning on spot because of virtual bumper -->
+            <!-- For the virtual bumber, allow forward motion even for larger angular goal displacement. -->
+            turn_on_spot_angle: 2.5
         </rosparam>
 
         <!-- Inputs -->

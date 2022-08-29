@@ -1,0 +1,45 @@
+ <launch>      
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/kn_short.gpx" />
+
+<!-- STATIC TRANSFORMS -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_1" args="0 0 0 0 0 0 odom base_link" />             
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_2" args="0 0 0 0 0 0 odom imu" /> 
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />             
+
+<!-- LLH FROM GPS TO FIX -->
+    <!--node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
+        <param name="port" type="string" value="/dev/ttyACM0" />   
+        <param name="baud" type="int" value="115200" />
+	    <param name="no_fix_sound_period" type="int" value="10" />
+    </node>
+    
+    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
+	    <param name="sound_period" type="int" value="10" />
+    </node-->
+
+<!-- FAKE GPS -->
+    <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+
+<!-- AZIMUTH -->
+    <!--node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
+        <param name="measuring_time" value="30" />
+    </node>
+    <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
+    </node-->
+
+<!-- FAKE AZIMUTH -->
+        <node pkg="gps_to_path" type="fake_mag" name="fake_mag" />
+
+<!-- PATH PLANNER -->
+    <node pkg="gps_to_path" type="path_planner_igraph" name="path_planner" output="screen">
+    	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
+    </node>
+
+<!-- PATH -->
+    <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">>
+    </node>
+
+    <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
+    </node>
+
+</launch>    

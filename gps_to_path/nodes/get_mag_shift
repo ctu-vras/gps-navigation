@@ -3,6 +3,8 @@ import os
 import time
 import yaml
 
+import numpy as np
+
 import rospy
 from std_msgs.msg import String
 from gps_to_path.msg import MagShift
@@ -25,6 +27,7 @@ class MagShiftCalc:
         self.y_mean = None
         self.z_mean = None
 
+        self.last_mag = None
         self.msg = MagShift()
         self.msg2 = MagneticField()
 
@@ -33,6 +36,9 @@ class MagShiftCalc:
 
         self.measuring_time = rospy.Duration(rospy.get_param('~measuring_time', 30))
         self.finish_measuring_time = rospy.Time(0)
+        self.two_d_mode = bool(rospy.get_param('~2d_mode', True))  # only calibrate in a plane
+        # If None, the axis will be autodetected; otherwise, specify either "X", "Y" or "Z"
+        self.ignore_axis = rospy.get_param('~2d_mode_ignore_axis', None)
 
         load_from_params = rospy.get_param("~load_from_params", False)
         load_from_params = load_from_params and rospy.has_param("magnetometer_bias_x")
@@ -93,6 +99,7 @@ class MagShiftCalc:
 
     def mag_callback(self, msg):
         self.frame_id = msg.header.frame_id
+        self.last_mag = msg
 
         if not self.started and rospy.Time.now().is_zero():
             return
@@ -136,6 +143,45 @@ class MagShiftCalc:
         self.x_mean = (self.x_min + self.x_max)/2
         self.y_mean = (self.y_min + self.y_max)/2
         self.z_mean = (self.z_min + self.z_max)/2
+
+        if self.two_d_mode:
+            x_range = self.x_max - self.x_min
+            y_range = self.y_max - self.y_min
+            z_range = self.z_max - self.z_min
+
+            rospy.loginfo("range %f %f %f" % (x_range, y_range, z_range))
+
+            free_axis = None
+            if self.ignore_axis is not None:
+                free_axis = self.ignore_axis.upper()
+            elif x_range < min(0.75 * y_range, 0.75 * z_range):
+                free_axis = "X"
+            elif y_range < min(0.75 * x_range, 0.75 * z_range):
+                free_axis = "Y"
+            elif z_range < min(0.75 * x_range, 0.75 * y_range):
+                free_axis = "Z"
+
+            if free_axis == "X":
+                self.x_mean = 0
+            elif free_axis == "Y":
+                self.y_mean = 0
+            elif free_axis == "Z":
+                self.y_mean = 0
+
+            if free_axis is not None:
+                rospy.loginfo("Magnetometer calibration finished in 2D mode with %s axis uncalibrated." % (free_axis,))
+            else:
+                rospy.logwarn(
+                    "Magnetometer calibration in 2D mode requested, but autodetection of the free axis failed. "
+                    "Did you rotate the robot? Or did you do move with the robot in all 3 axes?")
+
+        if self.last_mag is not None:
+            magnitude = np.linalg.norm([
+                self.last_mag.magnetic_field.x - self.x_mean,
+                self.last_mag.magnetic_field.y - self.y_mean,
+                self.last_mag.magnetic_field.z - self.z_mean])
+            logfn = rospy.loginfo if magnitude < 1e-4 else rospy.logwarn
+            logfn("Magnitude of the calibrated magnetic field is %f T." % (magnitude,))
 
     def pub_msg(self, allow_save=True):
         self.msg.header.stamp = rospy.Time.now()

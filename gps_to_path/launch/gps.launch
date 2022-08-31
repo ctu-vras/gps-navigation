@@ -23,7 +23,7 @@
     </node>
 
     <!-- NTRIP CORRECTIONS -->>
-    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
+    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />
         <param name="num_threads" value="2" />

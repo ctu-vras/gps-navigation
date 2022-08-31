@@ -166,7 +166,7 @@ class MagShiftCalc:
             elif free_axis == "Y":
                 self.y_mean = 0
             elif free_axis == "Z":
-                self.y_mean = 0
+                self.z_mean = 0
 
             if free_axis is not None:
                 rospy.loginfo("Magnetometer calibration finished in 2D mode with %s axis uncalibrated." % (free_axis,))

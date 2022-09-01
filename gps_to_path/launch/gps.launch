@@ -11,7 +11,7 @@
 
     <!-- LLH FROM GPS TO FIX -->
     <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
-        <param name="port" type="string" value="/dev/ttyACM0" />   
+        <param name="port" type="string" value="/dev/ttyACM_gps" />
         <param name="baud" type="int" value="115200" />
     </node>
 

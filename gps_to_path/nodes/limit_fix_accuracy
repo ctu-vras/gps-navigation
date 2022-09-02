@@ -8,6 +8,7 @@ This node imposes a minimum limit on the covariance of GPS measurements. This ca
 odometry caused by the very accurate, but still jumping measurements.
 """
 
+import math
 import rospy
 from sensor_msgs.msg import NavSatFix
 
@@ -21,11 +22,13 @@ pub = rospy.Publisher("gps/fix_limited_accuracy", NavSatFix, queue_size=10)
 
 
 def cb(msg):
-    assert isinstance(msg, NavSatFix)
     cov = list(msg.position_covariance)
-    cov[0] = max(cov[0], min_lat_cov)
-    cov[4] = max(cov[4], min_lon_cov)
-    cov[8] = max(cov[8], min_alt_cov)
+    if max(cov[0], cov[4]) > 2:
+        return
+
+    cov[0] = math.pow(1000*max(cov[0], min_lat_cov), 2)
+    cov[4] = math.pow(1000*max(cov[4], min_lon_cov), 2)
+    cov[8] = 1000#10 * max(cov[8], min_alt_cov)
     msg.position_covariance = tuple(cov)
 
     pub.publish(msg)

@@ -1,35 +1,27 @@
 #!/usr/bin/env python
 
+import math
 import rospy
-import tf2_ros
 
-from nav_msgs.msg import Path
-from gps_to_path.msg import LlhFix
-import geometry_msgs.msg
-import std_msgs.msg
+from gps_to_path.msg import NavSatDetailedStatus
 from sensor_msgs.msg import NavSatFix
-from sound_play.msg import SoundRequest
 from sound_play.libsoundplay import SoundClient
 
-from geodesy import utm
-import datetime
-import time
-import re
-import serial
-from math import sqrt, sin, cos
-
-from tf.transformations import euler_from_quaternion
 
 class SoundFixCov():
     def __init__(self, sound_period):
-        self.sub_llh = rospy.Subscriber('fix', NavSatFix, self.fix_handle, queue_size=10)
-
         self.sound_handle = SoundClient()
         self.last_sound_time = 0
         self.last_msg_time = rospy.Time.now().to_sec()
+        self.last_correction_time = rospy.Time(0)
+        self.last_num_satellites = -1
+        self.require_corrections = rospy.get_param("~require_corrections", True)
         self.sound_period = sound_period
-        self.sound_string = "Fix covariance is {}"
+        self.sound_string = "Fix covariance is {}."
         self.no_fix_msg_period = 1
+
+        self.sub_llh = rospy.Subscriber('fix', NavSatFix, self.fix_handle, queue_size=10)
+        self.sub_details = rospy.Subscriber('fix_status', NavSatDetailedStatus, self.details_handle, queue_size=10)
 
     def fix_handle(self,msg):
         if rospy.Time.now().to_sec() - self.last_sound_time >= self.sound_period:
@@ -38,18 +30,32 @@ class SoundFixCov():
             long_cov = msg.position_covariance[0]
             lat_cov = msg.position_covariance[4]
 
-            pdop = (long_cov**2 + lat_cov**2)**(1/2)
+            pdop = math.sqrt(long_cov**2 + lat_cov**2)
 
             if pdop < 1:
-                pdop_str = "under one meter."
+                pdop_str = "under one meter"
             else:
                 pdop_str = str(round(pdop))
 
-            voice_msg = self.sound_handle.voiceSound(self.sound_string.format(pdop_str))
-            rospy.loginfo(self.sound_string.format(pdop_str))
+            message = self.sound_string.format(pdop_str)
+
+            corrections_age = rospy.Time.now() - self.last_correction_time
+            if self.require_corrections and corrections_age > rospy.Duration(4, 0):
+                message += " No corrections!"
+
+            if 0 <= self.last_num_satellites < 4:
+                message += " Only {} satellite{}!".format(
+                    self.last_num_satellites, "s" if self.last_num_satellites > 1 else "")
+
+            voice_msg = self.sound_handle.voiceSound(message)
+            rospy.loginfo(message)
             voice_msg.play()
 
         self.last_msg_time = rospy.Time.now().to_sec()
+
+    def details_handle(self, msg):
+        self.last_correction_time = msg.last_corrections_time
+        self.last_num_satellites = msg.satellites_used
 
     def run(self):
         rate = rospy.Rate(10)
@@ -61,13 +67,14 @@ class SoundFixCov():
                 voice_msg = self.sound_handle.voiceSound("No fix.")
                 rospy.loginfo("No fix.")
                 voice_msg.play()
-        rate.sleep()
+            rate.sleep()
+
 
 def main():
     rospy.init_node('sound_fix_cov')
 
     sound_period = rospy.get_param('~sound_period', 10)
-    
+
     node = SoundFixCov(sound_period)
     node.run()
 

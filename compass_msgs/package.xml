@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>compass_msgs</name>
+  <version>1.0.0</version>
+  <description>Messages related to compass</description>
+
+  <author email="peckama2@fel.cvut.cz">Martin Pecka</author>
+  <maintainer email="peckama2@fel.cvut.cz">Martin Pecka</maintainer>
+  
+  <url type="website">https://github.com/ctu-vras/gps-navigation</url>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <depend>std_msgs</depend>
+
+  <build_depend>message_generation</build_depend>
+
+  <build_export_depend>message_runtime</build_export_depend>
+  <exec_depend>message_runtime</exec_depend>
+</package>

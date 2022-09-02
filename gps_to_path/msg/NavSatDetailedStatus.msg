@@ -1,0 +1,5 @@
+Header header
+sensor_msgs/TimeReference gps_time
+uint8 satellites_used
+time last_corrections_time
+float32 integer_ambiguity_ratio

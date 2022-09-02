@@ -1,24 +1,26 @@
 #!/usr/bin/env python
+import math
 
 import rospy
-import tf2_ros
 
-from nav_msgs.msg import Path
-from gps_to_path.msg import LlhFix
-import geometry_msgs.msg
-import std_msgs.msg
-from sensor_msgs.msg import NavSatFix
-from sound_play.msg import SoundRequest
-from sound_play.libsoundplay import SoundClient
+from gps_to_path.msg import LlhFix, NavSatDetailedStatus
+from sensor_msgs.msg import NavSatFix, NavSatStatus
 
-from geodesy import utm
 import datetime
-import time
 import re
-import serial
-from math import sqrt, sin, cos
 
-from tf.transformations import euler_from_quaternion
+
+rtklib_fix_quality_to_navsatfix_status = {
+    0: NavSatStatus.STATUS_NO_FIX,    # there will be no LLH messages without a fix, but for sure...
+    1: NavSatStatus.STATUS_GBAS_FIX,  # fix
+    2: NavSatStatus.STATUS_FIX,       # float
+    # 3: reserved,
+    4: NavSatStatus.STATUS_SBAS_FIX,  # dgps or sbas
+    5: NavSatStatus.STATUS_FIX,       # single
+}
+
+
+unix_epoch_start = datetime.datetime(1970, 1, 1)
 
 
 class GPSData():
@@ -26,79 +28,109 @@ class GPSData():
         self.time = 0.
         self.lat = 0.
         self.long = 0.
-        self.fix = 0
+        self.alt = 0.
+        self.fix_quality = 0
         self.satellites = 0
         self.lat_cov = 0.
         self.long_cov = 0.
+        self.alt_cov = 0.
+        self.lat_lon_cov = 0.
+        self.lon_alt_cov = 0.
+        self.alt_lat_cov = 0.
+        self.corrections_age = 0.
+        self.last_corrections_time = rospy.Time(0)
+        self.integer_ambiguity_ratio = 0.
 
     def from_array(self, data):
         self.time = data[0]
         self.lat = float(data[1])
         self.long = float(data[2])
         self.alt = float(data[3])
-        self.fix = data[4]
-        self.satellites = data[5]
+        self.fix_quality = int(data[4])
+        self.satellites = int(data[5])
         self.lat_cov = float(data[6])**2
         self.long_cov = float(data[7])**2
         self.alt_cov = float(data[8])**2
+        self.lat_lon_cov = float(data[9])**2
+        self.lon_alt_cov = float(data[10])**2
+        self.alt_lat_cov = float(data[11])**2
+        self.corrections_age = float(data[12])
+        self.integer_ambiguity_ratio = float(data[13])
+
+        if self.corrections_age != 0.0:
+            now = rospy.Time.now()
+            age = rospy.Duration(self.corrections_age)
+            self.last_corrections_time = now - age if now >= (rospy.Time(0) + age) else rospy.Time(0)
 
 
 class LlhToFix():
     def __init__(self):
         self.pub_path = rospy.Publisher('fix', NavSatFix, queue_size=10)    
+        self.pub_details = rospy.Publisher('fix_status', NavSatDetailedStatus, queue_size=10)    
         self.fix_msg = NavSatFix()
+        self.details_msg = NavSatDetailedStatus()
         self.gps_data = GPSData()
 
         self.sub_llh = rospy.Subscriber('llh', LlhFix, self.llh_handle, queue_size=10)
 
-    def llh_handle(self,msg):
+    def llh_handle(self, msg):
         llh_sentence = msg.data
         self.parse_data(llh_sentence)
 
-        self.set_fix_msg()
+        self.set_fix_msg(msg.header.stamp)
         self.pub_path.publish(self.fix_msg)
+        self.pub_details.publish(self.details_msg)
 
-    def set_fix_msg(self):
-        header = std_msgs.msg.Header()
-        header.stamp = rospy.Time.now()  # float(self.gps_data.time)
-        header.frame_id = "gps"
-
-        self.fix_msg.header = header
+    def set_fix_msg(self, stamp):
+        self.fix_msg.header.frame_id = "gps"
+        self.fix_msg.header.stamp = stamp
 
         self.fix_msg.latitude = self.gps_data.lat
         self.fix_msg.longitude = self.gps_data.long
         self.fix_msg.altitude = self.gps_data.alt
 
-        self.fix_msg.status.status = 0
-        self.fix_msg.status.service = 1
+        self.fix_msg.status.status = rtklib_fix_quality_to_navsatfix_status[self.gps_data.fix_quality]
+        self.fix_msg.status.service = NavSatStatus.SERVICE_GPS | NavSatStatus.SERVICE_GALILEO
 
-        self.fix_msg.position_covariance = [self.gps_data.long_cov, 0., 0.,
-                                            0., self.gps_data.lat_cov, 0.,
-                                            0., 0., self.gps_data.alt_cov]
+        d = self.gps_data
+        self.fix_msg.position_covariance = [
+            d.long_cov,    d.lat_lon_cov, d.lon_alt_cov,
+            d.lat_lon_cov, d.lat_cov,     d.alt_lat_cov,
+            d.lon_alt_cov, d.alt_lat_cov, d.alt_cov
+        ]
+        self.fix_msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_KNOWN
 
-    def date_to_timestamp(self, date):
-        ts = time.mktime(datetime.datetime.strptime(
-            date, "%Y/%m/%d,%H:%M:%S.%f").timetuple())
-        return ts
+        self.details_msg.header = self.fix_msg.header
+        self.details_msg.gps_time.header = self.fix_msg.header
+        self.details_msg.gps_time.time_ref = self.gps_data.time
+        self.details_msg.gps_time.source = "GPS"
+        self.details_msg.last_corrections_time = self.gps_data.last_corrections_time
+        self.details_msg.satellites_used = self.gps_data.satellites
+        self.details_msg.integer_ambiguity_ratio = self.gps_data.integer_ambiguity_ratio
+
+    def llh_time_to_ros_time(self, llh_day, llh_time):
+        py_time = datetime.datetime.strptime(llh_day + "," + llh_time + " UTC", "%Y/%m/%d,%H:%M:%S.%f %Z")
+        seconds = int(math.floor((py_time - unix_epoch_start).total_seconds()))
+        nanoseconds = py_time.microsecond * 1000
+        return rospy.Time(seconds, nanoseconds)
 
     def parse_data(self, llh_sentence):
         llh_contents = re.sub(' +', ' ', llh_sentence).strip()
         llh_commas = llh_contents.replace(' ', ',')
         llh_arr = llh_commas.split(',')
 
-        date = llh_arr[0]+','+llh_arr[1]
-        ts = self.date_to_timestamp(date)
-        ts = str(ts)
+        ros_time = self.llh_time_to_ros_time(llh_arr[0], llh_arr[1])
         llh_arr.pop(0)
-        llh_arr[0] = ts
+        llh_arr[0] = ros_time
         self.gps_data.from_array(llh_arr)
 
     def run(self):
         rospy.spin()
 
+
 def main():
     rospy.init_node('llh_to_fix')
-    
+
     node = LlhToFix()
     node.run()
 

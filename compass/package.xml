@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>compass</name>
+  <version>1.0.0</version>
+  <description>Compass based on a 3-axis magnetometer, attitude readings and possibly also GPS.</description>
+
+  <author email="peckama2@fel.cvut.cz">Martin Pecka</author>
+  <maintainer email="peckama2@fel.cvut.cz">Martin Pecka</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>angles</build_depend>
+  <build_depend>compass_msgs</build_depend>
+  <build_depend>geographiclib</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>imu_transformer</build_depend>
+  <build_depend>message_filters</build_depend>
+  <build_depend>nodelet</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>roslib</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_depend>tf2_geometry_msgs</build_depend>
+  <build_depend>tf2_ros</build_depend>
+
+  <exec_depend>compass_msgs</exec_depend>
+  <exec_depend>geographiclib</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>imu_transformer</exec_depend>
+  <exec_depend>message_filters</exec_depend>
+  <exec_depend>nodelet</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>roslib</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <export>
+      <nodelet plugin="${prefix}/nodelets.xml" />
+  </export>
+</package>

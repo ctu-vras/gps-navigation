@@ -36,8 +36,8 @@ class FakeGps():
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             self.msg.header.stamp = rospy.Time.now()
-            #self.msg.latitude += 0.000001 * random.random()
-            #self.msg.longitude += 0.000001 * random.random()
+            self.msg.latitude += 0.00002 * random.gauss(0,1)
+            self.msg.longitude += 0.00002 * random.gauss(0,1)
             self.publisher.publish(self.msg)
             rate.sleep()
 

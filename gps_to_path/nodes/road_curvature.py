@@ -1,3 +1,5 @@
+from __future__ import division
+from __future__ import absolute_import
 import shapely.geometry as geom
 import numpy as np
 from math import floor
@@ -5,8 +7,8 @@ from math import floor
 from road_crossing_consts import *
 
 
-def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point):
-    '''
+def circum_circle_radius(A, B, C):
+    u'''
     Return the radius value of circumcircle for triange defined by three points A, B, C.
 
     Parameters
@@ -33,8 +35,8 @@ def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point):
         return 10000
 
 
-def get_average_radius(road_network: geom.MultiLineString):
-    '''
+def get_average_radius(road_network):
+    u'''
     Returns radius for every road segment for all roads in road network.
 
     Parameters
@@ -42,8 +44,8 @@ def get_average_radius(road_network: geom.MultiLineString):
     road_network: shapely.geometry.MultiLineString
         All the roads in our area represented as MultiLineString.
     '''
-    names = ['radius', 'length', 'coords', 'curvature_level', 'curvature']
-    formats = ['f8', 'f8', '(2,2)f8', 'i1', 'f8']
+    names = [u'radius', u'length', u'coords', u'curvature_level', u'curvature']
+    formats = [u'f8', u'f8', u'(2,2)f8', u'i1', u'f8']
     curve_type = dict(names=names, formats=formats)
     segments = []
 
@@ -56,11 +58,11 @@ def get_average_radius(road_network: geom.MultiLineString):
             segments.append(np.array([tuple([avg_radius, seg_len, (road_coords[0], road_coords[1]), 0, 0])], dtype=curve_type))
             continue
         # Create individual circumcircles and calculate theirs radii
-        for i in range(len(road_coords)-2):
+        for i in xrange(len(road_coords)-2):
             radius.append(circum_circle_radius(geom.Point(road_coords[i]), geom.Point(road_coords[i+1]), geom.Point(road_coords[i+2])))
         # Set radii for corresponding road segments
         road_segments = []
-        for i in range(len(road_coords)-1):
+        for i in xrange(len(road_coords)-1):
             if i == 0:
                 avg_radius = radius[0]
             elif i == len(road_coords)-2:
@@ -74,8 +76,8 @@ def get_average_radius(road_network: geom.MultiLineString):
     return segments
 
 
-def rank_segments_curve(segments: list, junctions: list):
-    '''
+def rank_segments_curve(segments, junctions):
+    u'''
     Set curvature level for each road segment. Segments with junction node are automaticaly highest level.
 
     Parameters
@@ -90,18 +92,18 @@ def rank_segments_curve(segments: list, junctions: list):
 
     for road in segments:
         # Check if x and y coordinates of at least one point are in junctions coords
-        road['curvature_level'][np.amin(np.isin(road['coords'][:], junctions_coords)[:,0], axis=1)+np.amin(np.isin(road['coords'][:], junctions_coords)[:,1], axis=1)] = 5
+        road[u'curvature_level'][np.amin(np.isin(road[u'coords'][:], junctions_coords)[:,0], axis=1)+np.amin(np.isin(road[u'coords'][:], junctions_coords)[:,1], axis=1)] = 5
         # If radius lower then treshold and curvature level not yet given
-        road['curvature_level'][(road['radius'] < LEVEL_4_MAX_RADIUS) & (road['curvature_level'] == 0)] = 4
-        road['curvature_level'][(road['radius'] < LEVEL_3_MAX_RADIUS) & (road['curvature_level'] == 0)] = 3
-        road['curvature_level'][(road['radius'] < LEVEL_2_MAX_RADIUS) & (road['curvature_level'] == 0)] = 2
-        road['curvature_level'][(road['radius'] < LEVEL_1_MAX_RADIUS) & (road['curvature_level'] == 0)] = 1
+        road[u'curvature_level'][(road[u'radius'] < LEVEL_4_MAX_RADIUS) & (road[u'curvature_level'] == 0)] = 4
+        road[u'curvature_level'][(road[u'radius'] < LEVEL_3_MAX_RADIUS) & (road[u'curvature_level'] == 0)] = 3
+        road[u'curvature_level'][(road[u'radius'] < LEVEL_2_MAX_RADIUS) & (road[u'curvature_level'] == 0)] = 2
+        road[u'curvature_level'][(road[u'radius'] < LEVEL_1_MAX_RADIUS) & (road[u'curvature_level'] == 0)] = 1
 
-        road['curvature'] = road['length'] * weights[road['curvature_level']]
+        road[u'curvature'] = road[u'length'] * weights[road[u'curvature_level']]
 
 
-def road_cost_for_curve(segments: list, exploration_limit: int = 100):
-    '''
+def road_cost_for_curve(segments, exploration_limit = 100):
+    u'''
     Returns segments sorted into 15 levels based on theirs suitability for road traversation.
 
     Parameters
@@ -115,22 +117,22 @@ def road_cost_for_curve(segments: list, exploration_limit: int = 100):
     count = 0
 
     for road in segments:
-        for i in range(len(road)):
+        for i in xrange(len(road)):
             count += 1
-            seg_value = road[i]["curvature"]
-            dist1 = road[i]["length"]/2
-            for j in range(i, -1, -1):
-                seg_value += road[j]["curvature"]
-                dist1 += road[j]["length"]
+            seg_value = road[i][u"curvature"]
+            dist1 = road[i][u"length"]/2
+            for j in xrange(i, -1, -1):
+                seg_value += road[j][u"curvature"]
+                dist1 += road[j][u"length"]
                 if dist1 >= exploration_limit:
                     break
-            dist2 = road[i]["length"]/2
-            for j in range(i, len(road)):
-                seg_value += road[j]["curvature"]
-                dist2 += road[j]["length"]
+            dist2 = road[i][u"length"]/2
+            for j in xrange(i, len(road)):
+                seg_value += road[j][u"curvature"]
+                dist2 += road[j][u"length"]
                 if dist2 >= exploration_limit:
                     break
             seg_value /= (dist1+dist2)
-            ranked_segments.append((geom.LineString(road[i]['coords']), (ROAD_CURVATURE_RANKS-1) if seg_value >= (ROAD_CURVATURE_RANKS-1) else floor(seg_value)))
-    print("INFO: Processed {} road segments.".format(count))
+            ranked_segments.append((geom.LineString(road[i][u'coords']), (ROAD_CURVATURE_RANKS-1) if seg_value >= (ROAD_CURVATURE_RANKS-1) else floor(seg_value)))
+    print u"INFO: Processed {} road segments.".format(count)
     return ranked_segments

@@ -1,3 +1,5 @@
+from __future__ import division
+from __future__ import absolute_import
 import numpy as np
 from geodesy import utm
 import shapely.geometry as geom
@@ -5,15 +7,15 @@ from matplotlib import pyplot as plt
 from matplotlib import patches as ptch
 from math import ceil
 
-highway_tags = ["primary", "secondary", "tertiary", "unclassified", "residential", "primary_link", "secondary_link", \
-                "tertiary_link", "service", "track", "cycleway", "busway", "road", "living_street"]
-highway_tags.remove("cycleway")
-highway_tags.remove("track")
+highway_tags = [u"primary", u"secondary", u"tertiary", u"unclassified", u"residential", u"primary_link", u"secondary_link", \
+                u"tertiary_link", u"service", u"track", u"cycleway", u"busway", u"road", u"living_street"]
+highway_tags.remove(u"cycleway")
+highway_tags.remove(u"track")
 #highway_tags = ["primary", "secondary"]
 
 
 def get_roads(data):
-    '''
+    u'''
     Returns list of all crossable road in given map.
     Return value is list of list of tuples, where each list of tuples represents one road.
     Each tuple represents one Node in OSM Way, and its values are Node.id, Node.lat, Node.lon.
@@ -25,16 +27,16 @@ def get_roads(data):
     '''
     highway_nodes = []
     for way in data.ways:
-        if way.tags.get("highway") in highway_tags:
+        if way.tags.get(u"highway") in highway_tags:
             road_nodes = []
             for node in way.nodes:
                 road_nodes.append((node.id, float(node.lat), float(node.lon)))
-            highway_nodes.append((road_nodes, way.tags.get("highway")))
+            highway_nodes.append((road_nodes, way.tags.get(u"highway")))
     return highway_nodes
 
 
 def get_crossings(data):
-    '''
+    u'''
     Returns list of all crossings in given map.
     Return value is list of tuples, where each tuples represents one crossing.
     Tuple represents one Node in OSM Way, and its values are Node.id, Node.lat, Node.lon.
@@ -46,13 +48,13 @@ def get_crossings(data):
     '''
     crossings = []
     for node in data.nodes:
-        if node.tags.get("highway") == "crossing" or node.tags.get("footway") == "crossing":
+        if node.tags.get(u"highway") == u"crossing" or node.tags.get(u"footway") == u"crossing":
             crossings.append((node.id, float(node.lat), float(node.lon)))
     return crossings
 
 
-def gps_to_utm(data: list, withID: bool = True):
-    '''
+def gps_to_utm(data, withID = True):
+    u'''
     Transforms GPS degrees coordinates into UTM coordinate system.
 
     Parameters
@@ -66,8 +68,8 @@ def gps_to_utm(data: list, withID: bool = True):
     return np.array([[node.easting, node.northing] for node in data])
 
 
-def create_line_for_road(road: list, withId: bool = True):
-    '''
+def create_line_for_road(road, withId = True):
+    u'''
     Creates shapely.geometry.LineString representation for given road coordinates.
 
     Parameters
@@ -84,8 +86,8 @@ def create_line_for_road(road: list, withId: bool = True):
     return line
 
 
-def create_road_network(roads: list, inUTM: bool = True, withID: bool = True):
-    '''
+def create_road_network(roads, inUTM = True, withID = True):
+    u'''
     Constructs road network for given list of individual roads.
 
     Parameters
@@ -103,8 +105,8 @@ def create_road_network(roads: list, inUTM: bool = True, withID: bool = True):
     return geom.MultiLineString(road_network)
 
 
-def find_intersections(road_network: geom.MultiLineString):
-    '''
+def find_intersections(road_network):
+    u'''
     Returns list of shapely.geometry.Point of intersecting points in road_network
 
     Parameters
@@ -114,8 +116,8 @@ def find_intersections(road_network: geom.MultiLineString):
     '''
     intersections = []
     roads = list(road_network.geoms)
-    for i in range(len(roads)):
-        for j in range(i+1, len(roads)):
+    for i in xrange(len(roads)):
+        for j in xrange(i+1, len(roads)):
             inter = roads[i].intersection(roads[j])
             if inter and inter not in intersections:  # intersection exist and we have not found it yet
                 # We only deal with Point and MultiPoint
@@ -126,13 +128,13 @@ def find_intersections(road_network: geom.MultiLineString):
                     for point in list(inter.geoms):
                         intersections.append(point)
                 else:
-                    print("DEBUG: unhandled type in find_intersections():", type(inter))
+                    print u"DEBUG: unhandled type in find_intersections():", type(inter)
                     #raise TypeError()
     return intersections
 
 
-def find_junctions(intersections: list, road_network: geom.MultiLineString):
-    '''
+def find_junctions(intersections, road_network):
+    u'''
     Returns list of shapely.geometry.Point of junctions found from intersecting points in road_network
 
     Parameters
@@ -168,8 +170,8 @@ def find_junctions(intersections: list, road_network: geom.MultiLineString):
     return junctions
 
 
-def combine_road(junctions: list, intersections: list, road_network: geom.MultiLineString):
-    '''
+def combine_road(junctions, intersections, road_network):
+    u'''
     Connect roads that can be connected, road will therefore be from junction/map edge to junction/map edge.
 
     Parameters
@@ -206,7 +208,7 @@ def combine_road(junctions: list, intersections: list, road_network: geom.MultiL
     for road in new_road_network:
         new_road = []
         coords = list(road.coords)
-        for i in range(len(coords)-1):
+        for i in xrange(len(coords)-1):
             c1 = coords[i]
             c2 = coords[i+1]
 
@@ -214,8 +216,7 @@ def combine_road(junctions: list, intersections: list, road_network: geom.MultiL
             dist = c2[0]-c1[0], c2[1]-c1[1]
             steps = ceil(dist_meters/20)  # maximal length between two points 30 meters
             increment = dist[0]/steps, dist[1]/steps
-
-            for j in range(steps):
+            for j in xrange(int(steps)):
                 new_road.append(tuple([c1[0]+j*increment[0],c1[1]+j*increment[1]]))
         new_road.append(c2)
         new_new_road_network.append(geom.LineString(new_road))
@@ -225,16 +226,16 @@ def combine_road(junctions: list, intersections: list, road_network: geom.MultiL
 
 
 def road_class_price(roads):
-    costs = {"primary": 5, "secondary": 4, "tertiary": 3, "unclassified": 1, "residential": 2, "primary_link": 5, "secondary_link": 4, \
-                    "tertiary_link": 3, "service": 2, "track": 1, "cycleway": 1, "busway": 3, "road": 2, "living_street": 2}
+    costs = {u"primary": 5, u"secondary": 4, u"tertiary": 3, u"unclassified": 1, u"residential": 2, u"primary_link": 5, u"secondary_link": 4, \
+                    u"tertiary_link": 3, u"service": 2, u"track": 1, u"cycleway": 1, u"busway": 3, u"road": 2, u"living_street": 2}
     prices = []
     for road in roads:
         prices.append((geom.LineString(gps_to_utm(road[0], True)), costs[road[1]]))
     return prices
 
 
-def visualize_curves(segments: list, crossings: list, grid: bool = True):
-    '''
+def visualize_curves(segments, crossings, grid = True):
+    u'''
     Show map of processed area, e.g. its road network and crossings. Roads are show in color depending on their curve
     and crossings are green.
 
@@ -247,21 +248,21 @@ def visualize_curves(segments: list, crossings: list, grid: bool = True):
     grid: bool
         Show map with grid. Base value -> True.
     '''
-    colors = ["blue", "green", "yellow", "orange", "red", "magenta"]
+    colors = [u"blue", u"green", u"yellow", u"orange", u"red", u"magenta"]
     for road in segments:
         for segment in road:
-            x = [node[0] for node in segment["coords"]]
-            y = [node[1] for node in segment["coords"]]
-            plt.plot(x, y, color=colors[segment["curvature_level"]])
+            x = [node[0] for node in segment[u"coords"]]
+            y = [node[1] for node in segment[u"coords"]]
+            plt.plot(x, y, color=colors[segment[u"curvature_level"]])
     for crossing in crossings:
-        plt.plot(crossing[0], crossing[1], 'o', color='green')
+        plt.plot(crossing[0], crossing[1], u'o', color=u'green')
     if grid:
         plt.grid()
     plt.show()
 
 
-def visualize_curvature_rank(ranked_segments: list, crossings: list, grid: bool = True):
-    '''
+def visualize_curvature_rank(ranked_segments, crossings, grid = True):
+    u'''
     Show map of processed area, e.g. its road network and crossings. Roads are show in color depending on their traversability
     level and crossings are green.
 
@@ -275,37 +276,37 @@ def visualize_curvature_rank(ranked_segments: list, crossings: list, grid: bool 
         Show map with grid. Base value -> True.
     '''
     fig, ax = plt.subplots()
-    colors = ["blue", "deepskyblue", "aqua", "turquoise", "limegreen", "green", "yellow", "gold",\
-              "orange", "peru", "firebrick", "orangered", "deeppink", "magenta", "purple"]
+    colors = [u"blue", u"deepskyblue", u"aqua", u"turquoise", u"limegreen", u"green", u"yellow", u"gold",\
+              u"orange", u"peru", u"firebrick", u"orangered", u"deeppink", u"magenta", u"purple"]
     for rank in ranked_segments:
         for segment in rank:
-            x = [node[0] for node in segment["coords"]]
-            y = [node[1] for node in segment["coords"]]
+            x = [node[0] for node in segment[u"coords"]]
+            y = [node[1] for node in segment[u"coords"]]
             plt.plot(x, y, color=colors[ranked_segments.index(rank)])
 
     # legend
-    blue_patch = ptch.Patch(color="blue", label="Level 00")
-    deepskyblue_patch = ptch.Patch(color="deepskyblue", label="Level 01")
-    aqua_patch = ptch.Patch(color="aqua", label="Level 02")
-    turquoise_patch = ptch.Patch(color="turquoise", label="Level 03")
-    limegreen_patch = ptch.Patch(color="limegreen", label="Level 04")
-    green_patch = ptch.Patch(color="green", label="Level 05")
-    yellow_patch = ptch.Patch(color="yellow", label="Level 06")
-    gold_patch = ptch.Patch(color="gold", label="Level 07")
-    orange_patch = ptch.Patch(color="orange", label="Level 08")
-    tomato_patch = ptch.Patch(color="peru", label="Level 09")
-    orangered_patch = ptch.Patch(color="firebrick", label="Level 10")
-    red_patch = ptch.Patch(color="orangered", label="Level 11")
-    deeppink_patch = ptch.Patch(color="deeppink", label="Level 12")
-    magenta_patch = ptch.Patch(color="magenta", label="Level 13")
-    purple_patch = ptch.Patch(color="purple", label="Level 14")
+    blue_patch = ptch.Patch(color=u"blue", label=u"Level 00")
+    deepskyblue_patch = ptch.Patch(color=u"deepskyblue", label=u"Level 01")
+    aqua_patch = ptch.Patch(color=u"aqua", label=u"Level 02")
+    turquoise_patch = ptch.Patch(color=u"turquoise", label=u"Level 03")
+    limegreen_patch = ptch.Patch(color=u"limegreen", label=u"Level 04")
+    green_patch = ptch.Patch(color=u"green", label=u"Level 05")
+    yellow_patch = ptch.Patch(color=u"yellow", label=u"Level 06")
+    gold_patch = ptch.Patch(color=u"gold", label=u"Level 07")
+    orange_patch = ptch.Patch(color=u"orange", label=u"Level 08")
+    tomato_patch = ptch.Patch(color=u"peru", label=u"Level 09")
+    orangered_patch = ptch.Patch(color=u"firebrick", label=u"Level 10")
+    red_patch = ptch.Patch(color=u"orangered", label=u"Level 11")
+    deeppink_patch = ptch.Patch(color=u"deeppink", label=u"Level 12")
+    magenta_patch = ptch.Patch(color=u"magenta", label=u"Level 13")
+    purple_patch = ptch.Patch(color=u"purple", label=u"Level 14")
     handles = [blue_patch, deepskyblue_patch, aqua_patch, turquoise_patch, limegreen_patch, green_patch,\
               yellow_patch, gold_patch, orange_patch, tomato_patch, orangered_patch, red_patch, deeppink_patch,\
               magenta_patch, purple_patch]
     ax.legend(handles=handles)
 
     for crossing in crossings:
-        plt.plot(crossing[0], crossing[1], 'o', color='green')
+        plt.plot(crossing[0], crossing[1], u'o', color=u'green')
     if grid:
         plt.grid()
     plt.show()

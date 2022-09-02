@@ -6,7 +6,7 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
 
 <!-- LLH FROM GPS TO FIX -->
-    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
+<!--    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
         <param name="port" type="string" value="/dev/ttyACM0" />   
         <param name="baud" type="int" value="115200" />
     </node>
@@ -17,7 +17,7 @@
     <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
 	    <param name="sound_period" type="int" value="10" />
     </node>
-
+-->
 <!-- NTRIP CORRECTIONS -->>
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
         <param name="host" value="ntrip.pecny.cz" />
@@ -26,7 +26,7 @@
     </node>
 
 <!-- FAKE GPS -->
-    <!--node pkg="gps_to_path" type="fake_gps" name="fake_gps" /-->
+    <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
 
 <!-- AZIMUTH -->
     <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">

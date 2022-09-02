@@ -12,7 +12,7 @@ import std_msgs.msg
 from geodesy import utm
 import numpy as np
 import graph_tool.all as gt
-import osm_analysis 
+import osm_analysis
 import shapely.geometry as geometry
 import copy
 import osm_types
@@ -43,7 +43,7 @@ class PathPlanner():
         self.waypoints_msg = Waypoints()
 
         self.osm_planner_initialized = False
-        
+
 
     def update_fix(self,msg):
         utm_fix = utm.fromLatLong(msg.latitude,msg.longitude)

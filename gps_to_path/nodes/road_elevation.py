@@ -1,8 +1,10 @@
+from __future__ import division
+from __future__ import absolute_import
 import sjtsk_to_utm
 import numpy as np
 import geopy.distance
 from os import path
-from math import ceil, dist, floor
+from math import ceil, floor
 import shapely.geometry as geom
 import time
 from road_crossing_consts import *
@@ -16,7 +18,7 @@ def generate_waypoints(road, waypoints_density, circular=False):
     waypoints = []
     original_waypoint_indices = []
 
-    for i in range(len(coords)-1):
+    for i in xrange(len(coords)-1):
         c1 = coords[i]
         c2 = coords[i+1]
 
@@ -27,7 +29,7 @@ def generate_waypoints(road, waypoints_density, circular=False):
 
         original_waypoint_indices.append(len(waypoints))
 
-        for j in range(steps):
+        for j in xrange(steps):
             waypoints.append(tuple([c1[0]+j*increment[0],c1[1]+j*increment[1]]))
         
     original_waypoint_indices.append(len(waypoints))
@@ -36,7 +38,7 @@ def generate_waypoints(road, waypoints_density, circular=False):
     return waypoints
 
 
-def road_gps_to_csv(road, waypoints_density=0.1, waypoints_file="waypoints.csv", circular=False):
+def road_gps_to_csv(road, waypoints_density=0.1, waypoints_file=u"waypoints.csv", circular=False):
     coords = np.array([[node[1], node[2]] for node in road])
     if circular:
         coords = np.append(coords,[coords[0,:]],axis=0)
@@ -44,7 +46,7 @@ def road_gps_to_csv(road, waypoints_density=0.1, waypoints_file="waypoints.csv",
     waypoints = []
     original_waypoint_indices = []
     
-    for i in range(len(coords)-1):
+    for i in xrange(len(coords)-1):
         c1 = coords[i]
         c2 = coords[i+1]
 
@@ -54,7 +56,7 @@ def road_gps_to_csv(road, waypoints_density=0.1, waypoints_file="waypoints.csv",
 
         original_waypoint_indices.append(len(waypoints))
         
-        for j in range(ceil(dist_meters/waypoints_density)):
+        for j in xrange(ceil(dist_meters/waypoints_density)):
             waypoints.append(c1+j*increment)
         
     original_waypoint_indices.append(len(waypoints))
@@ -62,7 +64,7 @@ def road_gps_to_csv(road, waypoints_density=0.1, waypoints_file="waypoints.csv",
 
     #np.savetxt(waypoints_file, waypoints, delimiter=',')
     
-    print("Generated {} waypoints from {} coordinate pairs.".format(len(waypoints), len(coords)))
+    print u"Generated {} waypoints from {} coordinate pairs.".format(len(waypoints), len(coords))
 
     return original_waypoint_indices
 
@@ -70,34 +72,34 @@ def road_gps_to_csv(road, waypoints_density=0.1, waypoints_file="waypoints.csv",
 def get_road_elevation(road):
     waypoints = generate_waypoints(road, 10)
 
-    """ ZABAGED - data z katastru
+    u""" ZABAGED - data z katastru
         4g ..... 5m dense square lattice
         5g ..... irrelugar, newer, better """
-    fn_4g = "553988_CVUT/4g/PRAH72_4g.xyz"
-    fn_5g = "553988_CVUT/5g/PRAH72_5g.xyz"
+    fn_4g = u"553988_CVUT/4g/PRAH72_4g.xyz"
+    fn_5g = u"553988_CVUT/5g/PRAH72_5g.xyz"
 
     fn = fn_5g
 
-    if not path.exists(fn[:-3]+"csv"):
+    if not path.exists(fn[:-3]+u"csv"):
         transformer = sjtsk_to_utm.sjtsk2utm(fn)
         transformer.run()
         transformer.save_to_file()
         transformer.plot()
 
-    data = sjtsk_to_utm.DataPoints(waypoints, fn[:-3]+"csv", n_closest=5)
+    data = sjtsk_to_utm.DataPoints(waypoints, fn[:-3]+u"csv", n_closest=5)
     waypoints = data.run()
     return waypoints
 
 
-def get_road_network_elevation(road_network: geom.MultiLineString, elev_data_files: list):
-    '''start_t = time.time()
+def get_road_network_elevation(road_network, elev_data_files):
+    u'''start_t = time.time()
     data_file = "elev_data.csv"
     for file_name in elev_data_files:
         transformer = sjtsk_to_utm.sjtsk2utm(file_name, data_file)
         transformer.run()
         transformer.save_to_file()
     print("DEBUG: Elev data file: %.05f" % (time.time()-start_t))'''
-    data_file = "/home/vlkjan6/Documents/RobinGas/testfolder/553988_CVUT/5g/PRAH72_5g.xyz"
+    data_file = u"/home/vlkjan6/Documents/RobinGas/testfolder/553988_CVUT/5g/PRAH72_5g.xyz"
 
     network_elev = []
     road_nodes = []
@@ -108,19 +110,19 @@ def get_road_network_elevation(road_network: geom.MultiLineString, elev_data_fil
         waypoints.extend(generate_waypoints(road, 1))
         road_nodes.append(len(waypoints)-sum(road_nodes))
     data = sjtsk_to_utm.DataPoints(waypoints, data_file, n_closest=5)
-    print("DEBUG: Create DataPoints: %.05f" % (time.time()-start_t))
+    print u"DEBUG: Create DataPoints: %.05f" % (time.time()-start_t)
     start_t = time.time()
     elev_data = data.run()
-    print("DEBUG: Get elev: %.05f" % (time.time()-start_t))
+    print u"DEBUG: Get elev: %.05f" % (time.time()-start_t)
     prev_nodes = 0
     for num_nodes in road_nodes:
         network_elev.append(elev_data[prev_nodes:prev_nodes+num_nodes])
         prev_nodes += num_nodes
-    print("INFO: processed {} height points.".format(sum(road_nodes)))
+    print u"INFO: processed {} height points.".format(sum(road_nodes))
     return network_elev
 
 
-def classify_TPI(elev_data: list):
+def classify_TPI(elev_data):
     # TODO: Find best variables for our usecase. n_small and n_large probably set
     # What about s_change and l_change? Should they be the same, different, how, ...
     n_small = SMALL_NEIGH
@@ -128,10 +130,10 @@ def classify_TPI(elev_data: list):
     s_change = SMALL_CHANGE
     l_change = LARGE_CHANGE
     network_classification = []
-    num_class = [0 for i in range(10)]
+    num_class = [0 for i in xrange(10)]
     for road in elev_data:
         road_classification = []
-        for seg_num in range(len(road)-1):
+        for seg_num in xrange(len(road)-1):
             small = sum(road[seg_num+1:(seg_num+1+n_small if seg_num+1+n_small < len(road) else len(road)), 2])
             small = road[seg_num][2] - small/(n_small if seg_num+1+n_small < len(road) else len(road)-seg_num-1)
             large = sum(road[seg_num+1:(seg_num+1+n_large if seg_num+1+n_large < len(road) else len(road)), 2])
@@ -158,26 +160,32 @@ def classify_TPI(elev_data: list):
             num_class[classify-1] += 1
             road_classification.append((road[seg_num:seg_num+2, :2], classify))
         network_classification.append(road_classification)
-    print("DEBUG: TPI classification counts: {}.".format(num_class))
+    print u"DEBUG: TPI classification counts: {}.".format(num_class)
     return network_classification
 
+def dist(a,b):
+    dist = 0
+    for i in range(len(a)):
+	dist += (a[i]-b[i])**2
+    dist = dist**(1/2)
+    return dist
 
-def road_cost_for_height(network_classification: list, exploration_limit: int = 100):
+def road_cost_for_height(network_classification, exploration_limit = 100):
     class_costs = [CANYONS, MIDSLOPE_DRAIN, UPLAND_DRAIN, U_VALLEY, PLAINS, OPEN_SLOPES, \
                    UPPER_SLOPES, LOCAL_RIDGE, MIDSLOPE_RIDGE, MOUNTAIN_TOP]
     ranked_segments = []
     for road in network_classification:
         big_seg = []
-        for i in range(len(road)):
+        for i in xrange(len(road)):
             seg_value = 0
             dist1 = dist(road[i][0][0], road[i][0][1])/2 
-            for j in range(i, -1, -1):
+            for j in xrange(i, -1, -1):
                 seg_value += class_costs[road[j][1]-1]*dist(road[j][0][0], road[j][0][1]) 
                 dist1 += dist(road[j][0][0], road[j][0][1]) 
                 if dist1 >= exploration_limit:
                     break
             dist2 = dist(road[i][0][0], road[i][0][1])/2 
-            for j in range(i, len(road)):
+            for j in xrange(i, len(road)):
                 seg_value += class_costs[road[j][1]-1]*dist(road[j][0][0], road[j][0][1]) 
                 dist2 += dist(road[j][0][0], road[j][0][1]) 
                 if dist2 >= exploration_limit:

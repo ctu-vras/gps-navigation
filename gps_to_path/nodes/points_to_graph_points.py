@@ -66,9 +66,9 @@ def points_arr_to_point_line(points,density):
 
 def points_to_graph_points(point1, point2, density=1, width=10):
 
-    perpendicular_increase = round(width/2/density)
-    parallel_increase = round(width/4/density)
-    
+    perpendicular_increase = int(round(width/2/density))
+    parallel_increase = int(round(width/4/density))
+
     if point1.bounds == point2.bounds:
         return MultiPoint(np.array([point1.x, point1.y])),MultiPoint(np.array([point1.x, point1.y])),np.zeros((1,1))
     else:

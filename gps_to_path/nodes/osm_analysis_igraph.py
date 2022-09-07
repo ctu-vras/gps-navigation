@@ -1,12 +1,9 @@
 from __future__ import division
 
-from cmath import nan
-from math import inf, floor
-from tracemalloc import start
+from math import floor
 import rospy
 #from matplotlib.patches import Polygon
 import overpy
-import OSMPythonTools.api as osm
 import shapely.geometry as geometry
 from shapely.prepared import prep
 from shapely.ops import nearest_points
@@ -23,7 +20,6 @@ from random import random
 import time
 from copy import copy,deepcopy
 from points_to_graph_points import points_to_graph_points, points_arr_to_point_line, get_point_line
-import graph_tool.all as gt
 from scipy.spatial import ckdtree
 import igraph
 
@@ -295,7 +291,7 @@ class PathAnalysis:
                         while new_way.id in self.ways.keys():
                             new_way.id = int(-10**15*random())
                         new_way.nodes = ways[i].nodes + ways[j].nodes[1:] 
-                        new_way.tags = {**ways[i].tags, **ways[j].tags}
+                        new_way.tags = ways[i].tags.update(ways[j].tags)
                         new_way.line = combined_line
   
                         if new_way.nodes[0].id == new_way.nodes[-1].id:
@@ -623,7 +619,7 @@ class PathAnalysis:
         return reduced_objects
 
     def get_min_index(self, indices, threshold):
-        ind = inf
+        ind = 1000000
         min_indices = np.where(indices > threshold)
         if min_indices:
             ind = min_indices[0][0]
@@ -1277,7 +1273,7 @@ class PathAnalysis:
             #        cost += (elev_segment[1])/ROAD_ELEVATION_RANKS * ELEVATION_WEIGHT
             cost /= (CURVATURE_WEIGHT+CLASS_WEIGHT)
             cost *= ROAD_CROSSINGS_RANKS
-            ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else floor(cost)].append(segment[0].buffer(7/2))
+            ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else int(floor(cost))].append(segment[0].buffer(7/2))
         self.road_polygons = ranked_segments_2
         
         

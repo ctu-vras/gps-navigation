@@ -16,7 +16,7 @@ def get_point_line(p1,p2,density,increase=0):
 
     vec = (b-a).T
 
-    line = get_equidistant_points(a,b,ceil(np.linalg.norm(vec)/density)+1)  # ceil, because more points is OK, while less points could be problematic (distance between points should not be larger than 1*density)
+    line = get_equidistant_points(a,b,int(ceil(np.linalg.norm(vec)/density))+1)  # ceil, because more points is OK, while less points could be problematic (distance between points should not be larger than 1*density)
     dist_line = np.zeros((len(line),1))
 
     if increase>0:
@@ -30,6 +30,7 @@ def increase_line(line,dist_line,vec,n,density):
     arange_increase_vec = arange_increase_vec.reshape((-1,1))
     increase_vec = arange_increase_vec * vec
     before = line[0] * np.ones((n,2)) - increase_vec
+    before = np.flip(before,axis=0)
     after = line[-1] * np.ones((n,2)) + increase_vec
 
     line = np.concatenate((before,line,after),axis=0)
@@ -66,8 +67,8 @@ def points_arr_to_point_line(points,density):
 
 def points_to_graph_points(point1, point2, density=1, width=10):
 
-    perpendicular_increase = round(width/2/density)
-    parallel_increase = round(width/4/density)
+    perpendicular_increase = int(round(width/2/density))
+    parallel_increase = int(round(width/4/density))
     
     if point1.bounds == point2.bounds:
         return MultiPoint(np.array([point1.x, point1.y])),MultiPoint(np.array([point1.x, point1.y])),np.zeros((1,1))

@@ -1,5 +1,5 @@
  <launch>      
-    <arg name="gpx_assignment" default="$(find gps_to_path)/data/kn_short.gpx" />
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/kn_aerial.gpx" />
     <arg name="run_ntrip_relay" default="true" />
 
 <!-- STATIC TRANSFORMS -->
@@ -15,7 +15,7 @@
     </node>
 
     <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
-	    <param name="sound_period" type="int" value="10" />
+	    <param name="sound_period" type="int" value="30" />
     </node>
 
 <!-- NTRIP CORRECTIONS -->>

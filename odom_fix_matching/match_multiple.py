@@ -1,12 +1,13 @@
 from odom_fix_matching import OdomMatcher
 from copy import copy
+import numpy as np
 
 # Into this dictionary put all the bag file names you want processed with the key
 # being the name of the robot.
 bags = {
-'tradr':['fn1','fn2','...'],
+'tradr':[],
 
-'spot': [],
+'spot': ['/home/robot/0908_bags/spot_2022-09-08-13-54-22.bag',],
 
 'husky': []
 }
@@ -20,6 +21,13 @@ odom_topics = {
     'marv': ["/imu_odom","/odom"]
 }
 
+joy_topics = {
+    'tradr': "/local_joy/cmd_vel",
+    'spot':  "/joy_local/cmd_vel",
+    'husky': None,
+    'marv':  None
+}
+
 
 for robot in bags.keys():
     for i,bag in enumerate(bags[robot]):
@@ -30,10 +38,12 @@ for robot in bags.keys():
             copy(odom_topics[robot]),         # Odometry topics.
             use_weights     = True,     # Weight matching based on covariance.
             fix_topic       = '/fix',   # Fix topic name.
+            joy_topic       = None, #joy_topics[robot], # Joystick topic name.
             switch_w_h      = False,    # Switch covariance of lat and lon.
             use_odom_covs   = False,    # Use the covariance of the odometries.
             produce_animation = True,   # Produce an animation of the movement of the robot.
-            match_z         = False     # Match z of odom with fix.
+            match_z         = False,     # Match z of odom with fix.
+            forced_background_coords = np.array([[445000,5542500],[445500,5543300]]),
         )
 
         bag.run()

@@ -8,9 +8,6 @@ import shapely.geometry as geom
 import time
 from road_crossing_consts import *
 
-def dist(p1,p2):
-    return np.sqrt(np.sum(np.square(p2-p1)))
-
 def generate_waypoints(road, waypoints_density, circular=False):
     coords = list(road.coords)
     if circular:
@@ -163,6 +160,9 @@ def classify_TPI(elev_data):
         network_classification.append(road_classification)
     print("DEBUG: TPI classification counts: {}.".format(num_class))
     return network_classification
+
+def dist(p1,p2):
+    return np.sqrt(np.sum(np.square(p2-p1)))
 
 
 def road_cost_for_height(network_classification, exploration_limit = 100):

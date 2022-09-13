@@ -74,7 +74,7 @@ class OdomMatcher():
         Output is the mean distance between corresponding points and a figure of the matched points
         for each odometry. Also produces a gif of the robot's traversing of the recorder paths.
     """
-    def __init__(self,bag_path,fn,odom_topics, use_weights, fix_topic=None, switch_w_h=False, use_odom_covs = False, produce_animation=True, match_z = False):
+    def __init__(self,bag_path,fn,odom_topics, use_weights, fix_topic=None, joy_topic=None, switch_w_h=False, use_odom_covs = False, produce_animation=True, match_z = False, forced_background_coords=None):
         self.bag_path = bag_path
         self.fn = fn
         print("Opening file {}.".format(self.bag_path))
@@ -84,6 +84,7 @@ class OdomMatcher():
             print("\nCould not open bag file {}\n".format(self.bag_path))
             quit()
         self.fix_topic = fix_topic
+        self.joy_topic = joy_topic
         self.odom_topics = odom_topics
         self.use_weights = use_weights
         self.switch_w_h = switch_w_h
@@ -94,10 +95,13 @@ class OdomMatcher():
         self.bg_image = None
         self.bg_image_animation = None
 
+        self.forced_background_coords = forced_background_coords
+
     def parse_topics(self):
         """ Save messages from desired topics (fix,odoms) as lists of points with time."""
         self.odometries = {}
         self.fixes = PositionsContainer()
+        self.joy_sticks = PositionsContainer()
 
         self.min_lat = 10000
         self.max_lat = -1
@@ -117,8 +121,15 @@ class OdomMatcher():
         # Apparently this also happens to odom topics...
         if self.fix_topic is not None and self.fix_topic[0] == '/':
             topics = self.odom_topics + [self.fix_topic, self.fix_topic[1:]]
+            fix_topics = [self.fix_topic, self.fix_topic[1:]]
         else:
             topics = self.odom_topics + [self.fix_topic]
+        
+        if self.joy_topic is not None and self.joy_topic[0] == '/':
+            topics = topics + [self.joy_topic, self.joy_topic[1:]]
+            self.joy_topic = [self.joy_topic, self.joy_topic[1:]]
+        else:
+            topics = topics + [self.joy_topic]
             
         for topic, msg, t in self.bag.read_messages(topics=topics):
         
@@ -136,23 +147,34 @@ class OdomMatcher():
                 if not topic in self.first_odom_values:
                     self.first_odom_values[topic] = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z]).reshape(-1,1)
             
-            # Save fix msg as Position object.
+            
             else:
-                # Save lat/long extremes.
-                if msg.latitude < self.min_lat:
-                    self.min_lat = msg.latitude
-                elif msg.latitude > self.max_lat:
-                    self.max_lat = msg.latitude
-                if msg.longitude < self.min_long:
-                    self.min_long = msg.longitude
-                elif msg.longitude > self.max_long:
-                    self.max_long = msg.longitude
+                # Save fix msg as Position object.
+                if topic in fix_topics:
+                    fix_topics = [topic]
+                    # Save lat/long extremes.
+                    if msg.latitude < self.min_lat:
+                        self.min_lat = msg.latitude
+                    elif msg.latitude > self.max_lat:
+                        self.max_lat = msg.latitude
+                    if msg.longitude < self.min_long:
+                        self.min_long = msg.longitude
+                    elif msg.longitude > self.max_long:
+                        self.max_long = msg.longitude
 
-                # Transform to UTM.
-                easting,northing,_,_ = utm.from_latlon(msg.latitude,msg.longitude)
+                    # Transform to UTM.
+                    easting,northing,self.utm_letter,self.utm_number = utm.from_latlon(msg.latitude,msg.longitude)
+                    
+                    position = Position(easting,northing,0,(msg.header.stamp).to_nsec(),msg.position_covariance[4],msg.position_covariance[0],None)
+                    self.fixes.positions.append(position)
+
+                # Joystick topic.
+                elif topic in self.joy_topic:
+                    # We just add the last robot position to when the joystick was used...
+                    if self.fixes.positions:
+                        self.joy_sticks.positions.append(self.fixes.positions[-1])
                 
-                position = Position(easting,northing,0,(msg.header.stamp).to_nsec(),msg.position_covariance[4],msg.position_covariance[0],None)
-                self.fixes.positions.append(position)
+                # Don't 'else:' here. There can be a rogue 'fix' topic........
 
         topics_to_remove = []
         for topic in self.odom_topics:
@@ -167,6 +189,10 @@ class OdomMatcher():
         if self.fix_topic and self.fixes.positions == []:
             print("Fix topic {} has not occured in bag file {} and won't be used.".format(self.fix_topic,self.bag_path))
             self.fix_topic = None
+            self.joy_topic = None
+
+        elif self.joy_topic is not None and not self.joy_sticks.positions:
+            self.joy_topic = None
     
     def get_subsequent_distances(self,positions_container):
         """ For each point calculate the distances between two subsequent points. """
@@ -277,6 +303,8 @@ class OdomMatcher():
         t_b = shorter_t - t_1
 
         dt = t_b/t_a
+        dt = np.clip(dt,0,1)    # We do not want to interpolate out of the bounds.
+                                # (that can lead to e.g. negative covariances...)
 
         interp_p = p_1 + (p_2-p_1) * dt
 
@@ -527,7 +555,12 @@ class OdomMatcher():
 
     def plot_background_map(self,ax,min_long,max_long,min_lat,max_lat,for_animation=False):
         """ Obtain background map for some wgs points. """
-        x_margin, y_margin = self.get_margin(min_long,max_long,min_lat,max_lat)
+        if self.forced_background_coords is None:
+            x_margin, y_margin = self.get_margin(min_long,max_long,min_lat,max_lat)
+        else:
+            x_margin, y_margin = (0,0)
+            min_lat,min_long = utm.to_latlon(self.forced_background_coords[0,0],self.forced_background_coords[0,1],self.utm_letter,self.utm_number)
+            max_lat,max_long = utm.to_latlon(self.forced_background_coords[1,0],self.forced_background_coords[1,1],self.utm_letter,self.utm_number)
 
         if self.bg_image is None:
             background_map = get_background_image(min_long, max_long, min_lat, max_lat, x_margin, y_margin)
@@ -607,6 +640,14 @@ class OdomMatcher():
             self.legend.append('fix')
             self.artists += self.ax_ani.plot([],[],linestyle='None', color=self.cmap(0), markersize = 5,marker='x',zorder=20,alpha=0.8)
 
+            if self.joy_topic is not None:
+                joy_points = self.joy_sticks.positions_arr()
+                joy_points = joy_points[::trimmer,:]
+
+                self.points_ani.append(joy_points)
+                self.legend.append('joy')
+                self.artists += self.ax_ani.plot([],[],linestyle='None',fillstyle='none', color='yellow',markersize = 10,marker='o',zorder=18,alpha=0.4, markeredgewidth=1)
+
             for i,odom in enumerate(self.odom_topics):
                 self.legend.append(odom)
 
@@ -676,8 +717,8 @@ class OdomMatcher():
 
         for odom in self.odom_topics:
             for correspondence in self.matched_points[odom].keys(): 
-                points1 = self.matched_points[odom][correspondence][0]
-                points2 = self.matched_points[odom][correspondence][1]
+                points1 = self.matched_points[odom][correspondence][0]          # ODOM
+                points2 = self.matched_points[odom][correspondence][1]          # FIX (or another odom)
                 trimmer = max([1,round(len(points1[:,0])/NUM_TRIMMED_POINTS)])
                 
                 covs_with_none = self.matched_points[odom][correspondence][2]
@@ -715,11 +756,19 @@ class OdomMatcher():
                 x2 = points2[::trimmer,0]
                 y2 = points2[::trimmer,1]
                 z2 = points2[::trimmer,2]
+
+                if self.joy_topic is not None:
+                    joy_arr = self.joy_sticks.positions_arr()
+                    x_joy = joy_arr[::trimmer,0]
+                    y_joy = joy_arr[::trimmer,1]
+                    z_joy = joy_arr[::trimmer,2]
                 
                 ax.scatter(x1,y1,s=7+15,marker="o",c=odom_colors[odom],edgecolor='black',lw=0.3,zorder=20,)
                 
                 if correspondence == self.fix_topic:
                     ax.scatter(x2,y2,s=6+15,marker="x",c=c,cmap=cmap,lw=1,zorder=21,alpha=1, norm=norm)
+                    if self.joy_topic is not None:
+                        ax.scatter(x_joy,y_joy,s=50,marker='o',edgecolors='yellow',facecolors='none',zorder=19,lw=1.5, alpha=0.4)
                 else:
                     ax.scatter(x2,y2,s=7+15,marker="o",c=odom_colors[correspondence],edgecolor='black',lw=0.3,zorder=21,alpha=0.8)                    
 
@@ -792,6 +841,8 @@ class OdomMatcher():
                 if correspondence == self.fix_topic:
                     ax_b.scatter(x2,z2,s=6+15,marker="x",c=c,cmap=cmap,lw=1,zorder=21,alpha=0.8,norm=norm)
                     ax_l.scatter(z2,y2,s=6+15,marker="x",c=c,cmap=cmap,lw=1,zorder=21,alpha=0.8,norm=norm)
+                    #ax_b.scatter(x_joy,z_joy,s=30,marker='o',edgecolors='gold',facecolors='none',zorder=19,lw=1.5, alpha=0.4)
+                    #ax_l.scatter(z_joy,y_joy,s=30,marker='o',edgecolors='gold',facecolors='none',zorder=19,lw=1.5, alpha=0.4)
                 else:
                     ax_b.scatter(x2,z2,s=7+15,marker="o",c=odom_colors[correspondence],edgecolor='black',lw=0.3,zorder=21)
                     ax_l.scatter(z2,y2,s=7+15,marker="o",c=odom_colors[correspondence],edgecolor='black',lw=0.3,zorder=21)
@@ -931,7 +982,10 @@ class OdomMatcher():
         return
 
     def __del__(self):
-        self.bag.close()
+        try:
+            self.bag.close()
+        except:
+            pass
 
 if __name__ == "__main__":
     bags = {
@@ -958,7 +1012,7 @@ if __name__ == "__main__":
 
     for robot in bags.keys():
         for i,bag in enumerate(bags[robot]):
-            bag = OdomMatcher(bag, bag[:-15], odom_topics[robot], use_weights=True, fix_topic = '/fix', switch_w_h = True, use_odom_covs=False, produce_animation=True, match_z = False)
+            bag = OdomMatcher(bag, bag[:-15], odom_topics[robot], use_weights=True, fix_topic = '/fix', joy_topic=None, switch_w_h = True, use_odom_covs=False, produce_animation=True, match_z = False)
             bag.run()
 
 

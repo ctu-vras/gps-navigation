@@ -7,8 +7,6 @@ python3 ./match_single.py bag_path odom1,odom2,... use_weights(bool) produce_ani
 e.g. python3 ./match_single.py /home/data/spot.bag /icp_odom,/spot/odometry true true\n\
 ---------------\n"
 
-print(len(sys.argv))
-
 if len(sys.argv) == 5:
 
     bag_file = sys.argv[1]
@@ -38,6 +36,7 @@ bag = OdomMatcher(
     odometry_topic_names,       # Odometry topics.
     use_weights     = weights,  # Weight matching based on covariance.
     fix_topic       = '/fix',   # Fix topic name.
+    joy_topic       = '/local_joy/cmd_vel', # Joystick topic name.
     switch_w_h      = False,    # Switch covariance of lat and lon.
     use_odom_covs   = False,    # Use the covariance of the odometries.
     produce_animation = ani,    # Produce an animation of the movement of the robot.

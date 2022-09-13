@@ -150,7 +150,6 @@ class PathAnalysis:
         gpx_f = open(coords_file, 'r')
         gpx_object = gpxpy.parse(gpx_f)
         self.waypoints = np.array([[point.latitude,point.longitude] for point in gpx_object.waypoints])
-
         self.waypoints, self.zone_number, self.zone_letter = self.waypoints_to_utm()
 
         self.waypoints = np.concatenate([current_robot_position,self.waypoints])
@@ -792,6 +791,8 @@ class PathAnalysis:
 
             graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
 
+            graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)
+
             edges = self.generate_edges(graph_points, 1.5*density)
             edge_points_1 = graph_points[edges[:,0]]
             edge_points_2 = graph_points[edges[:,1]]         
@@ -844,7 +845,8 @@ class PathAnalysis:
                                     'graph_points':graph_points,
                                     'graph_range':graph_range,
                                     'start_index_graph':start_index_graph,
-                                    'goal_index_graph':goal_index_graph
+                                    'goal_index_graph':goal_index_graph,
+                                    'graph_points_costs':graph_points_costs
                                     }
                     return graph_dict
                 else:
@@ -859,7 +861,8 @@ class PathAnalysis:
                                     'graph_points':None,
                                     'graph_range':graph_range,
                                     'start_index_graph':start_index_graph,
-                                    'goal_index_graph':goal_index_graph
+                                    'goal_index_graph':goal_index_graph,
+                                    'graph_points_costs':None
                                     }
                     return graph_dict
                 else:
@@ -1126,6 +1129,18 @@ class PathAnalysis:
     
     def get_path_dist(self,p1,p2):
         return np.sqrt(np.sum(np.square(p1-p2),axis=1))
+
+    def get_points_costs(self,road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss):
+        road_points = road_points_mask * ~footway_points_mask
+        no_footway_points = (out_of_max_dist_mask * ~footway_points_mask).reshape(-1,1)
+        
+        if self.road_crossing:
+            road_costs = sum(road_points[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)).reshape(-1,1)
+            cost = dist_from_line + road_costs + no_footway_loss*no_footway_points
+        else:
+            cost = dist_from_line + road_loss*road_points + no_footway_loss*no_footway_points
+        return [cost,dist_from_line,road_costs,no_footway_loss*no_footway_points]
+        #return cost
     
     def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss):
         #return dist_cost

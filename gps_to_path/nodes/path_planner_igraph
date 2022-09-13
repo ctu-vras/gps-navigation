@@ -3,11 +3,12 @@
 from __future__ import division
 import rospy
 import ros_numpy
-
+import time
 from nav_msgs.msg import Path
 from sensor_msgs.msg import NavSatFix,PointCloud2
 from geometry_msgs.msg import Point
 from gps_to_path.msg import Waypoints
+from stamped_msgs.msg import Float64
 import std_msgs.msg
 from geodesy import utm
 import numpy as np
@@ -15,6 +16,17 @@ import osm_analysis_igraph
 import shapely.geometry as geometry
 import copy
 import osm_types
+from numpy.lib import recfunctions as rfn
+from scipy.spatial import KDTree
+import matplotlib.pyplot as plt
+import math
+
+plt.ion()
+
+
+GRAPH_RADIUS = 20
+TRAV_RADIUS = 0.5
+UNTRAV_POINT_COST = 10
 
 def dist(p1,p2):
     p1 = np.array(p1)
@@ -37,16 +49,41 @@ class PathPlanner():
             "fix", NavSatFix, self.update_fix, queue_size=10)
         self.current_robot_position = None
 
+        self.sub_azimuth = rospy.Subscriber("mag_azimuth", Float64, self.update_azimuth, queue_size=10)
+        self.azimuth = None
+
+        self.sub_trav = rospy.Subscriber(
+            "trav_obstacles_pcd", PointCloud2, self.update_trav, queue_size=10)
+        self.untrav_points = None
+
+        self.untrav_cost = None
+
         self.pub_waypoints = rospy.Publisher(
             'waypoints', Waypoints, queue_size=10)
         self.waypoints_msg = Waypoints()
 
         self.osm_planner_initialized = False
-        
+
+        self.pub_graph_pcd = rospy.Publisher('graph_pcd', PointCloud2, queue_size=10)
+        self.graph_pcd_msg = PointCloud2()
+
+        fig,self.ax = plt.subplots()
+        plt.show()
+        self.art = None
+        #self.art1=None
+        #self.art2=None
+    
+    def update_trav(self,msg):
+        pcd_arr = ros_numpy.numpify(msg)
+        pcd_arr = rfn.structured_to_unstructured(pcd_arr)
+        self.untrav_points = pcd_arr
 
     def update_fix(self,msg):
         utm_fix = utm.fromLatLong(msg.latitude,msg.longitude)
         self.current_robot_position = np.array([[utm_fix.easting, utm_fix.northing]])
+
+    def update_azimuth(self, msg):
+        self.azimuth = msg.data
     
     def reached_goal_point(self,robot_position,goal_point):
         if dist(np.array(robot_position), np.array(goal_point)) <= self.goal_reached_distance:
@@ -87,17 +124,86 @@ class PathPlanner():
         # Search current sub graph from current robot position to goal point.
         # Return a list of points (i.e. a path).
         start_index_graph = self.get_nearest_graph_point_index(graph_dict, copy.copy(self.current_robot_position))
+        
+        # -------- TRAV ---------
+        if self.untrav_points is not None:
+            t = time.time()
+            graph_points = graph_dict['graph_points']
+            nearest_robot_point = graph_points[start_index_graph]
+            graph_tree = KDTree(graph_points)
+            nearest_graph_points_ind = graph_tree.query_ball_point(nearest_robot_point, r=GRAPH_RADIUS)
+
+            nearest_graph_points = KDTree(graph_points[nearest_graph_points_ind])
+            trav_tree = KDTree(self.untrav_points)
+
+            untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=TRAV_RADIUS)
+
+            untrav_mask = np.zeros(len(graph_points))
+            untrav_mask[nearest_graph_points_ind] = [len(a) for a in untrav_points_in_radius_ind]
+
+            self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],untrav_mask)
+
+            edges = np.array(graph_dict['graph'].get_edgelist())
+            #edge_points_1 = graph_points[edges[:,0]]
+            #edge_points_2 = graph_points[edges[:,1]]
+
+            untrav_cost = (untrav_mask[edges[:,0]] + untrav_mask[edges[:,1]]) * UNTRAV_POINT_COST / 2
+            untrav_cost = untrav_cost.T.reshape(-1,1)
+
+            if self.untrav_cost is not None and self.untrav_cost.shape == untrav_cost.shape:
+                self.untrav_cost = 0.99 * self.untrav_cost + 0.01 * untrav_cost
+            else:
+                self.untrav_cost = untrav_cost
+
+            graph_dict['graph'].es['trav_weight'] = graph_dict['graph'].es['weight'] + self.untrav_cost
+
+            print(time.time()-t)
+            #if self.art1 is not None:
+            #    self.art1.remove()
+            #if self.art2 is not None:
+            #    self.art2.remove()
+            #self.art1 = self.ax.scatter(self.untrav_points[:,0],self.untrav_points[:,1],c='blue',s=20)
+            #self.art2 = self.ax.scatter(self.current_robot_position[:,0],self.current_robot_position[:,1],c='red',s=50)
+            #plt.draw()
+            #plt.pause(0.001)
+        # -----------------------
+        else:
+            try:
+                graph_dict['graph'].es['trav_weight']
+            except:
+                graph_dict['graph'].es['trav_weight'] = graph_dict['graph'].es['weight']
+        
         goal_index_graph = graph_dict["goal_index_graph"]
         graph = graph_dict["graph"]
-        weights = graph.es["weight"]
 
         shortest_path_vertices = graph.get_shortest_paths(start_index_graph,
                                                             goal_index_graph,
-                                                            weights="weight")[0]
+                                                            weights="trav_weight")[0]
 
         path = [graph_dict["graph_points"][v] for v in shortest_path_vertices]
 
         return path
+
+    def utm_to_base_link(self, points):
+        points = points - self.current_robot_position
+
+        angle = -np.deg2rad(self.azimuth) - math.pi/2
+        R = np.array([[np.cos(angle),-np.sin(angle)],
+                        [np.sin(angle),np.cos(angle)]])
+        points = np.matmul(R,points.T).T
+
+        return points
+
+    def publish_graph_pcd(self,points,points_cost,untrav_mask):
+        dist_cost = points_cost[1].reshape(-1)
+        road_cost = points_cost[2].reshape(-1)
+        no_footway_cost = points_cost[3].reshape(-1)
+        total_cost = points_cost[0].reshape(-1) + untrav_mask
+        costs = [total_cost,dist_cost,road_cost,no_footway_cost,untrav_mask * UNTRAV_POINT_COST]
+        #total_cost = total_cost.astype(np.int16)
+        points = self.utm_to_base_link(points)
+        self.set_graph_pcd_msg(points,costs)
+        self.pub_graph_pcd.publish(self.graph_pcd_msg)
 
     def generate_waypoints_msg(self):
         header = std_msgs.msg.Header()
@@ -193,6 +299,41 @@ class PathPlanner():
         header.frame_id = "utm"
 
         self.osm_pcd_msg.header = header
+
+    def set_graph_pcd_msg(self, points, costs):
+
+        """ if self.art is not None:
+            self.art.remove()
+        self.art = self.ax.scatter(points[:,0],points[:,1])
+        plt.draw()
+        plt.pause(0.001) """
+
+        pcd_data = np.zeros(len(points), dtype=[
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32),
+            ('total_cost', np.uint16),
+            ('dist_cost', np.uint16),
+            ('road_cost', np.uint16),
+            ('no_footway_cost', np.uint16),
+            ('untrav_cost', np.uint16)])
+
+        pcd_data['x'] = points[:, 0]
+        pcd_data['y'] = points[:, 1]
+        pcd_data['z'] = np.zeros((points[:, 1].shape))
+        pcd_data['total_cost'] =  costs[0]
+        pcd_data['dist_cost'] =  costs[1]
+        pcd_data['road_cost'] =  costs[2]
+        pcd_data['no_footway_cost'] =  costs[3]
+        pcd_data['untrav_cost'] =  costs[4]
+
+        self.graph_pcd_msg = ros_numpy.msgify(PointCloud2, pcd_data)
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "base_link"
+
+        self.graph_pcd_msg.header = header
         
 
     def run(self):

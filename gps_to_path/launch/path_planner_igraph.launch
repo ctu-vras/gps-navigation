@@ -18,7 +18,7 @@
 	    <param name="sound_period" type="int" value="30" />
     </node>
 
-<!-- NTRIP CORRECTIONS -->>
+<!-- NTRIP CORRECTIONS -->
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />
@@ -42,8 +42,11 @@
     </node>
 
 <!-- PATH -->
-    <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">>
+    <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
     </node>
+
+    <node pkg="gps_to_path" type="trav_to_obstacles" name="trav_to_obstacles" output="screen"/>             
+
 
 <!-- OSM PCD VISUALIZATION -->
     <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">

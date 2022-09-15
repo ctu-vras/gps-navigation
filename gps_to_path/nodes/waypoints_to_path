@@ -1,23 +1,25 @@
 #!/usr/bin/env python
 
+"""
+This node is the final part of the planner pipeline.
+Publishes path for path_follower in the correct frame.
+
+Runs well and probably cannot be optimized much more.
+"""
+
 import rospy
 import tf2_ros
 from nav_msgs.msg import Path
 from sensor_msgs.msg import NavSatFix
-from stamped_msgs.msg import Float64, Float64MultiArray
+from stamped_msgs.msg import Float64
 from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose
-from gpx_to_waypoints import gpx_to_waypoints
-from gps_to_path.msg import Wgs, WgsArray, Waypoints
-from std_msgs.msg import String
-import gpxpy
-import gpxpy.gpx
+from gps_to_path.msg import Waypoints
 import std_msgs.msg
 from geodesy import utm
-from math import sqrt, sin, cos, pi
+from math import sin, cos, pi
 from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion, quaternion_inverse
-from numpy import deg2rad, rad2deg, genfromtxt
+from numpy import deg2rad
 import numpy as np
-import os.path
 from tf.transformations import euler_from_quaternion
 
 MAX_DIST_FROM_START = 3.
@@ -51,9 +53,11 @@ class WaypointsToPath():
         self.odom_base_link_trans = None
 
     def update_waypoints(self,msg):
+        """ Waypoints sub handler. """
         self.waypoints = np.array([[p.x,p.y] for p in msg.points])
 
     def update_azimuth(self, msg):
+        """ Azimuth sub handler. """
         self.azimuth = msg.data
 
     def get_utm_odom_rot(self):
@@ -65,11 +69,11 @@ class WaypointsToPath():
                                  self.odom_base_link_trans.transform.rotation.z,
                                  self.odom_base_link_trans.transform.rotation.w])    # how much to rotate base link frame to be aligned with odom frame
 
-        # how much to rotate utm frame to be aligned with odom frame
-        q = quaternion_multiply(q2, q1)
+        q = quaternion_multiply(q2, q1) # how much to rotate utm frame to be aligned with odom frame
         return q
 
-    def odom_to_utm_rotate(self, arr):
+    def utm_to_odom_rotate(self, arr):
+        """ This works but I am confused by all the rotations so I can't tell you much more, sorry. """
         utm_to_odom_q = self.get_utm_odom_rot()
         odom_to_utm_q = quaternion_inverse(utm_to_odom_q)
         odom_to_utm_angle = euler_from_quaternion(odom_to_utm_q)[2]
@@ -80,10 +84,11 @@ class WaypointsToPath():
         return np.array([x_rot, y_rot]).T
 
     def update_fix(self, msg):
+        """ Fix sub handler. """
         self.gps_utm = utm.fromLatLong(msg.latitude, msg.longitude)
 
     def main_cycle(self):
-
+        """ Main cycle of node. Handles publishing of path. """
         if self.odom_gps_trans and self.odom_base_link_trans:
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
@@ -98,10 +103,10 @@ class WaypointsToPath():
             # utm is not an actual tf trame, just an imaginary frame
 
             if self.waypoints is not None and self.gps_utm is not None:
-                rospy.logwarn_once("OK publishing waypoints.")
+                rospy.loginfo_once("OK publishing waypoints.")
                 self.gps_to_target_utm_frame = self.waypoints - \
                     np.array([self.gps_utm.easting, self.gps_utm.northing])
-                self.gps_to_target_odom_frame = self.odom_to_utm_rotate(
+                self.gps_to_target_odom_frame = self.utm_to_odom_rotate(
                     self.gps_to_target_utm_frame)
 
                 self.path_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
@@ -110,11 +115,12 @@ class WaypointsToPath():
                 self.set_path_msg()
                 self.pub_path.publish(self.path_msg)
             else:
-                rospy.logwarn_once("No waypoints for path or no fix yet.")
+                rospy.loginfo_once("No waypoints for path or no fix yet.")
         else:
-            rospy.logwarn("TF(odom,gps) or TF(odom,base_link) is missing.")
+            rospy.loginfo_once("TF(odom,gps) or TF(odom,base_link) is missing.")
 
     def get_pose(self, point):
+        """ Point (x,y) to pose msg. """
         x = point[0]
         y = point[1]
 
@@ -134,12 +140,14 @@ class WaypointsToPath():
         return pose_ob
 
     def get_pose_stamped(self, point):
+        """ Point (x,y) to stamped pose msg. """
         pose = self.get_pose(point)
         pose_stamped = PoseStamped()
         pose_stamped.pose = pose
         return pose_stamped
 
     def set_path_msg(self):
+        """ Prepare path msg to be published. """
         poses = []
 
         header = std_msgs.msg.Header()
@@ -174,7 +182,6 @@ class WaypointsToPath():
         while not rospy.is_shutdown():
             self.main_cycle()
             rate.sleep()
-
 
 def main():
     rospy.init_node('waypoints_to_path')

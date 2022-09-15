@@ -1,34 +1,26 @@
 #!/usr/bin/env python
+
+"""
+This node serves purely for vizualization of OSM data in rviz. 
+
+Probably could be optimized, but runs fast enough.
+"""
+
 from __future__ import division
 import rospy
-import overpy
-import shapely.geometry as geometry
-from shapely.prepared import prep
-from shapely.ops import linemerge
-import os
 import utm
 import numpy as np
-from random import random
-import time
-import gpx_to_waypoints
-
-import gpxpy
-import gpxpy.gpx
-
 import ros_numpy
 import tf2_ros
-from nav_msgs.msg import Path
-from sensor_msgs.msg import NavSatFix, PointCloud2, PointField
-from stamped_msgs.msg import Float64, Float64MultiArray
-from std_msgs.msg import String
-from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose, TransformStamped
-from gpx_to_waypoints import gpx_to_waypoints
+from sensor_msgs.msg import NavSatFix, PointCloud2
+from stamped_msgs.msg import Float64
+from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose
 import std_msgs.msg
-from math import sqrt, sin, cos, pi
-from tf.transformations import quaternion_from_euler, quaternion_from_matrix, quaternion_multiply, euler_from_quaternion, quaternion_inverse, inverse_matrix, quaternion_matrix
-from numpy import deg2rad, rad2deg, genfromtxt
-import os.path
+from math import sin, cos, pi
+from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion, quaternion_inverse
+from numpy import deg2rad
 import osm_types
+import time
 
 class OsmToPcd:
     def __init__(self):
@@ -53,7 +45,7 @@ class OsmToPcd:
                         }
 
         self.osm_pcd_utm = None
-        self.sub_fix = rospy.Subscriber("osm_pcd_utm", PointCloud2, self.save_osm_pcd_utm, queue_size=10)
+        self.sub_fix = rospy.Subscriber("osm_pcd_utm", PointCloud2, self.handle_osm_pcd_utm, queue_size=10)
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
@@ -76,33 +68,33 @@ class OsmToPcd:
         self.osm_pcd_msg = PointCloud2()
         
 
-    def save_osm_pcd_utm(self,msg):
+    def handle_osm_pcd_utm(self,msg):
+        """ OSM PCD UTM sub handler. Should be triggered once (osm_pcd_utm should be published once and latched). """
         self.osm_pcd_utm = ros_numpy.numpify(msg).ravel()
-        #self.roads = self.osm_pcd_utm[np.where(self.osm_pcd_utm[:]['type'] == osm_types.OSM_TYPES['roads'])[0]][:2]
-        #self.untraversables = self.osm_pcd_utm[np.where(self.osm_pcd_utm[:]['type'] == osm_types.OSM_TYPES['untraversables'])[0]][:2]
-        #self.footways = self.osm_pcd_utm[np.where(self.osm_pcd_utm[:]['type'] == osm_types.OSM_TYPES['footways'])[0]][:2]
 
         for key in self.osm_points:
             self.osm_points[key] = np.array(self.osm_pcd_utm[np.where(self.osm_pcd_utm[:]['type'] == osm_types.OSM_TYPES[key])[0]][['x','y']].tolist())
-        
-    
-    def update_osm_pcd(self):
+            
+    def update_osm_points(self):
+        """ Transform to odom frame. """
         # utm is not an actual tf trame, just an imaginary frame
         for key in self.osm_points:
 
             gps_to_target_utm_frame = self.osm_points[key] - \
                 np.array([self.gps_utm[0], self.gps_utm[1]])
 
-            gps_to_target_odom_frame = self.odom_to_utm_rotate(
+            gps_to_target_odom_frame = self.utm_to_odom_rotate(
                 gps_to_target_utm_frame)
 
             self.osm_pcd[key] = np.array([gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
                 gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
 
     def update_azimuth(self, msg):
+        """ Azimuth sub handler. """
         self.azimuth = msg.data
     
     def update_fix(self, msg):
+        """ Fix sub handler. """
         self.gps_utm = utm.from_latlon(msg.latitude, msg.longitude)
 
     def get_utm_odom_rot(self):
@@ -118,7 +110,8 @@ class OsmToPcd:
         q = quaternion_multiply(q2, q1)
         return q
 
-    def odom_to_utm_rotate(self, arr):
+    def utm_to_odom_rotate(self, arr):
+        """ Got working by trial and error -- might not be super cleanly written. """
         utm_to_odom_q = self.get_utm_odom_rot()
         odom_to_utm_q = quaternion_inverse(utm_to_odom_q)
         odom_to_utm_angle = euler_from_quaternion(odom_to_utm_q)[2]
@@ -129,7 +122,7 @@ class OsmToPcd:
         return np.array([x_rot, y_rot]).T
 
     def main_cycle(self):
-
+        """ Publishing OSM points as pcd in odom frame. """
         if self.odom_gps_trans and self.odom_base_link_trans:
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
@@ -144,12 +137,10 @@ class OsmToPcd:
 
             if self.gps_utm is not None and self.osm_pcd_utm is not None:
                 rospy.logwarn_once("OK. Publishing OSM PCD.")
-                self.update_osm_pcd()              
+                self.update_osm_points()              
                 
                 self.set_pcd_msg()
                 self.pub_osm.publish(self.osm_pcd_msg)
-                #pc = ros_numpy.numpify(self.pcd_msg).ravel()
-                # rospy.logwarn(pc)
             else:
                 rospy.logwarn_once("No fix or OSM PCD UTM yet.")
         else:
@@ -165,7 +156,7 @@ class OsmToPcd:
         pose_ob = Pose()
         point.x = x
         point.y = y
-        # set height equal to base_link, so that it is effectively ignored by path follower
+        # set height equal to base_link (for good vizualization in rviz)
         point.z = self.odom_base_link_trans.transform.translation.z
         quat.x = 0.
         quat.y = 0.

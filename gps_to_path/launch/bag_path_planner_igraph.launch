@@ -9,15 +9,15 @@
         <param name="points_density" type="double" value="0.5"/>
     </node>
 
-    <node pkg="gps_to_path" type="trav_to_obstacles" name="trav_to_obstacles" />             
+    <node pkg="gps_to_path" type="trav_to_obstacles_bag" name="trav_to_obstacles_bag" />             
+
+<!-- OSM -->
+    <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
+    </node>
 
 <!-- PATH -->
     <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
         <remap from="path" to="osm_path" />
     </node>
-
-<!-- OSM -->
-<node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
-</node>
 
 </launch>    

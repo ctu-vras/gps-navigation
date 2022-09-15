@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" Process pcd traversability segmantation for path planner. """
+""""""
 
 from __future__ import division
 import rospy
@@ -16,15 +16,16 @@ from stamped_msgs.msg import Float64
 import std_msgs.msg
 from tf.transformations import quaternion_matrix
 
+MAX_AGE = 0.2
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame):
+    def __init__(self,max_height,min_height,max_dist,min_dist,robot_base_frame):
 
         self.max_height = max_height
         self.min_height = min_height
         self.max_dist = max_dist
         self.min_dist = min_dist
-        self.max_age = max_age
+
         self.robot_base_frame = robot_base_frame
 
         self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
@@ -97,23 +98,23 @@ class TravToObstacles:
         
 
     def handle_pcd(self,msg):
+        
+        # BAG ONLY ~~~~~~~~~
+        if self.time_diff is None:
+            self.time_diff = rospy.Time.now() - msg.header.stamp
+
         t = rospy.Time.now()
          
         if self.gps_utm is not None and self.azimuth is not None:
-            # Check if the msg is not too old (relevant mostly in case it is produced faster than we can handle here).
-            if self.trans is not None and abs((msg.header.stamp - t).to_sec()) < MAX_AGE:
-
-                # PCD to numpy array of 3D points.
+            if self.trans is not None and abs((msg.header.stamp + self.time_diff - t).to_sec()) < MAX_AGE:
                 pcd_arr = ros_numpy.numpify(msg)
                 pcd_arr = rfn.structured_to_unstructured(pcd_arr)
 
                 pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
                 pcd_arr = pcd_arr[:,:3]
 
-                # Filter unwanted points and project onto the XY plane.
                 utm_untrav_points,untrav_points = self.process_points(pcd_arr)
 
-                # Publish.
                 self.set_pcd_msg(utm_untrav_points)
                 self.pub_obstacles.publish(self.obstacles_pcd_msg)
 
@@ -179,18 +180,34 @@ class TravToObstacles:
                 continue
         rospy.spin()
 
+        """ rate = rospy.Rate(10)
+
+        while (not self.odom_gps_trans) or (not self.odom_base_frame_trans):
+            try:
+                self.odom_gps_trans = self.tfBuffer.lookup_transform(
+                    'odom', 'gps', rospy.Time())
+                self.odom_base_frame_trans = self.tfBuffer2.lookup_transform(
+                    'odom', 'base_frame', rospy.Time())
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                rate.sleep()
+                continue
+        rospy.loginfo("Transformations obtained.") """
+
+        #while not rospy.is_shutdown():
+        #    self.main_cycle()
+        #    rate.sleep()
+
 
 def main():
     rospy.init_node('trav_to_obstacles')
 
     max_height = rospy.get_param('~max_height', 1.)
     min_height = rospy.get_param('~min_height', 0.05)
-    max_dist = rospy.get_param('~max_dist', 10.)     # HAS TO BE LARGER THAN trav_max_dist IN path_planner
+    max_dist = rospy.get_param('~max_dist', 6.)     # HAS TO BE SLIGHTLY LARGER THAN trav_max_dist IN path_planner
     min_dist = rospy.get_param('~min_dist', 0.5)
-    max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
-
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame)
+    
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,robot_base_frame)
 
     trav_to_obstacles.run()
 

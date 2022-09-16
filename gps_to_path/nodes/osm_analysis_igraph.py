@@ -138,11 +138,14 @@ class Way():
 RESERVE = 50 # meters
 
 class PathAnalysis:
-    def __init__(self, coords_file, road_crossing, current_robot_position):
+    def __init__(self, coords_file, road_crossing, current_robot_position, use_osm=True,use_solitary_nodes=True):
         
         self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
         self.road_crossing = road_crossing
+
+        self.use_osm = use_osm
+        self.use_solitary_nodes = use_solitary_nodes
 
         #self.waypoints = np.genfromtxt(in_file, delimiter=',') # This works for .csv files...
 
@@ -173,9 +176,9 @@ class PathAnalysis:
         self.footways = set()
         self.barriers = set()
 
-        self.roads_list = None
-        self.footways_list = None
-        self.barriers_list = None
+        self.roads_list = []
+        self.footways_list = []
+        self.barriers_list = []
 
         self.road_polygons = []
 
@@ -726,7 +729,7 @@ class PathAnalysis:
         rospy.loginfo("{} - Goal points ({}) generated".format(round(time.time()-t,3), len(goal_points)))
 
         # Generate graph for each pair of subsequent points.
-        while goal_points:
+        while goal_points and not rospy.is_shutdown():
             goal_point = goal_points.pop(0)
 
             graph_dict = self.generate_graph(start_point,goal_point)
@@ -771,46 +774,51 @@ class PathAnalysis:
                                                         graph_points.bounds[2],
                                                         graph_points.bounds[3],
                                                         reserve=OBJECTS_RESERVE)
-
+            
             # Remove points inside "barriers".
             graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
             dist_from_line = np.array(dist_from_line)
 
-            road_points_mask = []
+            if self.use_osm:
+                road_points_mask = []
 
-            if self.road_crossing:
-                for i in range(len(self.road_polygons)):
-                    road_points_mask.append(self.get_contain_mask(graph_points, objects_in_area['road_polygons'+str(i)]))
-            else:
-                road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
-            
-            footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
+                if self.road_crossing:
+                    for i in range(len(self.road_polygons)):
+                        road_points_mask.append(self.get_contain_mask(graph_points, objects_in_area['road_polygons'+str(i)]))
+                else:
+                    road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
+                
+                footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
 
-            out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
-            out_of_max_dist_mask = np.squeeze(out_of_max_dist_mask)
+                out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
+                out_of_max_dist_mask = np.squeeze(out_of_max_dist_mask)
 
             graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
 
-            graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)
-
             edges = self.generate_edges(graph_points, 1.5*density)
             edge_points_1 = graph_points[edges[:,0]]
-            edge_points_2 = graph_points[edges[:,1]]         
-
+            edge_points_2 = graph_points[edges[:,1]] 
+            
             road_points = []
-            not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
-            if self.road_crossing:
-                for i in range(ROAD_CROSSINGS_RANKS):
-                    road_points.append((road_points_mask[i][edges[:,0]] + road_points_mask[i][edges[:,1]]) * not_footway_points)
-            else:
-                road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
+            no_footways = []
+            graph_points_costs = []
+            
+            if self.use_osm:
+                graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)       
+
+                not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
+                if self.road_crossing:
+                    for i in range(ROAD_CROSSINGS_RANKS):
+                        road_points.append((road_points_mask[i][edges[:,0]] + road_points_mask[i][edges[:,1]]) * not_footway_points)
+                else:
+                    road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
+
+                no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
 
             dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
             dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS)
 
-            no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
-
-            costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS)
+            costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, self.use_osm)
 
             #edge_cost_tuples = np.concatenate((edges,costs),axis=1)
 
@@ -1142,15 +1150,22 @@ class PathAnalysis:
         return [cost,dist_from_line,road_costs,no_footway_loss*no_footway_points]
         #return cost
     
-    def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss):
+    def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss, use_osm=True):
         #return dist_cost
-        if type(roads) is not type(list()):  # list is when we use road crossing cost as we have multiple levels
-            return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + \
-                   roads*road_loss + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
+        vertices_dist_cost = np.sqrt(np.sum(np.square(p1-p2),axis=1))
+        if use_osm:
+            if type(roads) is not type(list()):  # list is when we use road crossing cost as we have multiple levels
+                return np.reshape(vertices_dist_cost + \
+                                roads * road_loss + \
+                                no_footway_loss * no_footways, (len(p1),1)) + \
+                                dist_cost
+            else:
+                return np.reshape(vertices_dist_cost + \
+                    sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
+                    no_footway_loss * no_footways, (len(p1),1)) + \
+                    dist_cost
         else:
-            return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + \
-                   sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
-                   no_footway_loss * no_footways, (len(p1),1)) + dist_cost
+            return np.reshape(vertices_dist_cost, (len(p1),1)) + dist_cost
 
     def sets_to_lists(self):
         self.roads_list     = list(self.roads)
@@ -1162,7 +1177,10 @@ class PathAnalysis:
         rospy.loginfo("Running analysis.")
         self.parse_ways()
         self.parse_rels()
-        self.parse_nodes()
+
+        if self.use_solitary_nodes:
+            self.parse_nodes()
+
         self.separate_ways()
 
         if self.road_crossing:
@@ -1185,7 +1203,7 @@ class PathAnalysis:
         """ Obtain data from OSM through their API. """
         break_time = 5
         tries = 1
-        while tries < 4:
+        while tries < 4 and not rospy.is_shutdown():
             rospy.loginfo("Running 1/3 OSM query.")
             try:
                 way_query = self.get_way_query()
@@ -1200,7 +1218,7 @@ class PathAnalysis:
                 tries += 1
 
         tries = 1
-        while tries < 4:
+        while tries < 4 and not rospy.is_shutdown():
             rospy.loginfo("Running 2/3 OSM query.")
             try:
                 rel_query = self.get_rel_query()
@@ -1215,19 +1233,20 @@ class PathAnalysis:
                 tries += 1
 
         tries = 1
-        while tries < 4:
-            rospy.loginfo("Running 3/3 OSM query.")
-            try:  
-                node_query = self.get_node_query()  # Query sometimes times out...
-                osm_nodes_data = self.api.query(node_query)
-                self.node_query = node_query
-                self.osm_nodes_data = osm_nodes_data
-                break
-            except Exception as e:
-                rospy.loginfo(e)
-                rospy.loginfo("--------------\nQuery failed.\nRerunning the query after {} s.".format(break_time))
-                time.sleep(break_time)
-                tries += 1
+        if self.use_solitary_nodes:
+            while tries < 4 and not rospy.is_shutdown():
+                rospy.loginfo("Running 3/3 OSM query.")
+                try:  
+                    node_query = self.get_node_query()  # Query sometimes times out...
+                    osm_nodes_data = self.api.query(node_query)
+                    self.node_query = node_query
+                    self.osm_nodes_data = osm_nodes_data
+                    break
+                except Exception as e:
+                    rospy.loginfo(e)
+                    rospy.loginfo("--------------\nQuery failed.\nRerunning the query after {} s.".format(break_time))
+                    time.sleep(break_time)
+                    tries += 1
 
         rospy.loginfo("Queries finished.")
 
@@ -1236,9 +1255,10 @@ class PathAnalysis:
         self.run_full_search(gpx_fn, road_cross_cost)
     
     def run_ros(self, queries=True):
-        if queries:
+        if queries and self.use_osm:
             self.run_queries()
-        self.run_parse()
+        if self.use_osm and not rospy.is_shutdown():
+            self.run_parse()
         self.run_graph_prep()
 
     def write_to_file(self,fn):

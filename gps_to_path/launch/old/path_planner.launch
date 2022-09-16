@@ -18,7 +18,7 @@
 	    <param name="sound_period" type="int" value="10" />
     </node>
 
-<!-- NTRIP CORRECTIONS -->>
+<!-- NTRIP CORRECTIONS -->
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />

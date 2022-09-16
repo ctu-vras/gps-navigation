@@ -101,7 +101,7 @@ class TravToObstacles:
          
         if self.gps_utm is not None and self.azimuth is not None:
             # Check if the msg is not too old (relevant mostly in case it is produced faster than we can handle here).
-            if self.trans is not None and abs((msg.header.stamp - t).to_sec()) < MAX_AGE:
+            if self.trans is not None and abs((msg.header.stamp - t).to_sec()) < self.max_age:
 
                 # PCD to numpy array of 3D points.
                 pcd_arr = ros_numpy.numpify(msg)

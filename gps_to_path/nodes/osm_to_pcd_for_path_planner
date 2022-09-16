@@ -80,14 +80,16 @@ class OsmToPcd:
         # utm is not an actual tf trame, just an imaginary frame
         for key in self.osm_points:
 
-            gps_to_target_utm_frame = self.osm_points[key] - \
-                np.array([self.gps_utm[0], self.gps_utm[1]])
+            if self.osm_points[key].size > 0:
 
-            gps_to_target_odom_frame = self.utm_to_odom_rotate(
-                gps_to_target_utm_frame)
+                gps_to_target_utm_frame = self.osm_points[key] - \
+                    np.array([self.gps_utm[0], self.gps_utm[1]])
 
-            self.osm_pcd[key] = np.array([gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
-                gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
+                gps_to_target_odom_frame = self.utm_to_odom_rotate(
+                    gps_to_target_utm_frame)
+
+                self.osm_pcd[key] = np.array([gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
+                    gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
 
     def update_azimuth(self, msg):
         """ Azimuth sub handler. """

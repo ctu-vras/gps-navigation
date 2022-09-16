@@ -15,6 +15,7 @@ from sensor_msgs.msg import NavSatFix, PointCloud2
 from stamped_msgs.msg import Float64
 import std_msgs.msg
 from tf.transformations import quaternion_matrix
+import time
 
 MAX_AGE = 0.2
 
@@ -98,7 +99,6 @@ class TravToObstacles:
         
 
     def handle_pcd(self,msg):
-        
         # BAG ONLY ~~~~~~~~~
         if self.time_diff is None:
             self.time_diff = rospy.Time.now() - msg.header.stamp
@@ -122,7 +122,7 @@ class TravToObstacles:
                 self.pub_obstacles_map.publish(self.obstacles_map_pcd_msg)
             else:
                 rospy.logwarn("throwing away old msg, age is {} s".format(round((msg.header.stamp - t).to_sec(),3)))
-
+        
     def set_map_pcd_msg(self, points):
         pcd_data = np.zeros(len(points), dtype=[
                 ('x', np.float32),

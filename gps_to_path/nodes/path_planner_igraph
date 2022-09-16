@@ -7,7 +7,7 @@ import time
 from sensor_msgs.msg import NavSatFix,PointCloud2
 from geometry_msgs.msg import Point
 from gps_to_path.msg import Waypoints
-from stamped_msgs.msg import Float64
+from stamped_msgs.msg import Float64, Bool
 import std_msgs.msg
 from geodesy import utm
 import numpy as np
@@ -42,7 +42,9 @@ class PathPlanner():
                 robot_base_frame,
                 max_goal_untrav_cost,
                 max_path_cost,
-                max_subgraph_time):
+                max_subgraph_time,
+                use_osm,
+                osm_use_solitary_nodes):
 
         self.finished = False
 
@@ -62,6 +64,9 @@ class PathPlanner():
 
         self.max_goal_untrav_cost = max_goal_untrav_cost
         self.max_path_cost = max_path_cost
+
+        self.use_osm = use_osm
+        self.osm_use_solitary_nodes = osm_use_solitary_nodes
 
         self.max_subgraph_time = max_subgraph_time
         self.subgraph_start_time = 0
@@ -90,6 +95,10 @@ class PathPlanner():
 
         self.pub_graph_pcd = rospy.Publisher('graph_pcd', PointCloud2, queue_size=10)
         self.graph_pcd_msg = PointCloud2()
+
+        self.road_dist_pub = rospy.Publisher('road_dist', Float64, queue_size=10)
+
+        self.is_on_road_pub = rospy.Publisher('is_on_road', Bool, queue_size=10)
 
         #fig,self.ax = plt.subplots()
         #plt.show()
@@ -259,7 +268,9 @@ class PathPlanner():
             untrav_cost = untrav_cost.T.reshape(-1,1)
 
             # Publish the graph as pcd for vizualization.
-            self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],self.untrav_mask)
+            if self.use_osm:
+                self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],self.untrav_mask)
+            
             graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight'] + untrav_cost  # SLOWNESS CULPRIT
 
             #if self.art1 is not None:
@@ -398,7 +409,7 @@ class PathPlanner():
         rospy.loginfo("Done generating points.")
         del self.pcd_msg
         del self.pcd_data
-        del self.osm_points
+        #del self.osm_points
 
     def set_pcd_msg(self):
         self.pcd_data = np.zeros(0, dtype=[
@@ -463,14 +474,57 @@ class PathPlanner():
         header.frame_id = self.robot_base_frame
 
         self.graph_pcd_msg.header = header
-        
+    
+    def publish_robot_road_dist(self):
+        road_points = self.osm_points['roads']
+        roads_tree = KDTree(road_points)
+        dist,_ = roads_tree.query(self.current_robot_position)
 
+        road_dist_msg = Float64()
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = self.robot_base_frame
+
+        road_dist_msg.header = header
+        road_dist_msg.data = dist
+
+        self.road_dist_pub.publish(road_dist_msg)
+
+    def publish_robot_is_on_road(self):
+        robot_position = geometry.Point(np.ravel(self.current_robot_position))
+        is_on_road = False
+
+        for road in self.roads:
+            if road.line.contains(robot_position):
+                is_on_road = True
+                break
+
+        is_on_road_msg = Bool()
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = self.robot_base_frame
+
+        is_on_road_msg.header = header
+        is_on_road_msg.data = is_on_road
+
+        self.is_on_road_pub.publish(is_on_road_msg)
+
+        print(is_on_road)
+        
+        
     def run(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown() and not self.finished:
+
             if self.osm_planner_initialized:
                 self.get_current_sub_graph()
                 self.waypoints = self.search_graph()
+
+                if self.osm_points['roads'].size != 0:
+                    self.publish_robot_road_dist()
+                    self.publish_robot_is_on_road()
                 
                 if self.waypoints is not None:
                     self.generate_waypoints_msg()
@@ -483,7 +537,9 @@ class PathPlanner():
 
                 self.osm_planner = osm_analysis_igraph.PathAnalysis(self.gpx_assignment,
                                                             True,
-                                                            copy.copy(self.current_robot_position))
+                                                            copy.copy(self.current_robot_position),
+                                                            self.use_osm,
+                                                            self.osm_use_solitary_nodes)
                 self.osm_planner.run_ros()
 
                 self.sub_graphs = self.osm_planner.sub_graphs
@@ -501,6 +557,15 @@ class PathPlanner():
             
                     self.publish_pcd = False
 
+        # When finished send one empty waypoints msg to overwrite the previous msg.
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "utm"
+
+        self.waypoints_msg.header = header
+        self.waypoints_msg.points = []
+        self.pub_waypoints.publish(self.waypoints_msg)
+
 def main():
     rospy.init_node('path_planner')
 
@@ -517,6 +582,8 @@ def main():
     max_goal_untrav_cost = rospy.get_param('~max_goal_untrav_cost', 200.)
     max_path_cost = rospy.get_param('~max_path_cost', 100.)
     max_subgraph_time = rospy.get_param('~max_subgraph_time', 30.)
+    use_osm = rospy.get_param('~use_osm', True)
+    osm_use_solitary_nodes = rospy.get_param('~osm_use_solitary_nodes', False)
 
     node = PathPlanner(gpx_assignment,
                         publish_pcd,
@@ -530,7 +597,9 @@ def main():
                         robot_base_frame,
                         max_goal_untrav_cost,
                         max_path_cost,
-                        max_subgraph_time
+                        max_subgraph_time,
+                        use_osm,
+                        osm_use_solitary_nodes
                         )
 
     node.run()

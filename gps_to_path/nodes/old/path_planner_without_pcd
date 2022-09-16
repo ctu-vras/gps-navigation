@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+
+import rospy
+from nav_msgs.msg import Path
+from sensor_msgs.msg import NavSatFix
+from geometry_msgs.msg import Point
+from gps_to_path.msg import Waypoints
+import std_msgs.msg
+from geodesy import utm
+import numpy as np
+import graph_tool.all as gt
+import osm_analysis 
+import shapely.geometry as geometry
+import copy
+
+GOAL_REACHED_DIST = 3.
+
+def dist(p1,p2):
+    p1 = np.array(p1)
+    p2 = np.array(p2)
+    if p1.ndim > 1 or p2.ndim > 1:
+        return np.sqrt(np.sum(np.square(p1-p2),axis=1))
+    else:
+        return np.sqrt(np.sum(np.square(p1-p2)))
+
+class PathPlanner():
+    def __init__(self, gpx_assignment):
+
+        self.gpx_assignment = gpx_assignment
+
+        # In the future replace FIX with FUSED LOCALIZATION
+        self.sub_fix = rospy.Subscriber(
+            "fix", NavSatFix, self.update_fix, queue_size=10)
+        self.current_robot_position = None
+
+        self.pub_waypoints = rospy.Publisher(
+            'waypoints', Waypoints, queue_size=10)
+        self.waypoints_msg = Waypoints()
+
+        self.osm_planner_initialized = False
+        
+        #self.start_point_added = False
+
+    def update_fix(self,msg):
+        utm_fix = utm.fromLatLong(msg.latitude,msg.longitude)
+        self.current_robot_position = np.array([[utm_fix.easting, utm_fix.northing]])
+            
+        #if not self.start_point_added:
+        #    self.osm_planner.add_start_point(self.current_robot_position)
+        #    self.start_point_added = True
+    
+    def reached_goal_point(self,robot_position,goal_point):
+        if dist(np.array(robot_position), np.array(goal_point)) <= GOAL_REACHED_DIST:
+            return True
+        else:
+            return False
+    
+    def get_current_goal_point(self):
+        goal_point_index = self.current_sub_graph['goal_index_graph']
+        goal_point = self.current_sub_graph['graph_points'][goal_point_index]
+        return goal_point
+
+    def get_current_sub_graph(self):
+        # Obtain graph which start point is the last goal point you visited.
+
+        if self.current_sub_graph is None:
+            self.current_sub_graph = self.sub_graphs.pop(0)
+        
+        goal_point = self.get_current_goal_point()
+
+        if self.reached_goal_point(copy.copy(self.current_robot_position), goal_point):
+            rospy.loginfo("Goal point {}/{} reached.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
+            if not self.sub_graphs:
+                rospy.loginfo("Last goal point reached.")
+                rospy.loginfo("Path planner finished.")
+            else:
+                self.current_sub_graph = self.sub_graphs.pop(0)
+                    
+    def get_nearest_graph_point_index(self, graph_dict, position):
+        graph_points = graph_dict['graph_points']
+
+        distances = dist(position,graph_points)
+        nearest_index = np.argmin(distances)
+        return nearest_index
+
+    def search_graph(self, graph_dict):
+        # Search current sub graph from current robot position to goal point.
+        # Return a list of points (i.e. a path).
+        start_index_graph = self.get_nearest_graph_point_index(graph_dict, copy.copy(self.current_robot_position))
+        goal_index_graph = graph_dict["goal_index_graph"]
+        graph = graph_dict["graph"]
+        weights = graph.edge_properties["cost"]
+
+        shortest_path_vertices,shortest_path_edges = gt.shortest_path(
+                                                        graph,
+                                                        graph.vertex(start_index_graph),
+                                                        graph.vertex(goal_index_graph),
+                                                        weights=weights)
+
+        
+        path = [graph_dict["graph_points"][graph.vertex_index[v]] for v in shortest_path_vertices]
+
+        return path
+
+    def generate_waypoints_msg(self):
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "utm"
+
+        self.waypoints_msg.header = header
+        self.waypoints_msg.points = []
+
+        for w in self.waypoints:
+            p = Point()
+            p.x = w[0]
+            p.y = w[1]
+            p.z = 0
+
+            self.waypoints_msg.points.append(p)
+
+
+    def run(self):
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+
+            if self.osm_planner_initialized:
+                self.get_current_sub_graph()
+                self.waypoints = self.search_graph(self.current_sub_graph)
+                self.generate_waypoints_msg()
+                self.pub_waypoints.publish(self.waypoints_msg)
+                rate.sleep()
+
+            elif self.current_robot_position is not None:
+
+                self.osm_planner = osm_analysis.PathAnalysis(self.gpx_assignment,
+                                                            True,
+                                                            copy.copy(self.current_robot_position))
+                self.osm_planner.run_ros()
+
+                self.sub_graphs = self.osm_planner.sub_graphs
+                self.current_sub_graph = None
+                self.num_sub_graphs = len(self.sub_graphs)
+
+                self.osm_planner_initialized = True
+
+                rospy.loginfo("Planner initialization finished.")
+
+
+
+
+def main():
+    rospy.init_node('path_planner')
+
+    gpx_assignment = rospy.get_param('~gpx_assignment', "$(find gps_to_path)/data/coords.gpx")
+
+    node = PathPlanner(gpx_assignment=gpx_assignment)
+
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

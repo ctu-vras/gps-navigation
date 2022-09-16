@@ -1,6 +1,0 @@
-<launch>    
-       <node pkg="gps_to_path" type="osm_to_pcd" name="osm_to_pcd" output="screen">
-            <param name="points_density" type="int" value="2" /> 
-        </node>
-</launch>
-

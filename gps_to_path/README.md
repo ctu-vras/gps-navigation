@@ -91,7 +91,6 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
     In seconds. If the current goal point has not been reached in this time, the next goal point is selected.<br />
     - **osm_use_solitary_nodes**  <br />
     Use solitary OSM nodes, which usually represent objects such as trees, benches, signs, etc. Speeds up initialization of the planner when set to 'false'. <br />
-<br />
     - **max_height**, **min_height**, **max_dist**, **min_dist**  <br />
     In meters. Parameters used for filtering untraversable points from the traversability pointcloud (e.g. points too close or too low from the robot frame perspective are filtered out). <br />
     - **max_age**  <br />

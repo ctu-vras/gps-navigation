@@ -1,12 +1,12 @@
+from __future__ import division
 import sjtsk_to_utm
 import numpy as np
 import geopy.distance
 from os import path
-from math import ceil, dist, floor
+from math import ceil, floor
 import shapely.geometry as geom
 import time
 from road_crossing_consts import *
-
 
 def generate_waypoints(road, waypoints_density, circular=False):
     coords = list(road.coords)
@@ -22,7 +22,7 @@ def generate_waypoints(road, waypoints_density, circular=False):
 
         dist_meters = geom.Point(c1).distance(geom.Point(c2))
         dist = c2[0]-c1[0], c2[1]-c1[1]
-        steps = ceil(dist_meters/waypoints_density)
+        steps = int(ceil(dist_meters/waypoints_density))
         increment = dist[0]/steps, dist[1]/steps
 
         original_waypoint_indices.append(len(waypoints))
@@ -89,7 +89,7 @@ def get_road_elevation(road):
     return waypoints
 
 
-def get_road_network_elevation(road_network: geom.MultiLineString, elev_data_files: list):
+def get_road_network_elevation(road_network, elev_data_files):
     '''start_t = time.time()
     data_file = "elev_data.csv"
     for file_name in elev_data_files:
@@ -120,7 +120,7 @@ def get_road_network_elevation(road_network: geom.MultiLineString, elev_data_fil
     return network_elev
 
 
-def classify_TPI(elev_data: list):
+def classify_TPI(elev_data):
     # TODO: Find best variables for our usecase. n_small and n_large probably set
     # What about s_change and l_change? Should they be the same, different, how, ...
     n_small = SMALL_NEIGH
@@ -161,8 +161,11 @@ def classify_TPI(elev_data: list):
     print("DEBUG: TPI classification counts: {}.".format(num_class))
     return network_classification
 
+def dist(p1,p2):
+    return np.sqrt(np.sum(np.square(p2-p1)))
 
-def road_cost_for_height(network_classification: list, exploration_limit: int = 100):
+
+def road_cost_for_height(network_classification, exploration_limit = 100):
     class_costs = [CANYONS, MIDSLOPE_DRAIN, UPLAND_DRAIN, U_VALLEY, PLAINS, OPEN_SLOPES, \
                    UPPER_SLOPES, LOCAL_RIDGE, MIDSLOPE_RIDGE, MOUNTAIN_TOP]
     ranked_segments = []

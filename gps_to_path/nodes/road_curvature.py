@@ -5,7 +5,7 @@ from math import floor
 from road_crossing_consts import *
 
 
-def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point):
+def circum_circle_radius(A, B, C):
     '''
     Return the radius value of circumcircle for triange defined by three points A, B, C.
 
@@ -33,7 +33,7 @@ def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point):
         return 10000
 
 
-def get_average_radius(road_network: geom.MultiLineString):
+def get_average_radius(road_network):
     '''
     Returns radius for every road segment for all roads in road network.
 
@@ -74,7 +74,7 @@ def get_average_radius(road_network: geom.MultiLineString):
     return segments
 
 
-def rank_segments_curve(segments: list, junctions: list):
+def rank_segments_curve(segments, junctions):
     '''
     Set curvature level for each road segment. Segments with junction node are automaticaly highest level.
 
@@ -100,7 +100,7 @@ def rank_segments_curve(segments: list, junctions: list):
         road['curvature'] = road['length'] * weights[road['curvature_level']]
 
 
-def road_cost_for_curve(segments: list, exploration_limit: int = 100):
+def road_cost_for_curve(segments, exploration_limit = 100):
     '''
     Returns segments sorted into 15 levels based on theirs suitability for road traversation.
 

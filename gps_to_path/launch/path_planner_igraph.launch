@@ -1,13 +1,18 @@
  <launch>      
-    <arg name="gpx_assignment" default="$(find gps_to_path)/data/kn_short.gpx" />
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/kn_aerial.gpx" />
     <arg name="run_ntrip_relay" default="true" />
+    <arg name="robot_base_frame" default="base_link" />
+    <arg name="use_osm" default="true" />
+
+
+        
 
 <!-- STATIC TRANSFORMS -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
 
 <!-- LLH FROM GPS TO FIX -->
     <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
-        <param name="port" type="string" value="/dev/ttyACM0" />   
+        <param name="port" type="string" value="/dev/ttyACM_gps" />   
         <param name="baud" type="int" value="115200" />
     </node>
 
@@ -15,10 +20,10 @@
     </node>
 
     <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
-	    <param name="sound_period" type="int" value="10" />
+	    <param name="sound_period" type="int" value="30" />
     </node>
 
-<!-- NTRIP CORRECTIONS -->>
+<!-- NTRIP CORRECTIONS -->
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />
@@ -39,11 +44,37 @@
 <!-- PATH PLANNER -->
     <node pkg="gps_to_path" type="path_planner_igraph" name="path_planner" output="screen">
     	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
+        <param name="goal_reached_distance" type="double" value="1."/>
+	<param name="publish_pcd" type="bool" value="true"/>
+	<param name="trav_max_dist" type="double" value="5."/>	
+	<param name="trav_radius" type="double" value="0.5"/>
+	<param name="untrav_point_cost" type="double" value="10."/>
+	<param name="long_term_memory_longevity" type="double" value="0.997" />
+	<param name="short_term_memory_longevity" type="double" value="0.8"/>
+	<param name="trav_inheritance_radius" type="double" value="0.71"/>	
+	<param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
+	<param name="max_goal_untrav_cost" type="double" value="200."/>
+	<!--param name="max_path_cost" type="double" value="1000." /-->
+	<param name="max_subgraph_time" type="double" value="120." />
+        <param name="use_osm" type="bool" value="$(arg use_osm)"/>
+	<param name="osm_use_solitary_nodes" type="bool" value="false"/>
     </node>
 
 <!-- PATH -->
-    <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">>
+    <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
     </node>
+
+<!-- TRAVERSABILITY PROCESSING -->
+    <node pkg="gps_to_path" type="trav_to_obstacles" name="trav_to_obstacles" output="screen">
+	<param name="max_height" type="double" value="1."/>
+	<param name="min_height" type="double" value="0.05"/>
+	<param name="max_dist" type="double" value="7." />
+	<param name="min_dist" type="double" value="0.5"/>
+	<param name="max_age" type="double" value="0.2"/>	
+	<param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>    
+    </node>
+
+
 
 <!-- OSM PCD VISUALIZATION -->
     <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">

@@ -51,7 +51,7 @@ def get_crossings(data):
     return crossings
 
 
-def gps_to_utm(data: list, withID: bool = True):
+def gps_to_utm(data, withID = True):
     '''
     Transforms GPS degrees coordinates into UTM coordinate system.
 
@@ -66,7 +66,7 @@ def gps_to_utm(data: list, withID: bool = True):
     return np.array([[node.easting, node.northing] for node in data])
 
 
-def create_line_for_road(road: list, withId: bool = True):
+def create_line_for_road(road, withId = True):
     '''
     Creates shapely.geometry.LineString representation for given road coordinates.
 
@@ -84,7 +84,7 @@ def create_line_for_road(road: list, withId: bool = True):
     return line
 
 
-def create_road_network(roads: list, inUTM: bool = True, withID: bool = True):
+def create_road_network(roads, inUTM = True, withID = True):
     '''
     Constructs road network for given list of individual roads.
 
@@ -103,7 +103,7 @@ def create_road_network(roads: list, inUTM: bool = True, withID: bool = True):
     return geom.MultiLineString(road_network)
 
 
-def find_intersections(road_network: geom.MultiLineString):
+def find_intersections(road_network):
     '''
     Returns list of shapely.geometry.Point of intersecting points in road_network
 
@@ -131,7 +131,7 @@ def find_intersections(road_network: geom.MultiLineString):
     return intersections
 
 
-def find_junctions(intersections: list, road_network: geom.MultiLineString):
+def find_junctions(intersections, road_network):
     '''
     Returns list of shapely.geometry.Point of junctions found from intersecting points in road_network
 
@@ -168,7 +168,7 @@ def find_junctions(intersections: list, road_network: geom.MultiLineString):
     return junctions
 
 
-def combine_road(junctions: list, intersections: list, road_network: geom.MultiLineString):
+def combine_road(junctions, intersections, road_network):
     '''
     Connect roads that can be connected, road will therefore be from junction/map edge to junction/map edge.
 
@@ -212,7 +212,7 @@ def combine_road(junctions: list, intersections: list, road_network: geom.MultiL
 
             dist_meters = geom.Point(c1).distance(geom.Point(c2))
             dist = c2[0]-c1[0], c2[1]-c1[1]
-            steps = ceil(dist_meters/20)  # maximal length between two points 30 meters
+            steps = int(ceil(dist_meters/20))  # maximal length between two points 30 meters
             increment = dist[0]/steps, dist[1]/steps
 
             for j in range(steps):
@@ -233,7 +233,7 @@ def road_class_price(roads):
     return prices
 
 
-def visualize_curves(segments: list, crossings: list, grid: bool = True):
+def visualize_curves(segments, crossings, grid = True):
     '''
     Show map of processed area, e.g. its road network and crossings. Roads are show in color depending on their curve
     and crossings are green.
@@ -260,7 +260,7 @@ def visualize_curves(segments: list, crossings: list, grid: bool = True):
     plt.show()
 
 
-def visualize_curvature_rank(ranked_segments: list, crossings: list, grid: bool = True):
+def visualize_curvature_rank(ranked_segments, crossings, grid = True):
     '''
     Show map of processed area, e.g. its road network and crossings. Roads are show in color depending on their traversability
     level and crossings are green.

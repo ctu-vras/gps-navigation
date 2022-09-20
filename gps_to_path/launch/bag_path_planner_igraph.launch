@@ -1,0 +1,23 @@
+ <launch>   
+    <param name="use_sim_time" value="true"/>
+    <!--rosparam command="load" file="/home/robot/Downloads/ugv_2022-08-12-16-27-46.bag.params"/-->
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/CH-forest-north_short_circle_debug.gpx" />
+
+<!-- PATH PLANNER -->
+    <node pkg="gps_to_path" type="path_planner_igraph" name="path_planner_igraph" output="screen">
+    	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
+        <param name="points_density" type="double" value="0.5"/>
+    </node>
+
+    <node pkg="gps_to_path" type="trav_to_obstacles_bag" name="trav_to_obstacles_bag" />             
+
+<!-- OSM -->
+    <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
+    </node>
+
+<!-- PATH -->
+    <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
+        <remap from="path" to="osm_path" />
+    </node>
+
+</launch>    

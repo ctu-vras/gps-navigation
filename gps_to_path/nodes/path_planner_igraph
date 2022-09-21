@@ -150,9 +150,7 @@ class PathPlanner():
         if self.current_sub_graph is None:
             self.current_sub_graph = self.sub_graphs.pop(0)
             self.subgraph_start_time = rospy.Time.now()
-        
-        print(self.current_sub_graph)
-        
+                
         goal_point = self.get_current_goal_point()
 
         if self.sub_graphs:
@@ -208,8 +206,8 @@ class PathPlanner():
                 # Replace the previous start position of robot to first waypoint...
                 self.sub_graphs.pop(0)
 
-                first_waypoint = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
-                current_position_point = geometry.Point(self.current_robot_position)
+                first_waypoint = geometry.Point(np.ravel(self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]))
+                current_position_point = geometry.Point(np.ravel(self.current_robot_position))
                 current_pos_to_start_point_graph = self.osm_planner.generate_graph(current_position_point, first_waypoint)
                 
                 # ... with current position of robot to first waypoint.

@@ -44,7 +44,10 @@ class PathPlanner():
                 max_path_cost,
                 max_subgraph_time,
                 use_osm,
-                osm_use_solitary_nodes):
+                osm_use_solitary_nodes,
+                repeat,
+                next_waypoint_proximity_switch,
+                min_time_near_goal):
 
         self.finished = False
 
@@ -67,6 +70,14 @@ class PathPlanner():
 
         self.use_osm = use_osm
         self.osm_use_solitary_nodes = osm_use_solitary_nodes
+
+        self.repeat = repeat
+
+        self.next_waypoint_proximity_switch = next_waypoint_proximity_switch
+
+        self.min_time_near_goal = min_time_near_goal
+        self.near_goal_point_time = -1
+        self.near_next_waypoint_time = -1
 
         self.max_subgraph_time = max_subgraph_time
         self.subgraph_start_time = 0
@@ -119,7 +130,11 @@ class PathPlanner():
         self.azimuth = msg.data
     
     def reached_goal_point(self,robot_position,goal_point):
-        if dist(np.array(robot_position), np.array(goal_point)) <= self.goal_reached_distance:
+        robot_position_temp = copy.copy(robot_position)
+
+        #rospy.logwarn(dist(np.array(robot_position_temp), np.array(goal_point)), self.goal_reached_distance)
+
+        if dist(np.array(robot_position_temp), np.array(goal_point)) <= self.goal_reached_distance:
             return True
         else:
             return False
@@ -138,9 +153,25 @@ class PathPlanner():
         
         goal_point = self.get_current_goal_point()
 
-        if self.reached_goal_point(copy.copy(self.current_robot_position), goal_point):
-            rospy.loginfo("Goal point {}/{} reached.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
-            self.next_waypoint()
+        next_goal_point = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+
+        if self.reached_goal_point(self.current_robot_position, goal_point):
+            if self.near_goal_point_time <= 0:
+                self.near_goal_point_time = rospy.Time.now().to_sec()
+
+            if rospy.Time.now().to_sec() - self.near_goal_point_time >= self.min_time_near_goal:
+                rospy.loginfo("Goal point {}/{} reached.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
+                self.next_waypoint()
+                self.near_goal_point_time = -1.  
+        
+        # Switch to next goal_point if nearby it.
+        elif self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
+            if self.near_next_waypoint_time <= 0:
+                self.near_next_waypoint_time = rospy.Time.now().to_sec()
+
+            if rospy.Time.now().to_sec() - self.near_next_waypoint_time >= self.min_time_near_goal:
+                self.next_waypoint()    
+                self.near_next_waypoint_time = -1.      
 
         if (rospy.Time.now() - self.subgraph_start_time).to_sec() > self.max_subgraph_time:
             rospy.loginfo("Subgraph timed out after {}. Goal point {}/{} not reached. Moving onto the next one".format(
@@ -163,13 +194,31 @@ class PathPlanner():
         if not self.sub_graphs:
             rospy.loginfo("Last goal point reached.")
             rospy.loginfo("Path planner finished.")
-            self.finished = True
+            
+            if self.repeat:
+                rospy.loginfo("Repeating path from first waypoint.")
+
+                self.sub_graphs = copy.copy(self.all_sub_graphs)
+                
+                # Replace the previous start position of robot to first waypoint...
+                self.sub_graphs.pop(0)
+
+                first_waypoint = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+                current_pos_to_start_point_graph = self.osm_planner.generate_graph(self.current_robot_position, first_waypoint)
+                
+                # ... with current position of robot to first waypoint.
+                self.sub_graphs.insert(0, current_pos_to_start_point_graph)
+
+            else:
+                self.finished = True
         
         # Pop next subgraph.
         else:
             self.current_sub_graph = self.sub_graphs.pop(0)
             self.current_sub_graph_changed = True
         
+        self.near_goal_point_time = -1
+        self.near_next_waypoint_time = -1
         self.subgraph_start_time = rospy.Time.now()
 
     def search_graph(self):
@@ -509,10 +558,7 @@ class PathPlanner():
         is_on_road_msg.header = header
         is_on_road_msg.data = is_on_road
 
-        self.is_on_road_pub.publish(is_on_road_msg)
-
-        print(is_on_road)
-        
+        self.is_on_road_pub.publish(is_on_road_msg)        
         
     def run(self):
         rate = rospy.Rate(10)
@@ -543,6 +589,10 @@ class PathPlanner():
                 self.osm_planner.run_ros()
 
                 self.sub_graphs = self.osm_planner.sub_graphs
+                    
+                if self.repeat:
+                    self.all_sub_graphs = copy.copy(self.sub_graphs)
+
                 self.current_sub_graph = None
                 self.num_sub_graphs = len(self.sub_graphs)
 
@@ -584,6 +634,9 @@ def main():
     max_subgraph_time = rospy.get_param('~max_subgraph_time', 30.)
     use_osm = rospy.get_param('~use_osm', True)
     osm_use_solitary_nodes = rospy.get_param('~osm_use_solitary_nodes', False)
+    repeat = rospy.get_param('~repeat', False)
+    next_waypoint_proximity_switch = rospy.get_param('~next_waypoint_proximity_switch', False)
+    min_time_near_goal = rospy.get_param('~min_time_near_goal', 1.)
 
     node = PathPlanner(gpx_assignment,
                         publish_pcd,
@@ -599,7 +652,10 @@ def main():
                         max_path_cost,
                         max_subgraph_time,
                         use_osm,
-                        osm_use_solitary_nodes
+                        osm_use_solitary_nodes,
+                        repeat,
+                        next_waypoint_proximity_switch,
+                        min_time_near_goal
                         )
 
     node.run()

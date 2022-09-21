@@ -20,13 +20,13 @@ import time
 MAX_AGE = 0.2
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,robot_base_frame):
+    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame):
 
         self.max_height = max_height
         self.min_height = min_height
         self.max_dist = max_dist
         self.min_dist = min_dist
-
+        self.max_age = max_age
         self.robot_base_frame = robot_base_frame
 
         self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
@@ -106,7 +106,7 @@ class TravToObstacles:
         t = rospy.Time.now()
          
         if self.gps_utm is not None and self.azimuth is not None:
-            if self.trans is not None and abs((msg.header.stamp + self.time_diff - t).to_sec()) < MAX_AGE:
+            if self.trans is not None and abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:
                 pcd_arr = ros_numpy.numpify(msg)
                 pcd_arr = rfn.structured_to_unstructured(pcd_arr)
 
@@ -122,7 +122,7 @@ class TravToObstacles:
                 self.pub_obstacles_map.publish(self.obstacles_map_pcd_msg)
             else:
                 rospy.logwarn("throwing away old msg, age is {} s".format(round((msg.header.stamp - t).to_sec(),3)))
-        
+
     def set_map_pcd_msg(self, points):
         pcd_data = np.zeros(len(points), dtype=[
                 ('x', np.float32),
@@ -205,9 +205,10 @@ def main():
     min_height = rospy.get_param('~min_height', 0.05)
     max_dist = rospy.get_param('~max_dist', 6.)     # HAS TO BE SLIGHTLY LARGER THAN trav_max_dist IN path_planner
     min_dist = rospy.get_param('~min_dist', 0.5)
+    max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
     
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,robot_base_frame)
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame)
 
     trav_to_obstacles.run()
 

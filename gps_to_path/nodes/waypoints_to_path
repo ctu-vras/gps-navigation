@@ -102,7 +102,7 @@ class WaypointsToPath():
                 pass
             # utm is not an actual tf trame, just an imaginary frame
 
-            if self.waypoints is not None and self.gps_utm is not None:
+            if self.waypoints is not None and self.waypoints.size > 0 and self.gps_utm is not None:                
                 rospy.loginfo_once("OK publishing waypoints.")
                 self.gps_to_target_utm_frame = self.waypoints - \
                     np.array([self.gps_utm.easting, self.gps_utm.northing])

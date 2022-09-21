@@ -146,14 +146,19 @@ class PathPlanner():
 
     def get_current_sub_graph(self):
         # Obtain graph which start point is the last goal point you visited.
-
+        
         if self.current_sub_graph is None:
             self.current_sub_graph = self.sub_graphs.pop(0)
             self.subgraph_start_time = rospy.Time.now()
         
+        print(self.current_sub_graph)
+        
         goal_point = self.get_current_goal_point()
 
-        next_goal_point = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+        if self.sub_graphs:
+            next_goal_point = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+        else:
+            next_goal_point = None
 
         if self.reached_goal_point(self.current_robot_position, goal_point):
             if self.near_goal_point_time <= 0:
@@ -165,7 +170,7 @@ class PathPlanner():
                 self.near_goal_point_time = -1.  
         
         # Switch to next goal_point if nearby it.
-        elif self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
+        elif next_goal_point is not None and self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
             if self.near_next_waypoint_time <= 0:
                 self.near_next_waypoint_time = rospy.Time.now().to_sec()
 
@@ -204,7 +209,8 @@ class PathPlanner():
                 self.sub_graphs.pop(0)
 
                 first_waypoint = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
-                current_pos_to_start_point_graph = self.osm_planner.generate_graph(self.current_robot_position, first_waypoint)
+                current_position_point = geometry.Point(self.current_robot_position)
+                current_pos_to_start_point_graph = self.osm_planner.generate_graph(current_position_point, first_waypoint)
                 
                 # ... with current position of robot to first waypoint.
                 self.sub_graphs.insert(0, current_pos_to_start_point_graph)

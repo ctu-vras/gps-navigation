@@ -21,6 +21,8 @@ import time
 from copy import copy,deepcopy
 from points_to_graph_points import points_to_graph_points, points_arr_to_point_line, get_point_line
 from scipy.spatial import ckdtree
+from scipy.spatial import KDTree
+
 import igraph
 
 import gpxpy
@@ -829,7 +831,12 @@ class PathAnalysis:
             graph.add_edges(edges)
             graph.es['weight'] = costs
 
-            start_index_graph = np.where(graph_points==[start_point.x,start_point.y])[0][0]
+            try:
+                start_index_graph = np.where(graph_points==[start_point.x,start_point.y])[0][0]
+            except:
+                tree = KDTree(graph_points)
+                _,ind = tree.query(start_point.coords)
+                start_index_graph = ind[0]
             #start_graph_index = np.where(np.array(graph.vs()["name"]).astype(int) == start_array_index)[0][0]
 
             goal_index_graph = np.where(graph_points==[goal_point.x,goal_point.y])[0][0]

@@ -1,5 +1,5 @@
 from cmath import nan
-from math import inf
+from math import inf, floor
 #from matplotlib.patches import Polygon
 import overpy
 import OSMPythonTools.api as osm
@@ -27,6 +27,10 @@ import gpxpy
 import gpxpy.gpx
 
 from graph_search_params import *
+import road_detection as rd_det
+import road_curvature as rd_cur
+import road_elevation as rd_ele
+from road_crossing_consts import *
 
 
 OSM_URL = "https://www.openstreetmap.org/api/0.6/way/{}/relations"
@@ -94,7 +98,7 @@ RESERVE = 50 # meters
 class PathAnalysis:
     def __init__(self, coords_file):
         
-        self.api = overpy.Overpass()
+        self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
         #self.waypoints = np.genfromtxt(in_file, delimiter=',') # This works for .csv files...
 
@@ -126,6 +130,8 @@ class PathAnalysis:
         self.roads_list = None
         self.footways_list = None
         self.barriers_list = None
+
+        self.road_polygons = []
 
         self.ways = dict()
 
@@ -402,13 +408,17 @@ class PathAnalysis:
         return valid
 
     def get_contain_mask(self, points, areas):
-
         #multi_polygon = geometry.MultiPolygon([(area.line.exterior.coords,[anti_area.line.exterior.coords for anti_area in anti_areas]) for area in areas])
-        multi_polygon = geometry.MultiPolygon([area.line for area in areas])
-        multi_polygon = multi_polygon.buffer(0)
-        multi_polygon = prep(multi_polygon)
-        contains = lambda p: multi_polygon.contains(p)
+        if len(areas) >= 1:
+            multi_polygon = geometry.MultiPolygon([area.line for area in areas] if type(areas[0]) is type(Way()) else areas)
+            multi_polygon = multi_polygon.buffer(0)
+            multi_polygon = prep(multi_polygon)
+            contains = lambda p: multi_polygon.contains(p)
+        else:
+            contains = lambda p: False
         mask = np.array(list(map(contains, points)))
+        #print(len(points))
+        #print(len(mask))
         return mask
     
     def mask_points(self, points, other_array, areas):
@@ -624,7 +634,7 @@ class PathAnalysis:
         return goal_points
 
     
-    def graph_search_path(self):
+    def graph_search_path(self, road_cross_cost):
         """ Using graph search prepare the path for the robot from the given waypoints. """
 
         print("Running graph search.")
@@ -673,6 +683,9 @@ class PathAnalysis:
         ax.set_ylabel('Northing (m)')
         plt.show() """
 
+        if road_cross_cost:
+            self.road_polygons = self.get_road_crossing_cost(None)
+
         path = []
 
         while goal_points:              # Main cycle.
@@ -686,7 +699,6 @@ class PathAnalysis:
             keep_previous_start = False
 
             while True:
-                t = time.time()
                 graph_range =  INIT_WIDTH + 2*increase_graph
                 graph_points, points_line, dist_from_line = points_to_graph_points(start_point, goal_point, density=density, width=graph_range)
 
@@ -699,8 +711,14 @@ class PathAnalysis:
                 graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
                 dist_from_line = np.array(dist_from_line)
 
-                road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
-
+                # TODO: Find a way to speed this up, longest time is taken by multi_polygon.buffer(0) in get_contain_mask
+                road_points_mask = []
+                if road_cross_cost:
+                    for i in range(len(self.road_polygons)):
+                        road_points_mask.append(self.get_contain_mask(graph_points, self.road_polygons[i]))
+                else:
+                    road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
+                
                 footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
 
                 out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
@@ -721,7 +739,13 @@ class PathAnalysis:
                 edge_points_1 = graph_points[edges[:,0]]
                 edge_points_2 = graph_points[edges[:,1]]
 
-                road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
+                road_points = []
+                not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
+                if road_cross_cost:
+                    for i in range(ROAD_CROSSINGS_RANKS):
+                        road_points.append((road_points_mask[i][edges[:,0]] + road_points_mask[i][edges[:,1]]) * not_footway_points)
+                else:
+                    road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
 
                 dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
                 dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS)
@@ -853,14 +877,20 @@ class PathAnalysis:
     
     def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss):
         #return dist_cost
-        return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + road_loss*roads + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
+        if type(roads) is not type(list()):  # list is when we use road crossing cost as we have multiple levels
+            return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + \
+                   roads*road_loss + no_footway_loss * no_footways, (len(p1),1)) + dist_cost
+        else:
+            return np.reshape(np.sqrt(np.sum(np.square(p1-p2),axis=1)) + \
+                   sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
+                   no_footway_loss * no_footways, (len(p1),1)) + dist_cost
 
     def sets_to_lists(self):
         self.roads_list     = list(self.roads)
         self.footways_list  = list(self.footways)
         self.barriers_list  = list(self.barriers)
 
-    def run(self, gpx_fn):
+    def run(self, gpx_fn, road_cross_cost):
         """ Run to get the complete graph search. """
         print("Running analysis.")
         self.parse_ways()
@@ -869,7 +899,9 @@ class PathAnalysis:
             self.parse_nodes()
         self.separate_ways()
         self.sets_to_lists()
-        self.graph_search_path()
+        start_t = time.time()
+        self.graph_search_path(road_cross_cost)
+        print("Path took: %.5f" % (time.time()-start_t))
         self.save_path_as_gpx(gpx_fn)
     
     def run_queries(self):
@@ -903,9 +935,9 @@ class PathAnalysis:
 
         print("Queries finished.")
 
-    def run_standalone(self, gpx_fn):
+    def run_standalone(self, gpx_fn, road_cross_cost):
         self.run_queries()
-        self.run(gpx_fn)
+        self.run(gpx_fn, road_cross_cost)
 
 
 
@@ -933,6 +965,35 @@ class PathAnalysis:
             f.close()
         
         print("Path saved to {}.".format(fn))
+
+    def get_road_crossing_cost(self, elev_data_files):
+        roads = rd_det.get_roads(self.osm_ways_data)
+        prices = rd_det.road_class_price(roads)
+        self.road_network = rd_det.create_road_network([road[0] for road in roads], False, True)
+        intersections = rd_det.find_intersections(self.road_network)
+        junctions = rd_det.find_junctions(intersections, self.road_network)
+        self.road_network = rd_det.combine_road(junctions, intersections, self.road_network)
+        segments = rd_cur.get_average_radius(self.road_network)
+        rd_cur.rank_segments_curve(segments, junctions)
+        ranked_segments = rd_cur.road_cost_for_curve(segments)
+        elev_data = rd_ele.get_road_network_elevation(self.road_network, elev_data_files)
+        class_TPI = rd_ele.classify_TPI(elev_data)
+        elev_cost = rd_ele.road_cost_for_height(class_TPI)
+        ranked_segments_2 = [[] for i in range(ROAD_CROSSINGS_RANKS)]
+        for segment in ranked_segments:
+            cost = (segment[1]+1)/ROAD_CURVATURE_RANKS * CURVATURE_WEIGHT
+            for road in prices:
+                if segment[0].distance(road[0]) < 1e-9:
+                    cost += road[1]/ROAD_CLASS_RANKS * CLASS_WEIGHT
+                    break
+            for elev_segment in elev_cost:
+                if elev_segment[0].distance(segment[0]) < 1e-9:
+                    cost += (elev_segment[1])/ROAD_ELEVATION_RANKS * ELEVATION_WEIGHT
+            cost /= (CURVATURE_WEIGHT+CLASS_WEIGHT+ELEVATION_WEIGHT)
+            cost *= ROAD_CROSSINGS_RANKS
+            ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else floor(cost)].append(segment[0].buffer(7/2))
+        return ranked_segments_2
+        
         
 # Useful links:
 # https://gis.stackexchange.com/questions/259422/how-to-get-a-multipolygon-object-from-overpass-ql

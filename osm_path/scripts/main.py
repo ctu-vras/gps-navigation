@@ -7,14 +7,25 @@ from geodesy import utm
 import gpxpy.gpx
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as ptch
 import numpy as np
 import pandas as pd
 
-if len(sys.argv) == 3:
-    COORDS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gpx/"+str(sys.argv[1]))
-    PATH_NAME = str(sys.argv[2])
+road_cross_cost = False
+if len(sys.argv) > 1:
+    if "-c" in sys.argv:
+        COORDS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gpx/"+str(sys.argv[sys.argv.index("-c")+1]))
+    else:
+        COORDS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gpx/cimicky.gpx")
+    if "-o" in sys.argv:
+        PATH_NAME = str(sys.argv[sys.argv.index("-o")+1])
+    else:
+        PATH_NAME = "path"
+    if "-r" in sys.argv:
+        road_cross_cost = True
+        print("good")
 else:
-    COORDS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gpx/cimicky.gpx")
+    COORDS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gpx/cimicky.gpx")
     PATH_NAME = "path"
 
 if not PATH_NAME.isalnum():
@@ -37,6 +48,37 @@ def plot_barrier_areas(barrier_areas, ax):
         
         if area.in_out != "inner":
             ax.fill(x,y,c='#BF0009', alpha=0.4, zorder = 5)
+
+def plot_road_costs(road_polygons, ax):
+    colors = ["blue", "deepskyblue", "aqua", "turquoise", "limegreen", "green", "yellow", "gold",\
+              "orange", "peru", "orangered", "firebrick", "deeppink", "magenta", "purple"]
+    for road_level in range(len(road_polygons)):
+        for road in road_polygons[road_level]:
+            x,y = road.exterior.xy
+            ax.fill(x, y, c=colors[road_level], alpha=0.6, zorder=6)
+
+def plot_legend(ax): 
+    blue_patch = ptch.Patch(color="blue", label="Level 00")
+    deepskyblue_patch = ptch.Patch(color="deepskyblue", label="Level 01")
+    aqua_patch = ptch.Patch(color="aqua", label="Level 02")
+    turquoise_patch = ptch.Patch(color="turquoise", label="Level 03")
+    limegreen_patch = ptch.Patch(color="limegreen", label="Level 04")
+    green_patch = ptch.Patch(color="green", label="Level 05")
+    yellow_patch = ptch.Patch(color="yellow", label="Level 06")
+    gold_patch = ptch.Patch(color="gold", label="Level 07")
+    orange_patch = ptch.Patch(color="orange", label="Level 08")
+    tomato_patch = ptch.Patch(color="peru", label="Level 09")
+    orangered_patch = ptch.Patch(color="orangered", label="Level 10")
+    red_patch = ptch.Patch(color="firebrick", label="Level 11")
+    deeppink_patch = ptch.Patch(color="deeppink", label="Level 12")
+    magenta_patch = ptch.Patch(color="magenta", label="Level 13")
+    purple_patch = ptch.Patch(color="purple", label="Level 14")
+    obstacle_patch = ptch.Patch(color="#BF0009", label="Obstacle")
+    path_patch = ptch.Patch(color="#50C2F6", label="Path")
+    handles = [blue_patch, deepskyblue_patch, aqua_patch, turquoise_patch, limegreen_patch, green_patch,\
+              yellow_patch, gold_patch, orange_patch, tomato_patch, orangered_patch, red_patch, deeppink_patch,\
+              magenta_patch, purple_patch, obstacle_patch, path_patch]
+    ax.legend(handles=handles, loc="center left", bbox_to_anchor=(1, 0.5))
 
 def get_margin(min_long,max_long,min_lat,max_lat):
     y_margin = (max_lat-min_lat) * 0.1
@@ -67,10 +109,11 @@ def plot_background_map(ax, image):
 
 # Run the graph search. Save generated path to a .gpx file.
 path_analysis = osm_analysis.PathAnalysis(COORDS_FILE)
-path_analysis.run_standalone(os.path.join(os.path.dirname(os.path.dirname(__file__)), "path/{}.gpx".format(PATH_NAME)))
+path_analysis.run_standalone(os.path.join(os.path.dirname(os.path.dirname(__file__)), "path/{}.gpx".format(PATH_NAME)), road_cross_cost)
 
 # Extract variables.
 roads =                 np.array(list(path_analysis.roads))
+road_polygons =         path_analysis.road_polygons
 footways =              np.array(list(path_analysis.footways))
 barriers =              np.array(list(path_analysis.barriers))
 
@@ -96,7 +139,10 @@ N = 100
 
 plot_background_map(ax, background_map)
 plot_barrier_areas(barriers,ax)
+plot_road_costs(road_polygons, ax)
 plot_path(path,ax)
+if road_cross_cost:
+    plot_legend(ax)
 
 ax.set_aspect('equal', adjustable='box')
 ax.set_xlabel('Easting (m)')

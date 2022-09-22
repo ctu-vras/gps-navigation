@@ -1,11 +1,11 @@
 import shapely.geometry as geom
 import numpy as np
-from math import floor
+from math import floor, dist
 
 from road_crossing_consts import *
 
 
-def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point) -> float:
+def circum_circle_radius(A: tuple, B: tuple, C: tuple) -> float:
     '''
     Return the radius value of circumcircle for triange defined by three points A, B, C.
 
@@ -19,9 +19,9 @@ def circum_circle_radius(A: geom.Point, B: geom.Point, C: geom.Point) -> float:
         Third point defining the triangle.
     '''
     # Calculate lengths of individual sides.
-    lenA = B.distance(C)
-    lenB = A.distance(C)
-    lenC = A.distance(B)
+    lenA = dist(B, C)
+    lenB = dist(A, C)
+    lenC = dist(B, A)
 
     if lenA > 0 and lenB > 0 and lenC > 0:  # lengths are nonzero and positive
         divider = np.sqrt(np.fabs((lenA+lenB+lenC) * (lenB+lenC-lenA) * (lenA+lenC-lenB) * (lenA+lenB-lenC)))
@@ -52,12 +52,12 @@ def get_average_radius(road_network: geom.MultiLineString)-> list:
         road_coords = list(road.coords)
         if len(road_coords) < 3:  # we are not able to calculate circumcircle's radius
             avg_radius = 10000
-            seg_len = geom.Point(road_coords[0]).distance(geom.Point(road_coords[1]))
+            seg_len = dist(road_coords[0], road_coords[1])
             segments.append(np.array([tuple([avg_radius, seg_len, (road_coords[0], road_coords[1]), 0, 0])], dtype=curve_type))
             continue
         # Create individual circumcircles and calculate theirs radii
         for i in range(len(road_coords)-2):
-            radius.append(circum_circle_radius(geom.Point(road_coords[i]), geom.Point(road_coords[i+1]), geom.Point(road_coords[i+2])))
+            radius.append(circum_circle_radius(road_coords[i], road_coords[i+1], road_coords[i+2]))
         # Set radii for corresponding road segments
         road_segments = []
         for i in range(len(road_coords)-1):
@@ -67,7 +67,7 @@ def get_average_radius(road_network: geom.MultiLineString)-> list:
                 avg_radius = radius[-1]
             else:
                 avg_radius = min(radius[i-1:i+1])
-            seg_len = geom.Point(road_coords[i]).distance(geom.Point(road_coords[i+1]))
+            seg_len = dist(road_coords[i], road_coords[i+1])
             road_segments.append(tuple([avg_radius, seg_len, (road_coords[i], road_coords[i+1]), 0, 0]))
         segments.append(np.array(road_segments, dtype=curve_type))
 

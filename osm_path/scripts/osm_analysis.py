@@ -684,7 +684,7 @@ class PathAnalysis:
         plt.show() """
 
         if road_cross_cost:
-            self.road_polygons = self.get_road_crossing_cost(None)
+            self.road_polygons = self.get_road_crossing_cost(ELEV_DATA_FILES)
 
         path = []
 

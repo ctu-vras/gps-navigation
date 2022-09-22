@@ -55,8 +55,11 @@ def get_road_network_elevation(road_network: geom.MultiLineString, elev_data_fil
     elev_data_files: list
         List with paths to all neccessary files containing elevation data.
     '''
-    # TODO: multiple input files of elevation data
-    data_file = "/home/vlkjan6/Documents/gps-navigation/gps-navigation/osm_path/scripts/PRAH72_5g.xyz"
+    data_file = "elev_data.xyz"
+    open(data_file, "w").close()
+    for file in elev_data_files:
+        with open(data_file, 'a+') as elev_data, open(file, 'r') as data:
+            elev_data.write(data.read())
 
     network_elev = []
     road_nodes_count = []

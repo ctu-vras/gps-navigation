@@ -1,6 +1,6 @@
 <launch>
 <group ns="gps">    
-    <arg name="gpx_file" default="$(find gps_to_path)/data/kn.gpx" />
+    <arg name="gpx_file" default="$(find gps_to_path)/data/unhost_base_ex_short_lap.gpx" />
     <arg name="circular_path" default="false" />
     <arg name="reversed_path" default="false" />
     <arg name="run_ntrip_relay" default="true" />
@@ -14,10 +14,12 @@
         <param name="baud" type="int" value="115200" />
     </node>
 
-    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)">
+    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />
         <param name="num_threads" value="2" />
+        <param name="sigkill_timeout" value="30" />
+        <param name="sigkill_on_stream_stop" value="true" />
     </node>
 
    <!-- FAKE GPS -->

@@ -140,7 +140,7 @@ class Way():
 RESERVE = 50 # meters
 
 class PathAnalysis:
-    def __init__(self, coords_file, road_crossing, current_robot_position, use_osm=True,use_solitary_nodes=True):
+    def __init__(self, coords_file, road_crossing, current_robot_position, use_osm=True,use_solitary_nodes=True, flip=False):
         
         self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
@@ -149,6 +149,8 @@ class PathAnalysis:
         self.use_osm = use_osm
         self.use_solitary_nodes = use_solitary_nodes
 
+        self.flip = flip
+
         #self.waypoints = np.genfromtxt(in_file, delimiter=',') # This works for .csv files...
 
         # Gpx file to numpy array.
@@ -156,6 +158,9 @@ class PathAnalysis:
         gpx_object = gpxpy.parse(gpx_f)
         self.waypoints = np.array([[point.latitude,point.longitude] for point in gpx_object.waypoints])
         self.waypoints, self.zone_number, self.zone_letter = self.waypoints_to_utm()
+
+        if self.flip:
+            self.waypoints = np.flip(self.waypoints, 0)
 
         self.waypoints = np.concatenate([current_robot_position,self.waypoints])
         

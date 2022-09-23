@@ -649,7 +649,7 @@ class PathAnalysis:
         interval = round(dist/density)
 
         start_index = np.where(points_validity==True)[0][0]         # First start point is the first valid point
-        goal_points.append(points_line[start_index])
+        goal_points.append(points_line[int(start_index)])
 
         goal_index = min(start_index+interval, len(points_line), self.get_min_index(original_waypoint_indices, start_index))
 
@@ -659,7 +659,7 @@ class PathAnalysis:
             else:
                 goal_index = len(points_line)-1
 
-            current_validity = points_validity[start_index:goal_index+1]
+            current_validity = points_validity[int(start_index):int(goal_index+1)]
 
             if np.sum(current_validity) == len(current_validity):
                 pass
@@ -680,10 +680,10 @@ class PathAnalysis:
                 else:               # large obstacle until the end (no more goal points)        
                     break
             
-            goal_points.append(points_line[goal_index])
+            goal_points.append(points_line[int(goal_index)])
 
             for area in self.barriers:
-                if area.line.contains(points_line[goal_index]):
+                if area.line.contains(points_line[int(goal_index)]):
                     rospy.loginfo("point bad")
 
             if goal_index == len(points_line)-1:

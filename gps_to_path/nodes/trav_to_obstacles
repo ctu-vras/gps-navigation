@@ -27,7 +27,8 @@ class TravToObstacles:
         self.max_age = max_age
         self.robot_base_frame = robot_base_frame
 
-        self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
+        #self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
+        self.sub_pcd = rospy.Subscriber("geometric_traversability_raw", PointCloud2, self.handle_pcd, queue_size=1)
 
         self.sub_fix =  rospy.Subscriber("fix", NavSatFix, self.update_fix, queue_size = 10)
         self.gps_utm = None
@@ -59,7 +60,7 @@ class TravToObstacles:
                                     trans.transform.rotation.z,
                                     trans.transform.rotation.w])   
         R = R[:3,:3]
-        points = np.matmul(R,points.T)
+        points = np.matmul(-R,points.T)
         points = points.T
         return points
 
@@ -104,10 +105,11 @@ class TravToObstacles:
             if self.trans is not None and abs((msg.header.stamp - t).to_sec()) < self.max_age:
 
                 # PCD to numpy array of 3D points.
-                pcd_arr = ros_numpy.numpify(msg)
-                pcd_arr = rfn.structured_to_unstructured(pcd_arr)
+                pcd_struct = ros_numpy.numpify(msg)
+                pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z','cost']])
 
-                pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
+                #pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
+                pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]
                 pcd_arr = pcd_arr[:,:3]
 
                 # Filter unwanted points and project onto the XY plane.

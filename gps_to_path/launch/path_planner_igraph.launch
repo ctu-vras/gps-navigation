@@ -4,6 +4,8 @@
     <arg name="robot_base_frame" default="base_link" />
     <arg name="use_osm" default="true" />
     <arg name="repeat" default="false" />
+    <arg name="trav_obstacle_field" defaul="cost" />
+    <arg name="mirrored_points" default="1.">   <!--CHANGE TO -1. IF TRAV POINTS ARE MIRRORED-->
 
         
 
@@ -71,12 +73,17 @@
 
 <!-- TRAVERSABILITY PROCESSING -->
     <node pkg="gps_to_path" type="trav_to_obstacles" name="trav_to_obstacles" output="screen">
+
+    <remap from="cloud_segmentation/lidar_cloud" to="geometric_traversability_raw" />
+
 	<param name="max_height" type="double" value="0.5"/>
 	<param name="min_height" type="double" value="-1."/>
 	<param name="max_dist" type="double" value="7." />
 	<param name="min_dist" type="double" value="0.5"/>
 	<param name="max_age" type="double" value="1."/>	
-	<param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>    
+	<param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
+	<param name="trav_obstacle_field" type="string" value="$(arg trav_obstacle_field)"/>
+	<param name="mirrored_points" type="double" value="$(arg mirrored_points)"/>
     </node>
 
 

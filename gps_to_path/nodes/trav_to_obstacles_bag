@@ -61,7 +61,7 @@ class TravToObstacles:
                                     trans.transform.rotation.z,
                                     trans.transform.rotation.w])   
         R = R[:3,:3]
-        points = np.matmul(R,points.T)
+        points = np.matmul(-R,points.T)
         points = points.T
         return points
 

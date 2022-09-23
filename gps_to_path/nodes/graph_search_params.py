@@ -1,4 +1,4 @@
-INIT_WIDTH = 100          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+INIT_WIDTH = 30          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
 
 DENSITY = 1             # In meters. How dense is the graph (distance between neighboring nodes).
 

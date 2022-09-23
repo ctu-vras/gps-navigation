@@ -18,7 +18,7 @@ from tf.transformations import quaternion_matrix
 
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame):
+    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,mirrored_points):
 
         self.max_height = max_height
         self.min_height = min_height
@@ -26,6 +26,9 @@ class TravToObstacles:
         self.min_dist = min_dist
         self.max_age = max_age
         self.robot_base_frame = robot_base_frame
+
+        self.trav_obstacle_field = trav_obstacle_field
+        self.mirrored_points = mirrored_points
 
         #self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
         self.sub_pcd = rospy.Subscriber("geometric_traversability_raw", PointCloud2, self.handle_pcd, queue_size=1)
@@ -60,7 +63,7 @@ class TravToObstacles:
                                     trans.transform.rotation.z,
                                     trans.transform.rotation.w])   
         R = R[:3,:3]
-        points = np.matmul(-R,points.T)
+        points = -np.matmul(R,points.T) # MINUS HERE
         points = points.T
         return points
 
@@ -76,7 +79,7 @@ class TravToObstacles:
         angle = np.deg2rad(self.azimuth) + math.pi/2
         R = np.array([[np.cos(angle),-np.sin(angle)],
                         [np.sin(angle),np.cos(angle)]])
-        points = np.matmul(R,points.T).T
+        points = np.matmul(self.mirrored_points*R,points.T).T
 
         # Translation.
         points = points + self.gps_utm
@@ -106,10 +109,10 @@ class TravToObstacles:
 
                 # PCD to numpy array of 3D points.
                 pcd_struct = ros_numpy.numpify(msg)
-                pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z','cost']])
+                pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
 
                 #pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
-                pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]
+                pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types
                 pcd_arr = pcd_arr[:,:3]
 
                 # Filter unwanted points and project onto the XY plane.
@@ -191,8 +194,9 @@ def main():
     min_dist = rospy.get_param('~min_dist', 0.5)
     max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
+    trav_obstacle_field = rospy.get_param('~trav_obstacle_field', 'cost')
 
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame)
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field)
 
     trav_to_obstacles.run()
 

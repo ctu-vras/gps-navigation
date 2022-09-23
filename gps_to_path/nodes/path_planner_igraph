@@ -245,111 +245,114 @@ class PathPlanner():
         
         # -------- TRAV ---------
         if self.untrav_points is not None:
-            graph_points = graph_dict['graph_points']
-
-            nearest_robot_point = graph_points[start_index]
-            graph_tree = KDTree(graph_points)
-            nearest_graph_points_ind = graph_tree.query_ball_point(nearest_robot_point, r=self.trav_max_dist)
-
-            nearest_graph_points = KDTree(graph_points[nearest_graph_points_ind])
-            
             try:
-                trav_tree = KDTree(self.untrav_points)
-                untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
+                if self.untrav_points.size > 0:
+                    graph_points = graph_dict['graph_points']
 
-                #untrav_mask = np.zeros(len(graph_points))
-                #untrav_mask[nearest_graph_points_ind] = [len(a) for a in untrav_points_in_radius_ind]
+                    nearest_robot_point = graph_points[start_index]
+                    graph_tree = KDTree(graph_points)
+                    nearest_graph_points_ind = graph_tree.query_ball_point(nearest_robot_point, r=self.trav_max_dist)
 
-                #near_points_untrav_mask = np.zeros(len(nearest_graph_points_ind))
-                near_points_untrav_mask = np.array([len(a) for a in untrav_points_in_radius_ind])
+                    nearest_graph_points = KDTree(graph_points[nearest_graph_points_ind])
+                    
+                    trav_tree = KDTree(self.untrav_points)
+                    untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
 
-                # Near graph vertices cost is equal to number of nearby untrav points and the rest of the mask is zeros.
-                #untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
+                    #untrav_mask = np.zeros(len(graph_points))
+                    #untrav_mask[nearest_graph_points_ind] = [len(a) for a in untrav_points_in_radius_ind]
+
+                    #near_points_untrav_mask = np.zeros(len(nearest_graph_points_ind))
+                    near_points_untrav_mask = np.array([len(a) for a in untrav_points_in_radius_ind])
+
+                    # Near graph vertices cost is equal to number of nearby untrav points and the rest of the mask is zeros.
+                    #untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
+                    
+                    #except:
+                    #    trav_tree = KDTree(graph_points)
+                    #    untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
+                    #    near_points_untrav_mask = np.array([0 for a in untrav_points_in_radius_ind])
+
+                    # Initialization of trav mask.
+                    if self.untrav_mask is None:
+                        untrav_mask = np.zeros(len(graph_points))
+                        self.untrav_mask = untrav_mask
+                        self.current_sub_graph_changed = False
+
+                    # Inheritance of trav mask between near vertices of previous and new subgraph when subgraph changes.
+                    if self.untrav_mask is not None and self.current_sub_graph_changed == True:
+                        previous_points_tree = KDTree(self.previous_points)
+                        dists,inds = previous_points_tree.query(graph_points)
+
+                        new_mask = np.zeros((len(graph_points)))
+                        new_mask_inds = np.arange(len(new_mask))
+
+                        inds = inds[dists <= self.trav_inheritance_radius]
+                        new_mask_inds = new_mask_inds[dists <= self.trav_inheritance_radius]
+
+                        new_mask[new_mask_inds] = self.untrav_mask[inds]
+
+                        self.untrav_mask = new_mask
+                        self.current_sub_graph_changed = False
+
+                    # Trav update.
+                    #if self.untrav_mask is not None and self.current_sub_graph_changed == False:
+                        
+                        # The near points are fully updated based on last trav pcd.
+                        #self.untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
+
+                        # The whole mask ages.
+                        #self.untrav_mask = self.memory_longevity * self.untrav_mask
+                        #current_mask_is_larger = untrav_mask > self.untrav_mask
+                        #self.untrav_mask[current_mask_is_larger] = untrav_mask[current_mask_is_larger]
+                        #self.untrav_mask[~current_mask_is_larger] = self.memory_longevity * self.untrav_mask[~current_mask_is_larger] + (1-self.memory_longevity) * untrav_mask[~current_mask_is_larger]
+
+                    # Trav update.
+                    # The near points are fully updated based on last trav pcd.
+                    #print(self.short_term_memory_longevity)
+                    #print(self.untrav_mask[nearest_graph_points_ind])
+                    #print((1-self.short_term_memory_longevity))
+                    #print(near_points_untrav_mask)
+                    self.untrav_mask[nearest_graph_points_ind] = self.short_term_memory_longevity * self.untrav_mask[nearest_graph_points_ind] + (1-self.short_term_memory_longevity) * near_points_untrav_mask
+
+                    # The whole mask ages.
+                    self.untrav_mask = self.long_term_memory_longevity * self.untrav_mask
+                    
+                    self.previous_points = graph_points # previous points used when the subgraph changes (trav inheritance)
+
+                    #edges2 = np.array(graph_dict['graph'].get_edgelist())   # SLOWNESS CULPRIT 1 (bellow line is faster)
+                    edges = np.fromiter(chain(*graph_dict['graph'].get_edgelist()), np.dtype('i'), count=-1).reshape(-1, 2)
+
+                    #edge_points_1 = graph_points[edges[:,0]]
+                    #edge_points_2 = graph_points[edges[:,1]]
+
+                    untrav_cost = (self.untrav_mask[edges[:,0]] + self.untrav_mask[edges[:,1]]) * self.untrav_point_cost / 2
+                    untrav_cost = untrav_cost.T.reshape(-1,1)
+
+                    # Publish the graph as pcd for vizualization.
+                    if self.use_osm:
+                        self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],self.untrav_mask)
+                    
+                    graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight'] + untrav_cost  # SLOWNESS CULPRIT
+
+                    #if self.art1 is not None:
+                    #    self.art1.remove()
+                    #if self.art2 is not None:
+                    #    self.art2.remove()
+                    #self.art1 = self.ax.scatter(self.untrav_points[:,0],self.untrav_points[:,1],c='blue',s=20)
+                    #self.art2 = self.ax.scatter(self.current_robot_position[:,0],self.current_robot_position[:,1],c='red',s=50)
+                    #plt.draw()
+                    #plt.pause(0.001)
+                # -----------------------
+                    #print(graph_dict['start_index_graph'],goal_index_graph)
+                    # If waypoint (current goal point) is untraversable - choose the point on the line along the gas pipe.
+                    if self.untrav_mask[goal_index_graph] > self.max_goal_untrav_cost:
+                        rospy.logwarn("Waypoint {}/{} is untraversable. Moving goal one point closer.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
+                        graph_dict['goal_index_graph'] -= 1
+            
+                        #self.next_waypoint()
+                        return None
             except:
-                trav_tree = KDTree(graph_points)
-                untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
-                near_points_untrav_mask = np.array([0 for a in untrav_points_in_radius_ind])
                 pass
-            # Initialization of trav mask.
-            if self.untrav_mask is None:
-                untrav_mask = np.zeros(len(graph_points))
-                self.untrav_mask = untrav_mask
-                self.current_sub_graph_changed = False
-
-            # Inheritance of trav mask between near vertices of previous and new subgraph when subgraph changes.
-            if self.untrav_mask is not None and self.current_sub_graph_changed == True:
-                previous_points_tree = KDTree(self.previous_points)
-                dists,inds = previous_points_tree.query(graph_points)
-
-                new_mask = np.zeros((len(graph_points)))
-                new_mask_inds = np.arange(len(new_mask))
-
-                inds = inds[dists <= self.trav_inheritance_radius]
-                new_mask_inds = new_mask_inds[dists <= self.trav_inheritance_radius]
-
-                new_mask[new_mask_inds] = self.untrav_mask[inds]
-
-                self.untrav_mask = new_mask
-                self.current_sub_graph_changed = False
-
-            # Trav update.
-            #if self.untrav_mask is not None and self.current_sub_graph_changed == False:
-                
-                # The near points are fully updated based on last trav pcd.
-                #self.untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
-
-                # The whole mask ages.
-                #self.untrav_mask = self.memory_longevity * self.untrav_mask
-                #current_mask_is_larger = untrav_mask > self.untrav_mask
-                #self.untrav_mask[current_mask_is_larger] = untrav_mask[current_mask_is_larger]
-                #self.untrav_mask[~current_mask_is_larger] = self.memory_longevity * self.untrav_mask[~current_mask_is_larger] + (1-self.memory_longevity) * untrav_mask[~current_mask_is_larger]
-
-            # Trav update.
-            # The near points are fully updated based on last trav pcd.
-            #print(self.short_term_memory_longevity)
-            #print(self.untrav_mask[nearest_graph_points_ind])
-            #print((1-self.short_term_memory_longevity))
-            #print(near_points_untrav_mask)
-            self.untrav_mask[nearest_graph_points_ind] = self.short_term_memory_longevity * self.untrav_mask[nearest_graph_points_ind] + (1-self.short_term_memory_longevity) * near_points_untrav_mask
-
-            # The whole mask ages.
-            self.untrav_mask = self.long_term_memory_longevity * self.untrav_mask
-            
-            self.previous_points = graph_points # previous points used when the subgraph changes (trav inheritance)
-
-            #edges2 = np.array(graph_dict['graph'].get_edgelist())   # SLOWNESS CULPRIT 1 (bellow line is faster)
-            edges = np.fromiter(chain(*graph_dict['graph'].get_edgelist()), np.dtype('i'), count=-1).reshape(-1, 2)
-
-            #edge_points_1 = graph_points[edges[:,0]]
-            #edge_points_2 = graph_points[edges[:,1]]
-
-            untrav_cost = (self.untrav_mask[edges[:,0]] + self.untrav_mask[edges[:,1]]) * self.untrav_point_cost / 2
-            untrav_cost = untrav_cost.T.reshape(-1,1)
-
-            # Publish the graph as pcd for vizualization.
-            if self.use_osm:
-                self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],self.untrav_mask)
-            
-            graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight'] + untrav_cost  # SLOWNESS CULPRIT
-
-            #if self.art1 is not None:
-            #    self.art1.remove()
-            #if self.art2 is not None:
-            #    self.art2.remove()
-            #self.art1 = self.ax.scatter(self.untrav_points[:,0],self.untrav_points[:,1],c='blue',s=20)
-            #self.art2 = self.ax.scatter(self.current_robot_position[:,0],self.current_robot_position[:,1],c='red',s=50)
-            #plt.draw()
-            #plt.pause(0.001)
-        # -----------------------
-            #print(graph_dict['start_index_graph'],goal_index_graph)
-            # If waypoint (current goal point) is untraversable - choose the point on the line along the gas pipe.
-            if self.untrav_mask[goal_index_graph] > self.max_goal_untrav_cost:
-                rospy.logwarn("Waypoint {}/{} is untraversable. Moving goal one point closer.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
-                graph_dict['goal_index_graph'] -= 1
-    
-                #self.next_waypoint()
-                return None
-
         else:
             # Else triggers if no trav msg has arrived yet. In that case we simply use the base weights.
             # Try except here for initialization if the variable has not been initialized yet.

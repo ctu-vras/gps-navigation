@@ -47,7 +47,8 @@ class PathPlanner():
                 osm_use_solitary_nodes,
                 repeat,
                 next_waypoint_proximity_switch,
-                min_time_near_goal):
+                min_time_near_goal,
+                flip):
 
         self.finished = False
 
@@ -72,6 +73,7 @@ class PathPlanner():
         self.osm_use_solitary_nodes = osm_use_solitary_nodes
 
         self.repeat = repeat
+        self.flip = flip
 
         self.next_waypoint_proximity_switch = next_waypoint_proximity_switch
 
@@ -589,7 +591,8 @@ class PathPlanner():
                                                             True,
                                                             copy.copy(self.current_robot_position),
                                                             self.use_osm,
-                                                            self.osm_use_solitary_nodes)
+                                                            self.osm_use_solitary_nodes,
+                                                            self.flip)
                 self.osm_planner.run_ros()
 
                 self.sub_graphs = self.osm_planner.sub_graphs
@@ -641,6 +644,7 @@ def main():
     repeat = rospy.get_param('~repeat', False)
     next_waypoint_proximity_switch = rospy.get_param('~next_waypoint_proximity_switch', False)
     min_time_near_goal = rospy.get_param('~min_time_near_goal', 1.)
+    flip = rospy.get_param('~flip', False)
 
     node = PathPlanner(gpx_assignment,
                         publish_pcd,
@@ -659,7 +663,8 @@ def main():
                         osm_use_solitary_nodes,
                         repeat,
                         next_waypoint_proximity_switch,
-                        min_time_near_goal
+                        min_time_near_goal,
+                        flip
                         )
 
     node.run()

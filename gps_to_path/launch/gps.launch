@@ -27,6 +27,8 @@
         <param name="host" value="ntrip.pecny.cz" />
         <param name="port" value="2101" />
         <param name="num_threads" value="2" />
+        <param name="sigkill_timeout" value="30" />
+        <param name="sigkill_on_stream_stop" value="true" />
     </node>
 
    <!-- FAKE GPS -->

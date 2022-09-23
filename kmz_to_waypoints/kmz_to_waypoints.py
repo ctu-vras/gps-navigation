@@ -14,6 +14,7 @@ import math
 import gpxpy
 from copy import copy
 import os
+import xml.etree.ElementTree as ET
 
 from background_map import *
 
@@ -81,12 +82,18 @@ class KmzParser:
             self.kml_data = self.kmz.read(self.kml_fn)
         else:
             self.kmz = None
-            with open(self.kml_fn, 'rt', encoding="utf-8") as f:
-                self.kml_data = f.read()
+            self.kml_data = ET.parse(self.kml_fn)
+            self.kml_data = self.kml_data.getroot()
+            self.kml_data = ET.tostring(self.kml_data, encoding="utf-8", method = 'xml')
+            #with open(self.kml_fn, 'rt', encoding="utf-8") as f:
+            #    self.kml_data = f.read()
     
     def extract_elements_from_kml(self):
         self.kml = kml.KML()
-        self.kml.from_string(self.kml_data)
+        try:
+            self.kml.from_string(self.kml_data)
+        except:
+            self.kml.from_string(self.kml_data)
 
         self.data = list(self.kml.features())
         self.data = list(self.data[0].features())
@@ -363,7 +370,9 @@ class KmzParser:
         self.visualize()
 
 if __name__ == "__main__":
-    kmz_fn = "/home/robot/Downloads/001_p(1).kmz"
+    #kml_fn = "/home/robot/unhost.kml"
+    #kmz_fn = None
+    kmz_fn = "/home/robot/Downloads/001_p.kmz"
     kml_fn = "doc.kml"
     parser = KmzParser(kml_fn = kml_fn, kmz_fn = kmz_fn)
     parser.run()

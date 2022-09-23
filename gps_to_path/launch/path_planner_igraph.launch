@@ -1,5 +1,5 @@
  <launch>      
-    <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_easy.gpx" />
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_spot_2.gpx" />
     <arg name="run_ntrip_relay" default="true" />
     <arg name="robot_base_frame" default="base_link" />
     <arg name="use_osm" default="true" />
@@ -71,8 +71,8 @@
 
 <!-- TRAVERSABILITY PROCESSING -->
     <node pkg="gps_to_path" type="trav_to_obstacles" name="trav_to_obstacles" output="screen">
-	<param name="max_height" type="double" value="1."/>
-	<param name="min_height" type="double" value="0.05"/>
+	<param name="max_height" type="double" value="0.5"/>
+	<param name="min_height" type="double" value="-1."/>
 	<param name="max_dist" type="double" value="7." />
 	<param name="min_dist" type="double" value="0.5"/>
 	<param name="max_age" type="double" value="1."/>	

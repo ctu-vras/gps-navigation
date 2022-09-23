@@ -253,19 +253,23 @@ class PathPlanner():
 
             nearest_graph_points = KDTree(graph_points[nearest_graph_points_ind])
             
-            trav_tree = KDTree(self.untrav_points)
+            try:
+                trav_tree = KDTree(self.untrav_points)
+                untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
 
-            untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
+                #untrav_mask = np.zeros(len(graph_points))
+                #untrav_mask[nearest_graph_points_ind] = [len(a) for a in untrav_points_in_radius_ind]
 
-            #untrav_mask = np.zeros(len(graph_points))
-            #untrav_mask[nearest_graph_points_ind] = [len(a) for a in untrav_points_in_radius_ind]
+                #near_points_untrav_mask = np.zeros(len(nearest_graph_points_ind))
+                near_points_untrav_mask = np.array([len(a) for a in untrav_points_in_radius_ind])
 
-            #near_points_untrav_mask = np.zeros(len(nearest_graph_points_ind))
-            near_points_untrav_mask = np.array([len(a) for a in untrav_points_in_radius_ind])
-
-            # Near graph vertices cost is equal to number of nearby untrav points and the rest of the mask is zeros.
-            #untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
-
+                # Near graph vertices cost is equal to number of nearby untrav points and the rest of the mask is zeros.
+                #untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
+            except:
+                trav_tree = KDTree(graph_points)
+                untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
+                near_points_untrav_mask = np.array([0 for a in untrav_points_in_radius_ind])
+                pass
             # Initialization of trav mask.
             if self.untrav_mask is None:
                 untrav_mask = np.zeros(len(graph_points))

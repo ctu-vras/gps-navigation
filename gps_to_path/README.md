@@ -4,6 +4,9 @@ https://en.mapy.cz/s/nunupunepo
 
 # TL;DR Most important stuff is here.
 
+### Branches:
+ - Use **python2** on spot and tradr. Use **main** on husky.
+
 ### Use path_planner_igraph.launch as in this example:<br /><br />
 **roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/unhost.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br /> mirrored_points:=1. <br />**
  - Initialization takes some time because of use_osm:=true. If you want it to be much faster, set use_osm:=false. You lose OSM information, but usually, that should be fine. If the initialization gets **stuck on "Running query" inside terminal** you can set use_osm:=false or try and provide a better internet connection (e.g. ~/lte_on.sh on tradr).

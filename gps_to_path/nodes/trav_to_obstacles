@@ -195,8 +195,9 @@ def main():
     max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
     trav_obstacle_field = rospy.get_param('~trav_obstacle_field', 'cost')
+    mirrored_points = rospy.get_param('~mirrored_points', 1.)
 
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field)
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,mirrored_points)
 
     trav_to_obstacles.run()
 

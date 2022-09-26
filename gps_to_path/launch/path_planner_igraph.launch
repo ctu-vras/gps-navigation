@@ -4,9 +4,11 @@
     <arg name="robot_base_frame" default="base_link" />
     <arg name="use_osm" default="true" />
     <arg name="repeat" default="false" />
+    <arg name="flip" default="false" />
     <arg name="trav_obstacle_field" defaul="cost" />
-    <arg name="mirrored_points" default="1.">   <!--CHANGE TO -1. IF TRAV POINTS ARE MIRRORED-->
-
+    <arg name="mirrored_points" default="1." />   <!--CHANGE TO -1. IF TRAV POINTS ARE MIRRORED-->
+    <arg name="max_height" value="0.5"/>
+	<arg name="min_height" value="-1."/>
         
 
 <!-- STATIC TRANSFORMS -->
@@ -65,6 +67,7 @@
         <param name="repeat" type="bool" value="$(arg repeat)"/>
         <param name="next_waypoint_proximity_switch" type="bool" value="true"/>
         <param name="min_time_near_goal" type="double" value="1."/>
+        <param name="flip" type="bool" value="$(arg flip)"/>
     </node>
 
 <!-- PATH -->
@@ -76,8 +79,8 @@
 
     <remap from="cloud_segmentation/lidar_cloud" to="geometric_traversability_raw" />
 
-	<param name="max_height" type="double" value="0.5"/>
-	<param name="min_height" type="double" value="-1."/>
+	<param name="max_height" type="double" value="$(arg max_height)"/>
+	<param name="min_height" type="double" value="$(arg min_height)"/>
 	<param name="max_dist" type="double" value="7." />
 	<param name="min_dist" type="double" value="0.5"/>
 	<param name="max_age" type="double" value="1."/>	

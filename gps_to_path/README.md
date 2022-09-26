@@ -5,14 +5,14 @@ https://en.mapy.cz/s/nunupunepo
 # TL;DR Most important stuff is here.
 
 ### Branches:
- - Use **python2** on spot and tradr. Use **main** on husky.
+ - Use **python2** branch on all robots even husky.
 
 ### Use path_planner_igraph.launch as in this example:<br /><br />
-**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/unhost.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br /> mirrored_points:=1. <br />**
+**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/unhost.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br /> trav_frame:=os_lidar  <br /> max_height:=1. <br /> min_height:=0.05 <br /> <br />**
  - Initialization takes some time because of use_osm:=true. If you want it to be much faster, set use_osm:=false. You lose OSM information, but usually, that should be fine. If the initialization gets **stuck on "Running query" inside terminal** you can set use_osm:=false or try and provide a better internet connection (e.g. ~/lte_on.sh on tradr).
+ - **max_height should be around the height of the robot from base frame and min_height should be around the distance from base_frame to ground (only traversability point between these two values IN REGARD TO BASE_FRAME will be used, rest will be filtered out). Working values should be around (min 0.05, max 1.) for TRADR and (min -1., max 0.5) for SPOT (don't know for HUSKY)**
  - flip:=true if you need to reverse the order of waypoints.
- - trav_obstacle_field:=obstacle IF cloud_segmentation/lidar_cloud trav_obstacle_field:=cost IF geometric_traversability_raw OR CHECK WITH TOMAS PETRICEK.
- - mirrored_points:=1. if traversability works fine - compare trav_obstacles_pcd_map topic and traversability pointcloud topic in rviz THEY SHOULD OVERLAP. If one of them is "reflected in base_link" (stredova soumernost se stredem v base_linku) then mirrored_points:=-1. IT SEEMS THAT WHEN USING geometric_traversability_raw YOU NEED TO SET IT TO TRUE AND WHEN USING cloud_segmentation/lidar_cloud SET IT TO FALSE. (Hopefully this will soon be resolved more appropriately...)
+ - **trav_obstacle_field:=obstacle AND trav_frame:=os_sensor IF cloud_segmentation/lidar_cloud trav_obstacle_field:=cost AND trav_frame:=os_lidar IF geometric_traversability_raw OR CHECK WITH TOMAS PETRICEK.**
  - TRAVERSABILITY IS NOT VITAL FOR THE PLANNER. It can run without it.
  - The whole traversability processing inside the planner node is in try/except for now. So if it suspiciously seems like the traversability is not doing anything, it could be that there is an repeated error, but it is not shown in the console or elsewhere.
  - If you get any error that crashes the planner and you can't fix it, you can always go back to **gps.launch**, which is the old planner (no traversability or OSM or graph search).
@@ -86,7 +86,7 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
 
 ### path_planner_igraph.launch
 
-**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=___ <br /> run_ntrip_relay:=___ <br /> robot_base_frame:=___ <br /> use_osm:=___ <br /> flip:=___ <br /> trav_obstacle_field:=___ <br /> mirrored_points:=___ <br />**
+**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=___ <br /> run_ntrip_relay:=___ <br /> robot_base_frame:=___ <br /> use_osm:=___ <br /> flip:=___ <br /> trav_obstacle_field:=___ <br /> trav_frame:=___ <br /> max_height:=___ <br /> min_height:=___ <br />**
 
 - Arguments explained:
     - **gpx_assignment** <br />
@@ -101,8 +101,10 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
     Reverse the order of waypoints generated from the gpx_assignment file.<br />
     - **trav_obstacle_field**  <br />
     Name of the field in which the traversability point cloud contains the information whether a point is traversable or not (hint: combinations used in the past are "cloud_segmentation/lidar_cloud" topic and "**obstacle**" trav_obstacle_field and "geometric_traversability_raw" topic with "**cost**".).<br />
-    - **mirrored_points**  <br />
-    Set to **-1.** if the traversability points from topic **trav_obstacles_pcd_map** in rviz appear to be reflected in a point (the point being the robot) when compared to the original source of traversability point cloud.<br />
+    - **trav_frame**  <br />
+    Name of the frame in which the traversability point cloud is published. os_lidar fo geometric_traversability_raw and os_sensor for cloud_segmentation/lidar_cloud.<br />
+    - **max_height**, **min_height**  <br />
+    In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too low or too high from the robot, related to base_link). Working values should be around (min 0.05, max 1.) for TRADR and (min -1., max 0.5) for SPOT (don't know for HUSKY). <br />
 
 - Other parameters inside the launch file explained:
     - **goal_reached_distance** <br />
@@ -127,14 +129,14 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
     In seconds. If the current goal point has not been reached in this time, the next goal point is selected.<br />
     - **osm_use_solitary_nodes**  <br />
     Use solitary OSM nodes, which usually represent objects such as trees, benches, signs, etc. Speeds up initialization of the planner when set to 'false'. <br />
-    - **max_height**, **min_height**, **max_dist**, **min_dist**  <br />
-    In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too close or too low from the robot frame perspective are filtered out). <br />
+    - **max_dist**, **min_dist**  <br />
+    In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too close from the robot frame perspective are filtered out). <br />
     - **max_age**  <br />
     In seconds. Maximum age of traversability point cloud message to be used (in case the traversability pcd msg comes at a higher frequency than we can process it at). <br />
 
 - For example:
 
-    **roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/cimicky.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br /> mirrored_points:=1. <br />**
+    **roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/cimicky.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br />  trav_frame:=os_lidar <br /> max_height:=0.5 <br /> min_height:=-1. <br />**
     Another way to launch this file is to first edit the default arguments inside path_planner_igraph.launch and then simply run the command:
 
     **roslaunch gps_to_path path_planner_igraph.launch**

@@ -1,5 +1,35 @@
-# Paths for experiment
-https://en.mapy.cz/s/bumegejeja
+# Unhost paths
+https://docs.google.com/document/d/1EATuN6nUMDcxek5O1ZXXLCy_q1Qzpz020aAbURKAkIs/edit
+https://en.mapy.cz/s/nunupunepo
+
+# TL;DR Most important stuff is here.
+
+### Branches:
+ - Use **python2** branch on all robots even husky.
+
+### Use path_planner_igraph.launch as in this example:<br /><br />
+**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/unhost.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br /> trav_frame:=os_lidar  <br /> max_height:=1. <br /> min_height:=0.05 <br /> <br />**
+ - Initialization takes some time because of use_osm:=true. If you want it to be much faster, set use_osm:=false. You lose OSM information, but usually, that should be fine. If the initialization gets **stuck on "Running query" inside terminal** you can set use_osm:=false or try and provide a better internet connection (e.g. ~/lte_on.sh on tradr).
+ - **max_height should be around the height of the robot from base frame and min_height should be around the distance from base_frame to ground (only traversability point between these two values IN REGARD TO BASE_FRAME will be used, rest will be filtered out). Working values should be around (min 0.05, max 1.) for TRADR and (min -1., max 0.5) for SPOT (don't know for HUSKY)**
+ - flip:=true if you need to reverse the order of waypoints.
+ - **trav_obstacle_field:=obstacle AND trav_frame:=os_sensor IF cloud_segmentation/lidar_cloud trav_obstacle_field:=cost AND trav_frame:=os_lidar IF geometric_traversability_raw OR CHECK WITH TOMAS PETRICEK.**
+ - TRAVERSABILITY IS NOT VITAL FOR THE PLANNER. It can run without it.
+ - The whole traversability processing inside the planner node is in try/except for now. So if it suspiciously seems like the traversability is not doing anything, it could be that there is an repeated error, but it is not shown in the console or elsewhere.
+ - If you get any error that crashes the planner and you can't fix it, you can always go back to **gps.launch**, which is the old planner (no traversability or OSM or graph search).
+<br />
+
+### Use follower.launch like this:<br /><br />
+**roslaunch gps_to_path follower.launch robot:=(ctu-robot/spot)**
+ - Don't forget the argument if robot is not ctu-robot!
+<br />
+
+### Checklist:
+ - Check Reach web UI (try 192.168.2.* IP of robot in browser). Check if there is a fix and if corrections are coming (CORRECTIONS ARE ONLY COMING IF THE PATH PLANNER IS RUNNING).
+ - Keep an eye on the terminal of the path planner; there should not be any errors.
+ - In rviz check if trav_obstacles_pcd_map and whichever traversability point cloud you use are overlaping. If not, set mirrored_points:=-1.
+ - In rviz check if path makes sense (if using OSM a check against osm_pcd topic in rviz). If not, check if gpx_assignment is set correctly.
+ - In rviz check if the path is not rotating wildly compared to base_link. IF YES, THAN CALIBRATE COMPASS PARAMETERS. EXPECT THIS TO HAPPEN WITH SPOT.
+
 
 # What is this package
 A package for the navigation of a robot using the Emlid Reach M+ GPS module and an IMU.
@@ -10,7 +40,7 @@ A package for the navigation of a robot using the Emlid Reach M+ GPS module and 
 3. (optional) Check that you are receiving fix on your robot (without NTRIP corrections) and that your IMU is working. If you are not receiving fix and would still like to test the package out, in the path planner launch file you are about to run (e.g. **launch/path_planner_igraph.launch**) comment out the section **LLH FROM GPS TO FIX** and comment in the section **FAKE GPS**.
 4. Run **path_planner_igraph.launch** with arguments (see example lower).
 5. Calibrate the compass by rotating the robot in place, 360 degrees in ideally both directions. **OR** If calibration has been done in the past on the robot, then the parameters have been saved and will be used if parameter **load_from_file** of node **get_mag_shift** is set to True (default).
-6. (optional) The *path* topic should now be publishing. The *mag_azimuth* topic should be reporting the orientation of the robot and the gps should be receiving NTRIP.
+6. (optional) The *path* topic should now be publishing. The *mag_azimuth* topic should be reporting the orientation of the robot and the gps should be receiving NTRIP. Topics which can be visualized in rviz are *trav_obstacles_pcd_map, osm_pcd, graph_pcd*.
 7. Prepare robot for autonomous driving.
 8. Run follower.launch. The robot stops after reaching the goal or after the follower is terminated.
 
@@ -56,7 +86,7 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
 
 ### path_planner_igraph.launch
 
-**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=___ <br /> run_ntrip_relay:=___ <br /> robot_base_frame:=___ <br /> use_osm:=___ <br />**
+**roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=___ <br /> run_ntrip_relay:=___ <br /> robot_base_frame:=___ <br /> use_osm:=___ <br /> flip:=___ <br /> trav_obstacle_field:=___ <br /> trav_frame:=___ <br /> max_height:=___ <br /> min_height:=___ <br />**
 
 - Arguments explained:
     - **gpx_assignment** <br />
@@ -67,6 +97,14 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
     Base frame of the robot to be used in the planner and in the processing of traversability pointcloud. <br />
     - **use_osm**  <br />
     Use OSM data in the planner. If 'false', the planner initialization is **much faster** and **does not require internet connection**.<br />
+    - **flip**  <br />
+    Reverse the order of waypoints generated from the gpx_assignment file.<br />
+    - **trav_obstacle_field**  <br />
+    Name of the field in which the traversability point cloud contains the information whether a point is traversable or not (hint: combinations used in the past are "cloud_segmentation/lidar_cloud" topic and "**obstacle**" trav_obstacle_field and "geometric_traversability_raw" topic with "**cost**".).<br />
+    - **trav_frame**  <br />
+    Name of the frame in which the traversability point cloud is published. os_lidar fo geometric_traversability_raw and os_sensor for cloud_segmentation/lidar_cloud.<br />
+    - **max_height**, **min_height**  <br />
+    In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too low or too high from the robot, related to base_link). Working values should be around (min 0.05, max 1.) for TRADR and (min -1., max 0.5) for SPOT (don't know for HUSKY). <br />
 
 - Other parameters inside the launch file explained:
     - **goal_reached_distance** <br />
@@ -91,23 +129,19 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
     In seconds. If the current goal point has not been reached in this time, the next goal point is selected.<br />
     - **osm_use_solitary_nodes**  <br />
     Use solitary OSM nodes, which usually represent objects such as trees, benches, signs, etc. Speeds up initialization of the planner when set to 'false'. <br />
-    - **max_height**, **min_height**, **max_dist**, **min_dist**  <br />
-    In meters. Parameters used for filtering untraversable points from the traversability pointcloud (e.g. points too close or too low from the robot frame perspective are filtered out). <br />
+    - **max_dist**, **min_dist**  <br />
+    In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too close from the robot frame perspective are filtered out). <br />
     - **max_age**  <br />
     In seconds. Maximum age of traversability point cloud message to be used (in case the traversability pcd msg comes at a higher frequency than we can process it at). <br />
 
 - For example:
 
-    **roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/cimicky.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br />**
+    **roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/cimicky.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br />  trav_frame:=os_lidar <br /> max_height:=0.5 <br /> min_height:=-1. <br />**
     Another way to launch this file is to first edit the default arguments inside path_planner_igraph.launch and then simply run the command:
 
-    **roslaunch gps_to_path gps.launch**
+    **roslaunch gps_to_path path_planner_igraph.launch**
 
     And change any of the other parameters mentioned higher inside the launch file.
-
-
-## (optional) Recording (TRADR robot)
-**roslaunch nifti_vision_data rec_ugv_min.launch additional_topics:="fix path whole_path mag_azimuth mag_shift"**
 
 ## (optional) ICP
 **getIcp**
@@ -115,12 +149,14 @@ Second is the newer and more advanced **path_planner_igraph.launch**. In additio
 ## (optional if running **gps.launch**) OSM data to PCD (osm visualisation)
 **roslaunch gps_to_path osm.launch**<br />
 Also has a parameter points_density -- set this inside the osm.launch file (set lower for faster performance -- might be necessary for long paths).<br />
-The topic to which the pointcloud is published is **osm_pcd**.
+The topic to which the point cloud is published is **osm_pcd**.
 
 ## (optional) Path follower
-**roslaunch gps_to_path follower.launch<br /> cmd_vel:=___ <br /> max_speed:=___ <br /> allow_backward:=___ <br />**
+**roslaunch gps_to_path follower.launch<br /> robot:=___ <br /> cmd_vel:=___ <br /> max_speed:=___ <br /> allow_backward:=___ <br />**
 
 - Arguments explained:
+    - **robot** <br />
+    Name of the robot - **IMPORTANT IF ROBOT IS NOT TRADR**. <br />
     - **cmd_vel** <br />
     Topic to which to publish the velocity commands. <br />
     - **max_speed**  <br />
@@ -130,9 +166,10 @@ The topic to which the pointcloud is published is **osm_pcd**.
 
 - For example:
 
-    **roslaunch gps_to_path follower.launch<br /> cmd_vel:=cmd_vel <br /> max_speed:=0.5 <br /> allow_backward:=false <br />**
+    **roslaunch gps_to_path follower.launch<br /> robot:=spot <br /> cmd_vel:=nav/cmd_vel <br /> max_speed:=0.5 <br /> allow_backward:=false <br />**
     
 # Debugging
+(Any gps.launch mentions work with path_planner_igraph.launch as well.)
 1. **"I run gps.launch but path is not being published."**
 - Check if **fix topic** is being published. If not see point 2.
 2. **"Fix is not being published."**
@@ -154,6 +191,7 @@ The topic to which the pointcloud is published is **osm_pcd**.
  - Check terminal with follower.launch - does the robot think it has arrived to the goal? Check in rviz what the published path looks like. Could be poor fix quality or some issue with the published path.
 9. **"The robot is driving autonomously but is rapidly switching between going forward and backward or acting crazy."**
  - Could be an issue with the assigned path being **linear** and the argument **circular_path** of gps.launch being set to True. The path follower always calculates the path from the nearest point to his current location and this point can be switching rapidly if the path in both directions leads through almost exactly the same place. Change either the parameter or the assignment.
+ - Should not be problem if using path_planner_igraph.launch.
  - Also could be problem with **the path crossing itself**. Similar issue to above. You can manually drive through the crossing.
 
 # Detailed descriptions

@@ -15,13 +15,32 @@ from sensor_msgs.msg import NavSatFix
 
 def cb(msg):
     assert isinstance(msg, NavSatFix)
+    global first
+    global last_stamp
+    if last_stamp is not None and last_stamp > msg.header.stamp + rospy.Duration(3):
+        rospy.logwarn("ROS time jumped back, resetting")
+        last_stamp = None
+        first = None
+    last_stamp = msg.header.stamp
     pose = PoseWithCovarianceStamped()
     pose.header = msg.header
     pose.header.frame_id = utm_frame
+
     easting, northing, _, _ = utm.from_latlon(msg.latitude, msg.longitude)
-    pose.pose.pose.position.x = easting
-    pose.pose.pose.position.y = northing
-    pose.pose.pose.position.z = msg.altitude
+    altitude = msg.altitude
+
+    if first is None:
+        first = easting, northing, altitude
+        rospy.loginfo("Subtracting UTM pose %r from all data." % (first,))
+    if subtract_first:
+        easting -= first[0]
+        northing -= first[1]
+        altitude -= first[2]
+
+    pose.pose.pose.position.x = -northing if nwu else easting
+    pose.pose.pose.position.y = easting if nwu else northing
+    pose.pose.pose.position.z = altitude
+
     pose.pose.pose.orientation.w = 1
     pose.pose.covariance[0 * 6 + 0] = msg.position_covariance[0 * 3 + 0]
     pose.pose.covariance[0 * 6 + 1] = msg.position_covariance[0 * 3 + 1]
@@ -39,6 +58,11 @@ if __name__ == '__main__':
     rospy.init_node('fix_to_utm_pose')
 
     utm_frame = rospy.get_param('~utm_frame', 'utm')
+    subtract_first = rospy.get_param('~subtract_first', False)
+    # NWU is compatible with RViz pose display
+    nwu = rospy.get_param('~convert_to_nwu', True)
+    first = None
+    last_stamp = None
     pub = rospy.Publisher('~pose', PoseWithCovarianceStamped, queue_size=10)
     sub = rospy.Subscriber('~fix', NavSatFix, cb, queue_size=10)
 

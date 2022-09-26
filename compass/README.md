@@ -143,3 +143,15 @@ may be required to re-estimate the bias from time to time even during runtime.
 - `~magnetic_model` (string, defaults to autodetection by year): Name of the magnetic field model to use. If omitted,
      an automated decision is made based on the current year (or `~initial_year`, if set). This model is used for
      computing magnetic declination.
+
+## Node visualize\_azimuth
+
+This node visualizes an `Azimuth` messages in RViz converting them to a pose.
+
+### Subscribed topics
+
+- `~azimuth` (`compass_msgs/Azimuth`): The azimuth to visualize.
+
+### Published topics
+
+- `~azimuth_vis` (`geometry_msgs/PoseWithCovarianceStamped`): The pose which visualizes the azimuth.

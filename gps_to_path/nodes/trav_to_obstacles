@@ -18,7 +18,7 @@ from tf.transformations import quaternion_matrix
 
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,mirrored_points):
+    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field):
 
         self.max_height = max_height
         self.min_height = min_height
@@ -28,7 +28,6 @@ class TravToObstacles:
         self.robot_base_frame = robot_base_frame
 
         self.trav_obstacle_field = trav_obstacle_field
-        self.mirrored_points = mirrored_points
 
         #self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
         self.sub_pcd = rospy.Subscriber("geometric_traversability_raw", PointCloud2, self.handle_pcd, queue_size=1)
@@ -63,7 +62,7 @@ class TravToObstacles:
                                     trans.transform.rotation.z,
                                     trans.transform.rotation.w])   
         R = R[:3,:3]
-        points = -np.matmul(R,points.T) # MINUS HERE
+        points = np.matmul(R,points.T) # MINUS HERE
         points = points.T
         return points
 
@@ -79,7 +78,7 @@ class TravToObstacles:
         angle = np.deg2rad(self.azimuth) + math.pi/2
         R = np.array([[np.cos(angle),-np.sin(angle)],
                         [np.sin(angle),np.cos(angle)]])
-        points = np.matmul(self.mirrored_points*R,points.T).T
+        points = np.matmul(R,points.T).T
 
         # Translation.
         points = points + self.gps_utm
@@ -178,7 +177,7 @@ class TravToObstacles:
         while not self.trans:
             try:
                 self.trans = self.tf_buffer.lookup_transform(
-                    self.robot_base_frame, 'os_sensor', rospy.Time())
+                    self.robot_base_frame, 'os_lidar', rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()
                 continue
@@ -195,9 +194,8 @@ def main():
     max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
     trav_obstacle_field = rospy.get_param('~trav_obstacle_field', 'cost')
-    mirrored_points = rospy.get_param('~mirrored_points', 1.)
 
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,mirrored_points)
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field)
 
     trav_to_obstacles.run()
 

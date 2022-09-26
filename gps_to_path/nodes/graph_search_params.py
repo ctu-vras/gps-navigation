@@ -1,14 +1,14 @@
-INIT_WIDTH = 30          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+INIT_WIDTH = 60          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
 
 DENSITY = 1             # In meters. How dense is the graph (distance between neighboring nodes).
 
 GOAL_BASE_DIST = 30     # In meters. Desired distance between start and goal points in a sub-graph.
                         # If there is an obstacle in the way, the distance is modified accordingly.
 
-INCREASE = 50           # In meters. How much the range of the graph increases to each side
+INCREASE = 30           # In meters. How much the range of the graph increases to each side
                         # with further iterations. (The actual range increases by 2*INCREASE with each iter).
                         
-MAX_RANGE = 300         # In meters. Maximum range of the area that will be searched.
+MAX_RANGE = 200         # In meters. Maximum range of the area that will be searched.
 
 MAX_EFFECTIVE_RANGE = 50000 #  CURRENTLY NOT BEING USED.
 

@@ -18,7 +18,7 @@ from tf.transformations import quaternion_matrix
 
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,trav_frame):
+    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,trav_topic,odom_frame):
 
         self.max_height = max_height
         self.min_height = min_height
@@ -26,12 +26,13 @@ class TravToObstacles:
         self.min_dist = min_dist
         self.max_age = max_age
         self.robot_base_frame = robot_base_frame
+        self.odom_frame = odom_frame
 
         self.trav_obstacle_field = trav_obstacle_field
-        self.trav_frame = trav_frame
+        self.trav_frame = None
+        self.trav_topic = trav_topic
 
-        #self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
-        self.sub_pcd = rospy.Subscriber("geometric_traversability_raw", PointCloud2, self.handle_pcd, queue_size=1)
+        self.sub_pcd = rospy.Subscriber(self.trav_topic, PointCloud2, self.handle_pcd, queue_size=1)
 
         self.sub_fix =  rospy.Subscriber("fix", NavSatFix, self.update_fix, queue_size = 10)
         self.gps_utm = None
@@ -47,7 +48,15 @@ class TravToObstacles:
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
-        self.trans = None
+        self.odom_robot_trans = None
+
+        self.tf_buffer_2 = tf2_ros.Buffer()
+        self.tf_listener_2 = tf2_ros.TransformListener(self.tf_buffer_2)
+        self.odom_lidar_trans = None
+
+        self.tf_buffer_3 = tf2_ros.Buffer()
+        self.tf_listener_3 = tf2_ros.TransformListener(self.tf_buffer_3)
+        self.utm_odom_trans = None
 
         self.time_diff = None
 
@@ -63,7 +72,7 @@ class TravToObstacles:
                                     trans.transform.rotation.z,
                                     trans.transform.rotation.w])   
         R = R[:3,:3]
-        points = np.matmul(R,points.T) # MINUS HERE
+        points = np.matmul(R,points.T)
         points = points.T
         return points
 
@@ -88,25 +97,51 @@ class TravToObstacles:
     
     def process_points(self,points):
         points = points[points[:,0]!=-1.]                   # Get rid of (-1,-1,-1) points.
-        points = self.transform_points(points,self.trans)   # Transform to robot frame.
+        #points = self.transform_points(points,self.odom_robot_trans)   # Transform to robot frame.
 
-        points = points[(points[:,2] < self.max_height) &
+        """ points = points[(points[:,2] < self.max_height) &
                         (points[:,2] > self.min_height) &
                         (np.linalg.norm(points[:,0:2], axis=1) > self.min_dist) &
-                        (np.linalg.norm(points[:,0:2], axis=1) < self.max_dist)]  # Filter points based on height and distance.
+                        (np.linalg.norm(points[:,0:2], axis=1) < self.max_dist)] """  # Filter points based on height and distance.
+        points = self.transform_points(points,self.odom_lidar_trans)
+        points_height_wrt_robot = points[:,2] - self.odom_robot_trans.transform.translation.z
+        #points_height_wrt_robot = points[:,2] + self.odom_lidar_trans.transform.translation.z - self.odom_robot_trans.transform.translation.z
+        points = points[(points_height_wrt_robot < self.max_height) &
+                        (points_height_wrt_robot > self.min_height)]
 
+        #utm_points = self.base_frame_to_utm(points)
+        utm_points = self.transform_points(points,self.utm_odom_trans)
         points = points[:,:2]                               # Get rid of z coord.
-        utm_points = self.base_frame_to_utm(points)
+
         return utm_points,points
         
 
     def handle_pcd(self,msg):
+        #if self.odom_robot_trans is None or self.odom_lidar_trans is None:
+
+        self.trav_frame = msg.header.frame_id
+
+        try:
+            self.odom_robot_trans = self.tf_buffer.lookup_transform(
+                self.odom_frame, self.robot_base_frame, rospy.Time())
+
+            self.odom_lidar_trans = self.tf_buffer_2.lookup_transform(
+                self.odom_frame, self.trav_frame, rospy.Time())
+
+            self.utm_odom_trans = self.tf_buffer_3.lookup_transform(
+                "utm", self.odom_frame, rospy.Time())
+
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            rospy.logwarn("Cannot obtain transform.")
+            return
+
         t = rospy.Time.now()
          
         if self.gps_utm is not None and self.azimuth is not None:
-            # Check if the msg is not too old (relevant mostly in case it is produced faster than we can handle here).
-            if self.trans is not None and abs((msg.header.stamp - t).to_sec()) < self.max_age:
-
+            if self.odom_robot_trans is not None and \
+                self.odom_lidar_trans is not None and \
+                self.utm_odom_trans is not None and \
+                abs((msg.header.stamp - t).to_sec()) < self.max_age:
                 # PCD to numpy array of 3D points.
                 pcd_struct = ros_numpy.numpify(msg)
                 pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
@@ -122,8 +157,8 @@ class TravToObstacles:
                 self.set_pcd_msg(utm_untrav_points)
                 self.pub_obstacles.publish(self.obstacles_pcd_msg)
 
-                self.set_map_pcd_msg(untrav_points)
-                self.pub_obstacles_map.publish(self.obstacles_map_pcd_msg)
+                #self.set_map_pcd_msg(untrav_points)
+                #self.pub_obstacles_map.publish(self.obstacles_map_pcd_msg)
             else:
                 rospy.logwarn("throwing away old msg, age is {} s".format(round((msg.header.stamp - t).to_sec(),3)))
 
@@ -148,18 +183,19 @@ class TravToObstacles:
 
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
-        header.frame_id = self.robot_base_frame
+        header.frame_id = self.odom_frame
 
         self.obstacles_map_pcd_msg.header = header
 
     def set_pcd_msg(self, points):
         pcd_data = np.zeros(len(points), dtype=[
                 ('x', np.float32),
-                ('y', np.float32)])
-
+                ('y', np.float32),
+                ('z', np.float32)])
 
         pcd_data['x'] = points[:, 0]
         pcd_data['y'] = points[:, 1]
+        pcd_data['z'] = points[:, 2]
         #pcd_data['z'] = np.zeros((points[:, 1].shape))
         #pcd_data['r'] = 0.4
         #pcd_data['g'] = 0.8
@@ -169,19 +205,19 @@ class TravToObstacles:
 
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
-        header.frame_id = self.robot_base_frame
+        header.frame_id = "utm"
 
         self.obstacles_pcd_msg.header = header
 
     def run(self):
-        rate = rospy.Rate(10)
+        """ rate = rospy.Rate(10)
         while not self.trans:
             try:
                 self.trans = self.tf_buffer.lookup_transform(
                     self.robot_base_frame, self.trav_frame, rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()
-                continue
+                continue """
         rospy.spin()
 
 
@@ -195,9 +231,11 @@ def main():
     max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
     trav_obstacle_field = rospy.get_param('~trav_obstacle_field', 'cost')
-    trav_frame = rospy.get_param('~trav_frame', 'os_lidar')
+    #trav_frame = rospy.get_param('~trav_frame', 'os_lidar')
+    trav_topic = rospy.get_param('~trav_topic', 'geometric_traversability_raw')
+    odom_frame = rospy.get_param('~odom_frame', 'odom')
 
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,trav_frame)
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,trav_topic,odom_frame)
 
     trav_to_obstacles.run()
 

@@ -1,0 +1,200 @@
+#!/usr/bin/env python
+
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Czech Technical University in Prague
+
+"""Convert a :class:`sensor_msgs.msg.NavSatFix` message to a :class:`geometry_msgs.msg.PoseWithCovarianceStamped` in
+a cartesian frame (UTM by default), :class:`nav_msgs.msg.Odometry` or :class:`nav_msgs.msg.Path`.
+
+ROS parameters:
+ - `~publish_pose` (bool, default False): Whether to publish the fix converted to :class:`geometry_msgs.msg.Pose`.
+ - `~publish_odom` (bool, default False): Whether to publish the fix converted to :class:`nav_msgs.msg.Odometry`.
+ - `~publish_path` (bool, default False): Whether to publish the fix converted to :class:`nav_msgs.msg.Path`.
+ - `~subtract_first` (bool, default False): If True, all coordinates will be reported relative to the first received
+                                            fix message. Make sure you also change `~frame_id` in this case, as the
+                                            data will no longer be in UTM frame.
+ - `~z_offset` (float, default 0.0): Offset of altitude to add to the received fix.
+ - `~utm_zone` (int, optional): If set, specifies the UTM zone to use. If not set, all points are converted to the UTM
+                                zone corresponding to the first fix.
+ - `~frame_id` (string, default "utm"): Frame ID to use in the :class:`geometry_msgs.msg.PoseWithCovarianceStamped`
+                                        message.
+ - `~path_min_distance` (float, default 0.1 m): Minimum distance between each two consecutive waypoints in the path
+                                                message (except the last two that can be closer).
+ - `~path_max_size` (int, default 10000): Maximum number of waypoints stored in the path. If the path should overflow,
+                                          the oldest waypoints start being discarded.
+ - `~path_frame_id` (string, default is the frame read from `frame_id`): To correctly display :class:`nav_msgs.msg.Path`
+    in RViz with the large float values that can be found in UTM coords, the path has to be expressed in a frame that
+    yields lower float coordinates. Consider specifying a more local fixed frame here, and the node will convert the
+    path to this other frame. The conversion of each point is only done once when it is added. A good candidate for this
+    frame is `utm_local` or `gps_odom` if it is available.
+ - `~tf_timeout` (float, default 0.1 s): Timeout for waiting when transforming path points from `~frame_id`
+                                         to `~path_frame_id`.
+
+Published topics:
+ - `~pose` (:class:`geometry_msgs.msg.PoseWithCovarianceStamped`): The corresponding pose. Published only when parameter
+                                                                   `~publish_pose` is True.
+ - `~odom` (:class:`nav_msgs.msg.Odometry`): The corresponding odometry. Published only when parameter `~publish_odom`
+                                             is True.
+ - `~path` (:class:`nav_msgs.msg.Path`): The corresponding path. Published only when parameter `~publish_path` is True.
+
+Subscribed topics:
+ - `~fix` (:class:`sensor_msgs.msg.NavSatFix`): A GNSS fix message.
+ - `/tf`, `/tf_static`: If `~publish_path` is True and `~path_frame_id` differs from `~frame_id`.
+"""
+
+import numpy as np
+import sys
+import utm
+
+import rospy
+from tf2_ros import Buffer, TransformListener, TransformException
+# noinspection PyUnresolvedReferences
+import tf2_geometry_msgs
+
+from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped, PoseWithCovariance
+from nav_msgs.msg import Odometry, Path
+from sensor_msgs.msg import NavSatFix
+
+import cras
+
+
+class FixToUtmPose(cras.Node):
+    def __init__(self):
+        super(FixToUtmPose, self).__init__()
+
+        self._publish_pose = cras.get_param('~publish_pose', False)
+        self._publish_odom = cras.get_param('~publish_odom', False)
+        self._publish_path = cras.get_param('~publish_path', False)
+
+        if True not in (self._publish_pose, self._publish_odom, self._publish_path):
+            rospy.logfatal("At least one of ~publish_pose, ~publish_odom or ~publish_path has to be set to True")
+            sys.exit(1)
+
+        self._frame_id = cras.get_param('~frame_id', 'utm')
+        self._subtract_first = cras.get_param('~subtract_first', False)
+        self._z_offset = cras.get_param('~z_offset', 0.0, 'm')
+        self._utm_zone = None
+        if rospy.has_param('~utm_zone'):
+            self._utm_zone = cras.get_param('~utm_zone', result_type=int)
+        self._utm_zone_orig = self._utm_zone
+        self._path_min_distance = cras.get_param('~path_min_distance', 0.1, 'm')
+        self._path_max_size = cras.get_param('~path_max_size', 10000)
+        self._path_frame_id = cras.get_param('~path_frame_id', self._frame_id)
+        self._tf_timeout = cras.get_param('~tf_timeout', rospy.Duration(0.1))
+
+        if self._subtract_first and self._frame_id == "utm":
+            rospy.logwarn("~subtract_first is True and ~frame_id is 'utm'. This combination will probably produce "
+                          "invalid data.")
+
+        needs_tf = self._publish_path and self._path_frame_id != self._frame_id
+
+        if needs_tf:
+            self._tf = Buffer()
+            self._tf_listener = TransformListener(self._tf)
+
+        self._first_cartesian_pose = None
+        self._path = Path()
+
+        if self._publish_pose:
+            self._pose_pub = rospy.Publisher('~pose', PoseWithCovarianceStamped, queue_size=10)
+        if self._publish_odom:
+            self._odom_pub = rospy.Publisher('~odom', Odometry, queue_size=10)
+        if self._publish_path:
+            self._path_pub = rospy.Publisher('~path', Path, queue_size=10)
+
+        self._sub = rospy.Subscriber('~fix', NavSatFix, self.cb, queue_size=10)
+
+    def reset(self):
+        """Reset state of the class to the state where it was just after initialization."""
+        self._first_cartesian_pose = None
+        self._utm_zone = self._utm_zone_orig
+        del self._path.poses[:]
+        super(FixToUtmPose, self).reset()
+
+    def cb(self, msg):
+        """Convert the :class:`sensor_msgs.msg.NavSatFix` message to
+        :class:`geometry_msgs.msg.PoseWithCovarianceStamped` and publish it.
+
+        :param NavSatFix msg: The message to convert.
+        """
+        self.check_time_jump()  # call reset() if time jumps
+
+        pose = Pose()
+
+        easting, northing, self._utm_zone, _ = utm.from_latlon(msg.latitude, msg.longitude, self._utm_zone)
+        altitude = msg.altitude + self._z_offset
+
+        if self._first_cartesian_pose is None:
+            self._first_cartesian_pose = (easting, northing, altitude)
+            if self._subtract_first:
+                rospy.loginfo("Subtracting UTM pose %r from all data." % (self._first_cartesian_pose,))
+
+        if self._subtract_first:
+            easting -= self._first_cartesian_pose[0]
+            northing -= self._first_cartesian_pose[1]
+            altitude -= self._first_cartesian_pose[2]
+
+        pose.position.x = easting
+        pose.position.y = northing
+        pose.position.z = altitude
+        pose.orientation.w = 1
+
+        if self._publish_pose or self._publish_odom:
+            pose_cov = PoseWithCovariance()
+            pose_cov.pose = pose
+            for i in range(3):
+                pose_cov.covariance[(i * 6):(i * 6 + 2)] = msg.position_covariance[(i * 3):(i * 3 + 2)]
+
+            if self._publish_pose:
+                pose_stamped = PoseWithCovarianceStamped()
+                pose_stamped.header.stamp = msg.header.stamp
+                pose_stamped.header.frame_id = self._frame_id
+                pose_stamped.pose = pose_cov
+                self._pose_pub.publish(pose_stamped)
+            if self._publish_odom:
+                odom = Odometry()
+                odom.header.stamp = msg.header.stamp
+                odom.header.frame_id = self._frame_id
+                odom.child_frame_id = msg.header.frame_id
+                odom.pose = pose_cov
+                self._odom_pub.publish(odom)
+
+        if self._publish_path:
+            pose_stamped = PoseStamped()
+            pose_stamped.header.frame_id = self._frame_id
+            pose_stamped.header.stamp = msg.header.stamp
+            pose_stamped.pose = pose
+
+            if self._path_frame_id != self._frame_id:
+                try:
+                    pose_stamped = self._tf.transform(pose_stamped, self._path_frame_id, self._tf_timeout)
+                except TransformException as e:
+                    rospy.logerr("Error transforming path point: " + str(e))
+
+            self._path.poses.append(pose_stamped)
+
+            self._path.header = pose_stamped.header
+
+            if len(self._path.poses) > 2:
+                p = self._path.poses
+                p1 = p[-2].pose.position  # last point
+                p2 = p[-3].pose.position  # second last point
+                dist = np.linalg.norm([p1.x - p2.x, p1.y - p2.y, p1.z - p2.z])
+                if dist < self._path_min_distance:
+                    self._path.poses.pop(-2)
+
+            while len(self._path.poses) > self._path_max_size:
+                self._path.poses.pop(0)
+
+            self._path_pub.publish(self._path)
+
+    def run(self):
+        self.start_auto_check_time_jump()  # call reset() if time jumps
+        rospy.spin()
+
+
+if __name__ == '__main__':
+    rospy.init_node('fix_to_utm')
+
+    fix_to_utm_pose = FixToUtmPose()
+    fix_to_utm_pose.run()

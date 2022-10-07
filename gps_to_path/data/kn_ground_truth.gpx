@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="https://mapy.cz/">
+<wpt lat="50.07657496" lon="14.41786562"><ele>248.745</ele><name>Point 1</name></wpt>
+<wpt lat="50.07656402" lon="14.41788491"><ele>248.822</ele><name>Point 2</name></wpt>
+<wpt lat="50.07644251" lon="14.41791740"><ele>249.285</ele><name>Point 3</name></wpt>
+<wpt lat="50.07640152" lon="14.41791999"><ele>249.950</ele><name>Point 4</name></wpt>
+<wpt lat="50.07619847" lon="14.41794804"><ele>250.555</ele><name>Point 5</name></wpt>
+<wpt lat="50.07618094" lon="14.41792068"><ele>250.480</ele><name>Point 6</name></wpt>
+<wpt lat="50.07616108" lon="14.41796226"><ele>250.450</ele><name>Point 7</name></wpt>
+<wpt lat="50.07616971" lon="14.41811117"><ele>250.491</ele><name>Point 8</name></wpt>
+<wpt lat="50.07620874" lon="14.41810290"><ele>250.558</ele><name>Point 9</name></wpt>
+<wpt lat="50.07623059" lon="14.41818641"><ele>250.552</ele><name>Point 10</name></wpt>
+<wpt lat="50.07628640" lon="14.41809207"><ele>252.721</ele><name>Point 11</name></wpt>
+<wpt lat="50.07628905" lon="14.41811941"><ele>252.902</ele><name>Point 12</name></wpt>
+<wpt lat="50.07644477" lon="14.41813165"><ele>252.628</ele><name>Point 12</name></wpt>
+<wpt lat="50.07649353" lon="14.41811256"><ele>248.960</ele><name>Point 13</name></wpt>
+<wpt lat="50.07628954" lon="14.41815238"><ele>252.847</ele><name>Point 13</name></wpt>
+<wpt lat="50.07658354" lon="14.41810120"><ele>248.729</ele><name>Point 14</name></wpt>
+<wpt lat="50.07629076" lon="14.41817559"><ele>252.755</ele><name>Point 14</name></wpt>
+<wpt lat="50.07658597" lon="14.41812385"><ele>248.850</ele><name>Point 15</name></wpt>
+<wpt lat="50.07631019" lon="14.41814922"><ele>252.797</ele><name>Point 15</name></wpt>
+<wpt lat="50.07660147" lon="14.41809891"><ele>248.798</ele><name>Point 16</name></wpt>
+<wpt lat="50.07659274" lon="14.41796328"><ele>248.789</ele><name>Point 17</name></wpt>
+<wpt lat="50.07658074" lon="14.41794298"><ele>248.704</ele><name>Point 18</name></wpt>
+<wpt lat="50.07657331" lon="14.41793953"><ele>248.815</ele><name>Point 19</name></wpt>
+<wpt lat="50.07657086" lon="14.41788194"><ele>248.827</ele><name>Point 20</name></wpt>
+</gpx>

@@ -18,7 +18,7 @@ from tf.transformations import quaternion_matrix
 
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,trav_frame):
+    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field):
 
         self.max_height = max_height
         self.min_height = min_height
@@ -28,10 +28,10 @@ class TravToObstacles:
         self.robot_base_frame = robot_base_frame
 
         self.trav_obstacle_field = trav_obstacle_field
-        self.trav_frame = trav_frame
+        self.trav_frame = None
 
-        #self.sub_pcd = rospy.Subscriber("cloud_segmentation/lidar_cloud", PointCloud2, self.handle_pcd, queue_size=1)
-        self.sub_pcd = rospy.Subscriber("geometric_traversability_raw", PointCloud2, self.handle_pcd, queue_size=1)
+        self.trav_topic = rospy.get_param('~trav_topic', "geometric_traversability_raw")
+        self.sub_pcd = rospy.Subscriber(self.trav_topic, PointCloud2, self.handle_pcd, queue_size=1)
 
         self.sub_fix =  rospy.Subscriber("fix", NavSatFix, self.update_fix, queue_size = 10)
         self.gps_utm = None
@@ -98,34 +98,43 @@ class TravToObstacles:
         points = points[:,:2]                               # Get rid of z coord.
         utm_points = self.base_frame_to_utm(points)
         return utm_points,points
-        
 
     def handle_pcd(self,msg):
         t = rospy.Time.now()
+        self.trav_frame = msg.header.frame_id
+        try:
+            self.trans = self.tf_buffer.lookup_transform(
+                self.robot_base_frame, self.trav_frame, rospy.Time())
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            rospy.logwarn('No transformation between %s and %s available', self.robot_base_frame, self.trav_frame)
+            return
          
         if self.gps_utm is not None and self.azimuth is not None:
             # Check if the msg is not too old (relevant mostly in case it is produced faster than we can handle here).
-            if self.trans is not None and abs((msg.header.stamp - t).to_sec()) < self.max_age:
 
-                # PCD to numpy array of 3D points.
-                pcd_struct = ros_numpy.numpify(msg)
-                pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
+            # Discard old messages.
+            age = (t - msg.header.stamp).to_sec()
+            if age > self.max_age:
+                rospy.logwarn('Discarding points %.1f s > %.1f s old.', age, self.max_age)
+                return
 
-                #pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
-                pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types
-                pcd_arr = pcd_arr[:,:3]
+            # PCD to numpy array of 3D points.
+            pcd_struct = ros_numpy.numpify(msg)
+            pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
 
-                # Filter unwanted points and project onto the XY plane.
-                utm_untrav_points,untrav_points = self.process_points(pcd_arr)
+            #pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
+            pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types
+            pcd_arr = pcd_arr[:,:3]
 
-                # Publish.
-                self.set_pcd_msg(utm_untrav_points)
-                self.pub_obstacles.publish(self.obstacles_pcd_msg)
+            # Filter unwanted points and project onto the XY plane.
+            utm_untrav_points,untrav_points = self.process_points(pcd_arr)
 
-                self.set_map_pcd_msg(untrav_points)
-                self.pub_obstacles_map.publish(self.obstacles_map_pcd_msg)
-            else:
-                rospy.logwarn("throwing away old msg, age is {} s".format(round((msg.header.stamp - t).to_sec(),3)))
+            # Publish.
+            self.set_pcd_msg(utm_untrav_points)
+            self.pub_obstacles.publish(self.obstacles_pcd_msg)
+
+            self.set_map_pcd_msg(untrav_points)
+            self.pub_obstacles_map.publish(self.obstacles_map_pcd_msg)
 
     def set_map_pcd_msg(self, points):
         pcd_data = np.zeros(len(points), dtype=[
@@ -175,13 +184,8 @@ class TravToObstacles:
 
     def run(self):
         rate = rospy.Rate(10)
-        while not self.trans:
-            try:
-                self.trans = self.tf_buffer.lookup_transform(
-                    self.robot_base_frame, self.trav_frame, rospy.Time())
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                rate.sleep()
-                continue
+        while not rospy.is_shutdown():
+            rate.sleep()
         rospy.spin()
 
 
@@ -195,11 +199,11 @@ def main():
     max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
     trav_obstacle_field = rospy.get_param('~trav_obstacle_field', 'cost')
-    trav_frame = rospy.get_param('~trav_frame', 'os_lidar')
 
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field,trav_frame)
+    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field)
 
     trav_to_obstacles.run()
+
 
 if __name__ == '__main__':
     main()

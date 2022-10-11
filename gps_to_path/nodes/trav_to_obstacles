@@ -18,7 +18,7 @@ from tf.transformations import quaternion_matrix
 
 
 class TravToObstacles:
-    def __init__(self,max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field):
+    def __init__(self, max_height, min_height, max_dist, min_dist, max_age, robot_base_frame, trav_obstacle_field):
 
         self.max_height = max_height
         self.min_height = min_height
@@ -33,7 +33,7 @@ class TravToObstacles:
         self.trav_topic = rospy.get_param('~trav_topic', "geometric_traversability_raw")
         self.sub_pcd = rospy.Subscriber(self.trav_topic, PointCloud2, self.handle_pcd, queue_size=1)
 
-        self.sub_fix =  rospy.Subscriber("fix", NavSatFix, self.update_fix, queue_size = 10)
+        self.sub_fix = rospy.Subscriber("fix", NavSatFix, self.update_fix, queue_size=10)
         self.gps_utm = None
 
         self.sub_azimuth = rospy.Subscriber("mag_azimuth", Float64, self.update_azimuth, queue_size=10)
@@ -52,54 +52,55 @@ class TravToObstacles:
         self.time_diff = None
 
     def update_fix(self, msg):
-        self.gps_utm = np.array(utm.from_latlon(msg.latitude, msg.longitude)[:2]).reshape(1,2)
+        self.gps_utm = np.array(utm.from_latlon(msg.latitude, msg.longitude)[:2]).reshape(1, 2)
 
     def update_azimuth(self, msg):
         self.azimuth = msg.data
 
-    def rotate(self,points,trans):
+    def rotate(self, points, trans):
         R = quaternion_matrix([trans.transform.rotation.x,
-                                    trans.transform.rotation.y,
-                                    trans.transform.rotation.z,
-                                    trans.transform.rotation.w])   
-        R = R[:3,:3]
-        points = np.matmul(R,points.T) # MINUS HERE
+                               trans.transform.rotation.y,
+                               trans.transform.rotation.z,
+                               trans.transform.rotation.w])
+        R = R[:3, :3]
+        points = np.matmul(R, points.T)  # MINUS HERE
         points = points.T
         return points
 
-    def transform_points(self,points,trans):
-        points = self.rotate(points,trans)
-        points[:,0] += trans.transform.translation.x
-        points[:,1] += trans.transform.translation.y
-        points[:,2] += trans.transform.translation.z
+    def transform_points(self, points, trans):
+        points = self.rotate(points, trans)
+        points[:, 0] += trans.transform.translation.x
+        points[:, 1] += trans.transform.translation.y
+        points[:, 2] += trans.transform.translation.z
         return points
 
     def base_frame_to_utm(self, points):
         # Rotation.
-        angle = np.deg2rad(self.azimuth) + math.pi/2
-        R = np.array([[np.cos(angle),-np.sin(angle)],
-                        [np.sin(angle),np.cos(angle)]])
-        points = np.matmul(R,points.T).T
+        angle = np.deg2rad(self.azimuth) + math.pi / 2
+        R = np.array([[np.cos(angle), -np.sin(angle)],
+                      [np.sin(angle), np.cos(angle)]])
+        points = np.matmul(R, points.T).T
 
         # Translation.
         points = points + self.gps_utm
 
         return points
-    
-    def process_points(self,points):
-        points = points[points[:,0]!=-1.]                   # Get rid of (-1,-1,-1) points.
-        points = self.transform_points(points,self.trans)   # Transform to robot frame.
 
-        points = points[(points[:,2] < self.max_height) &
-                        (points[:,2] > self.min_height) &
-                        (np.linalg.norm(points[:,0:2], axis=1) > self.min_dist) &
-                        (np.linalg.norm(points[:,0:2], axis=1) < self.max_dist)]  # Filter points based on height and distance.
+    def process_points(self, points):
+        points = points[points[:, 0] != -1.]  # Get rid of (-1,-1,-1) points.
+        points = self.transform_points(points, self.trans)  # Transform to robot frame.
 
-        points = points[:,:2]                               # Get rid of z coord.
+        points = points[(points[:, 2] < self.max_height) &
+                        (points[:, 2] > self.min_height) &
+                        (np.linalg.norm(points[:, 0:2], axis=1) > self.min_dist) &
+                        (np.linalg.norm(points[:, 0:2],
+                                        axis=1) < self.max_dist)]  # Filter points based on height and distance.
+
+        points = points[:, :2]  # Get rid of z coord.
         utm_points = self.base_frame_to_utm(points)
-        return utm_points,points
+        return utm_points, points
 
-    def handle_pcd(self,msg):
+    def handle_pcd(self, msg):
         t = rospy.Time.now()
         self.trav_frame = msg.header.frame_id
         try:
@@ -108,7 +109,7 @@ class TravToObstacles:
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             rospy.logwarn('No transformation between %s and %s available', self.robot_base_frame, self.trav_frame)
             return
-         
+
         if self.gps_utm is not None and self.azimuth is not None:
             # Check if the msg is not too old (relevant mostly in case it is produced faster than we can handle here).
 
@@ -120,14 +121,15 @@ class TravToObstacles:
 
             # PCD to numpy array of 3D points.
             pcd_struct = ros_numpy.numpify(msg)
-            pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
+            pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x', 'y', 'z', self.trav_obstacle_field]])
 
-            #pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
-            pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types
-            pcd_arr = pcd_arr[:,:3]
+            # pcd_arr = pcd_arr[np.where(pcd_arr[:,6] == 1)]
+            pcd_arr = pcd_arr[~np.isnan(pcd_arr).any(axis=1)]  # remove nans
+            pcd_arr = pcd_arr[np.where(pcd_arr[:, -1] > 0.5)]  # works for both trav types
+            pcd_arr = pcd_arr[:, :3]
 
             # Filter unwanted points and project onto the XY plane.
-            utm_untrav_points,untrav_points = self.process_points(pcd_arr)
+            utm_untrav_points, untrav_points = self.process_points(pcd_arr)
 
             # Publish.
             self.set_pcd_msg(utm_untrav_points)
@@ -138,13 +140,12 @@ class TravToObstacles:
 
     def set_map_pcd_msg(self, points):
         pcd_data = np.zeros(len(points), dtype=[
-                ('x', np.float32),
-                ('y', np.float32),
-                ('z', np.float32),
-                ('r', np.float32),
-                ('g', np.float32),
-                ('b', np.float32)])
-
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32),
+            ('r', np.float32),
+            ('g', np.float32),
+            ('b', np.float32)])
 
         pcd_data['x'] = points[:, 0]
         pcd_data['y'] = points[:, 1]
@@ -163,16 +164,15 @@ class TravToObstacles:
 
     def set_pcd_msg(self, points):
         pcd_data = np.zeros(len(points), dtype=[
-                ('x', np.float32),
-                ('y', np.float32)])
-
+            ('x', np.float32),
+            ('y', np.float32)])
 
         pcd_data['x'] = points[:, 0]
         pcd_data['y'] = points[:, 1]
-        #pcd_data['z'] = np.zeros((points[:, 1].shape))
-        #pcd_data['r'] = 0.4
-        #pcd_data['g'] = 0.8
-        #pcd_data['b'] = 0.1
+        # pcd_data['z'] = np.zeros((points[:, 1].shape))
+        # pcd_data['r'] = 0.4
+        # pcd_data['g'] = 0.8
+        # pcd_data['b'] = 0.1
 
         self.obstacles_pcd_msg = ros_numpy.msgify(PointCloud2, pcd_data)
 
@@ -194,13 +194,14 @@ def main():
 
     max_height = rospy.get_param('~max_height', 1.)
     min_height = rospy.get_param('~min_height', 0.05)
-    max_dist = rospy.get_param('~max_dist', 10.)     # HAS TO BE LARGER THAN trav_max_dist IN path_planner
+    max_dist = rospy.get_param('~max_dist', 10.)  # HAS TO BE LARGER THAN trav_max_dist IN path_planner
     min_dist = rospy.get_param('~min_dist', 0.5)
     max_age = rospy.get_param('~max_age', 0.2)
     robot_base_frame = rospy.get_param('~robot_base_frame', 'base_link')
     trav_obstacle_field = rospy.get_param('~trav_obstacle_field', 'cost')
 
-    trav_to_obstacles = TravToObstacles(max_height,min_height,max_dist,min_dist,max_age,robot_base_frame,trav_obstacle_field)
+    trav_to_obstacles = TravToObstacles(max_height, min_height, max_dist, min_dist, max_age, robot_base_frame,
+                                        trav_obstacle_field)
 
     trav_to_obstacles.run()
 

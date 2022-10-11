@@ -708,7 +708,7 @@ class PathAnalysis:
         t = time.time()
 
         # Generate line of points from given waypoints -- the desired path.
-        points_line, original_waypoint_indices = points_arr_to_point_line(self.points,density=DENSITY)
+        points_line, original_waypoint_indices = points_arr_to_point_line(self.points, density=DENSITY)
         line = geometry.LineString(points_line)
 
         # Get untraversable areas along this line.

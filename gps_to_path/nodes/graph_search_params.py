@@ -1,6 +1,7 @@
 INIT_WIDTH = 60          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
 
-DENSITY = 1             # In meters. How dense is the graph (distance between neighboring nodes).
+# DENSITY = 1             # In meters. How dense is the graph (distance between neighboring nodes).
+DENSITY = 0.5             # In meters. How dense is the graph (distance between neighboring nodes).
 
 GOAL_BASE_DIST = 30     # In meters. Desired distance between start and goal points in a sub-graph.
                         # If there is an obstacle in the way, the distance is modified accordingly.

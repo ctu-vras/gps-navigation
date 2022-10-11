@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D 
 import numpy as np
 import pyproj
-from geodesy import utm
+import utm
 import shapely.geometry as geometry
 from shapely.ops import nearest_points
 from os import path
@@ -20,8 +20,8 @@ class sjtsk2utm():
         self.utm = pyproj.Proj("+proj=utm zone=33 north")
 
         self.waypoints = np.loadtxt("/home/vlkjan6/Documents/RobinGas/testfolder/waypoints.csv",delimiter=",")
-        self.waypoints = [utm.fromLatLong(self.waypoints[i,0],self.waypoints[i,1]) for i in range(len(self.waypoints))]
-        self.waypoints = np.array([[self.waypoints[i].easting, self.waypoints[i].northing] for i in range(len(self.waypoints))])
+        self.waypoints = [utm.from_latlon(self.waypoints[i,0],self.waypoints[i,1]) for i in range(len(self.waypoints))]
+        self.waypoints = np.array([[self.waypoints[i][0], self.waypoints[i][1]] for i in range(len(self.waypoints))])
 
     def run(self):
         self.data_utm = (np.array(list(pyproj.transform(self.sjtsk, self.utm, self.data_sjtsk[:,0], self.data_sjtsk[:,1])) + [self.data_sjtsk[:,2]])).T
@@ -53,8 +53,8 @@ class DataPoints():
 
     def waypoints_to_utm(self):
         for i,waypoint in enumerate(self.waypoints):
-            utm_coords = utm.fromLatLong(waypoint[0],waypoint[1])
-            waypoint = np.array([utm_coords.easting, utm_coords.northing])
+            utm_coords = utm.from_latlon(waypoint[0],waypoint[1])
+            waypoint = np.array([utm_coords[0], utm_coords[1]])
             self.waypoints[i] = waypoint
 
     def narrow_region(self):

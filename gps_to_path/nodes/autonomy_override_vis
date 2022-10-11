@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Czech Technical University in Prague
+
+"""
+Visualize when the operator manually intervened during an autonomous mission.
+
+Red spheres mean occasions where the operator just stopped the robot. Green spheres mean occasions where the operator
+did actively drive the robot.
+
+Subscriptions:
+- `local_joy/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+- `joy_local/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+- `secondary_joy/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+- `joy_secondary/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+
+Publications:
+- `autonomy_override_vis` (:class:`visualization_msgs.msg.MarkerArray`): Markers visualizing the manual interventions.
+
+Parameters:
+- `~time_threshold` (float, defaults to 5.0, seconds): After how long time a new marker should be added.
+- `~marker_frame_id` (str, defaults to "base_link"): The frame in which the markers are published.
+- `~marker_size` (float, defaults to 1.0, meters): Size of the markers.
+- `~marker_alpha` (float, defaults to 0.8, range [0.0-1.0]): Transparency of the markers.
+"""
+
+import rospy
+
+from geometry_msgs.msg import Twist
+from visualization_msgs.msg import Marker, MarkerArray
+
+import cras
+
+
+class AutonomyOverrideVisualization(cras.Node):
+    def __init__(self):
+        super(AutonomyOverrideVisualization, self).__init__()
+
+        self.array = MarkerArray()
+        self.last_override_stamp = None
+
+        self.time_threshold = cras.get_param("~time_threshold", rospy.Duration(5))
+        self.marker_frame_id = cras.get_param("~marker_frame_id", "base_link")
+        self.marker_size = cras.get_param("~marker_size", 1.0, "m")
+        self.marker_alpha = cras.get_param("~marker_alpha", 0.8)
+
+        self.pub = rospy.Publisher('autonomy_override_vis', MarkerArray, queue_size=10, latch=True)
+
+        self.sub1 = rospy.Subscriber('local_joy/cmd_vel', Twist, self.cb)
+        self.sub2 = rospy.Subscriber('joy_local/cmd_vel', Twist, self.cb)
+        self.sub3 = rospy.Subscriber('secondary_joy/cmd_vel', Twist, self.cb)
+        self.sub4 = rospy.Subscriber('joy_secondary/cmd_vel', Twist, self.cb)
+
+    def cb(self, msg):
+        """Twist callback.
+
+        :param Twist msg: The receieved message.
+        """
+        if self.last_override_stamp is not None and rospy.Time.now() < self.last_override_stamp + self.time_threshold:
+            return
+        self.last_override_stamp = rospy.Time.now()
+
+        is_zero = msg.linear.x == 0 and msg.linear.y == 0 and msg.angular.z == 0
+        marker = Marker()
+        marker.header.stamp = rospy.Time.now()
+        marker.header.frame_id = self.marker_frame_id
+        topic = msg._connection_header["topic"]
+        marker.id = len(self.array.markers)
+        marker.pose.orientation.w = 1
+        marker.action = Marker.ADD
+        marker.color.a = self.marker_alpha
+        if is_zero:
+            marker.color.r = 1
+        else:
+            marker.color.g = 1
+        marker.ns = topic
+        marker.scale.x = marker.scale.y = marker.scale.z = self.marker_size
+        marker.type = Marker.SPHERE
+
+        self.array.markers.append(marker)
+
+        self.pub.publish(self.array)
+
+    def reset(self):
+        del self.array.markers[:]
+        self.pub.publish(self.array)
+        self.last_override_stamp = None
+        super(AutonomyOverrideVisualization, self).reset()
+
+    def run(self):
+        self.start_auto_check_time_jump()  # call reset() if time jumps
+
+        rospy.spin()
+
+
+def main():
+    rospy.init_node('autonomy_override_vis')
+
+    node = AutonomyOverrideVisualization()
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

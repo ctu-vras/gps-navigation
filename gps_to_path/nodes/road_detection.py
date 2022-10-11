@@ -1,5 +1,5 @@
 import numpy as np
-from geodesy import utm
+import utm
 import shapely.geometry as geom
 from matplotlib import pyplot as plt
 from matplotlib import patches as ptch

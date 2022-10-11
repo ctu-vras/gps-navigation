@@ -1,8 +1,6 @@
 from __future__ import division
 
-from cmath import nan
 from math import inf, floor
-from tracemalloc import start
 import rospy
 #from matplotlib.patches import Polygon
 import overpy
@@ -140,7 +138,7 @@ class Way():
 RESERVE = 50 # meters
 
 class PathAnalysis:
-    def __init__(self, coords_file, road_crossing, current_robot_position):
+    def __init__(self, coords_file, road_crossing, current_robot_position=None):
         
         self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
@@ -155,7 +153,8 @@ class PathAnalysis:
 
         self.waypoints, self.zone_number, self.zone_letter = self.waypoints_to_utm()
 
-        self.waypoints = np.concatenate([current_robot_position,self.waypoints])
+        if current_robot_position is not None:
+            self.waypoints = np.concatenate([current_robot_position,self.waypoints])
         
         self.max_x = np.max(self.waypoints[:,0]) + RESERVE
         self.min_x = np.min(self.waypoints[:,0]) - RESERVE

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D 
 import numpy as np
 import pyproj
-from geodesy import utm
+import utm
 import shapely.geometry as geometry
 from shapely.ops import nearest_points
 from os import path

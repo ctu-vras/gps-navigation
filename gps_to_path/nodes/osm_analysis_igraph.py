@@ -140,7 +140,7 @@ class Way():
 RESERVE = 50 # meters
 
 class PathAnalysis:
-    def __init__(self, coords_file, road_crossing, current_robot_position, use_osm=True,use_solitary_nodes=True, flip=False):
+    def __init__(self, coords_file, road_crossing, current_robot_position=None, use_osm=True,use_solitary_nodes=True, flip=False):
         
         self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
@@ -162,7 +162,8 @@ class PathAnalysis:
         if self.flip:
             self.waypoints = np.flip(self.waypoints, 0)
 
-        self.waypoints = np.concatenate([current_robot_position,self.waypoints])
+        if current_robot_position is not None:
+            self.waypoints = np.concatenate([current_robot_position,self.waypoints])
         
         self.max_x = np.max(self.waypoints[:,0]) + RESERVE
         self.min_x = np.min(self.waypoints[:,0]) - RESERVE

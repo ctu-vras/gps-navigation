@@ -6,7 +6,14 @@
 """
 This node imposes a minimum limit on the covariance of GPS measurements. This can be used to limit jitter of a fused
 odometry caused by the very accurate, but still jumping measurements. It also filters some susceptible values of fix.
+
+It can either subscribe to :class:`sensor_msgs.msg.NavSatFix` messages alone, or to these messages accompanied by
+:class:`gps_to_path.msg.NavSatDetailedStatus` messages. It automatically tries to subscribe to both, and when it detects
+that the detailed status messages are available, it only uses the algorithm that takes the detailed status into account.
 """
+import math
+from collections import deque
+from threading import Lock
 
 from message_filters import TimeSynchronizer, Subscriber
 import rospy
@@ -15,18 +22,24 @@ from gps_to_path.msg import NavSatDetailedStatus
 
 rospy.init_node("nav_sat_fix_filter")
 
-min_cov = rospy.get_param("~min_cov", 1e-3)
+min_fix_cov = rospy.get_param("~min_fix_cov", 1e-6)
+min_float_cov = rospy.get_param("~min_float_cov", 1e-3)
 max_cov = rospy.get_param("~max_cov", 10)
 
-min_lat_cov = rospy.get_param("~min_lat_cov", min_cov)
-min_lon_cov = rospy.get_param("~min_lon_cov", min_cov)
-min_alt_cov = rospy.get_param("~min_alt_cov", min_cov)
+min_fix_lat_cov = rospy.get_param("~min_fix_lat_cov", min_fix_cov)
+min_fix_lon_cov = rospy.get_param("~min_fix_lon_cov", min_fix_cov)
+min_fix_alt_cov = rospy.get_param("~min_fix_alt_cov", min_fix_cov)
 
-degraded_fix_cov_multiplier = rospy.get_param("~degraded_fix_cov_multiplier", 100)
+min_float_lat_cov = rospy.get_param("~min_float_lat_cov", min_float_cov)
+min_float_lon_cov = rospy.get_param("~min_float_lon_cov", min_float_cov)
+min_float_alt_cov = rospy.get_param("~min_float_alt_cov", min_float_cov)
+
+average_fix_cov_multiplier = rospy.get_param("~average_fix_cov_multiplier", 100)
+degraded_fix_cov_multiplier = rospy.get_param("~degraded_fix_cov_multiplier", 1000)
 
 fix_lost_duration = rospy.Duration(rospy.get_param("~fix_lost_duration", 1.0))
-fix_regain_cooldown = rospy.Duration(rospy.get_param("~fix_regain_cooldown", 10.0))
-max_correction_age = rospy.Duration(rospy.get_param("~max_correction_age", 10.0))
+fix_reconvergence_duration = rospy.Duration(rospy.get_param("~fix_reconvergence_duration", 20.0))
+max_corrections_age = rospy.Duration(rospy.get_param("~max_corrections_age", 10.0))
 
 STATE_NO_FIX = 0
 STATE_HAS_FIX = 1
@@ -39,20 +52,85 @@ state_names = {
 }
 
 FIX_QUALITY_OK = 0
-FIX_QUALITY_DEGRADED = 1
-FIX_QUALITY_BAD = 2
+FIX_QUALITY_AVERAGE = 1
+FIX_QUALITY_DEGRADED = 2
+FIX_QUALITY_BAD = 3
 
 fix_quality_names = {
     FIX_QUALITY_OK: "OK",
+    FIX_QUALITY_AVERAGE: "AVERAGE",
     FIX_QUALITY_DEGRADED: "DEGRADED",
     FIX_QUALITY_BAD: "BAD",
 }
 
+RTK_FIX_STATUSES = (NavSatStatus.STATUS_GBAS_FIX, NavSatStatus.STATUS_SBAS_FIX)
+
 pub = rospy.Publisher("gps/fix_filtered", NavSatFix, queue_size=10)
 
+processed_stamps = deque(maxlen=10)
+processed_stamps_lock = Lock()
 
-def cb(fix_msg, status_msg):
-    """Callback for fix messages.
+
+def fix_only_cb(fix_msg):
+    """Callback for fix messages without status.
+
+    :param NavSatFix fix_msg: 
+    :return: 
+    """
+    # create a fake status message
+
+    status_msg = NavSatDetailedStatus()
+    status_msg.header = fix_msg.header
+
+    satellites_used = {
+        NavSatStatus.STATUS_NO_FIX: 0,
+        NavSatStatus.STATUS_FIX: 7,
+        NavSatStatus.STATUS_SBAS_FIX: 12,
+        NavSatStatus.STATUS_GBAS_FIX: 15,
+    }
+    status_msg.satellites_used = satellites_used[fix_msg.status.status]
+
+    if fix_msg.status.status in RTK_FIX_STATUSES:
+        status_msg.last_corrections_time = rospy.Time.now()
+        status_msg.integer_ambiguity_ratio = 3.0
+    elif fix_msg.status.status == NavSatStatus.STATUS_FIX:
+        if max(fix_msg.position_covariance[0], fix_msg.position_covariance[4]) < 0.1:
+            status_msg.last_corrections_time = rospy.Time.now()
+            status_msg.integer_ambiguity_ratio = 1.3
+        else:
+            status_msg.last_corrections_time = rospy.Time.now() - rospy.Duration(120)
+            status_msg.integer_ambiguity_ratio = 0
+
+    # run the filter with the fake status message
+    filtered_fix = filter_fix(fix_msg, status_msg)
+
+    with processed_stamps_lock:
+        if fix_msg.header.stamp not in processed_stamps:
+            if filtered_fix is not None:
+                pub.publish(filtered_fix)
+            processed_stamps.append(fix_msg.header.stamp)
+
+
+def fix_with_status_cb(fix_msg, status_msg):
+    """Callback for fix messages with status.
+
+    :param NavSatFix fix_msg: 
+    :param NavSatDetailedStatus status_msg: 
+    """
+    # once we get a fix with status, we no longer need the fix_only version
+    fix_only_sub.unregister()
+
+    filtered_fix = filter_fix(fix_msg, status_msg)
+
+    with processed_stamps_lock:
+        if fix_msg.header.stamp not in processed_stamps:
+            if filtered_fix is not None:
+                pub.publish(filtered_fix)
+            processed_stamps.append(fix_msg.header.stamp)
+
+
+def filter_fix(fix_msg, status_msg):
+    """Callback for fix messages with status.
 
     :param NavSatFix fix_msg: 
     :param NavSatDetailedStatus status_msg: 
@@ -71,29 +149,39 @@ def cb(fix_msg, status_msg):
     if state == STATE_NO_FIX:
         state = STATE_HAS_FIX
 
-    if state == STATE_HAS_FIX and last_fix_stamp is not None and fix_msg.header.stamp - last_fix_stamp > fix_lost_duration:
+    if state == STATE_HAS_FIX and last_fix_stamp is not None \
+            and fix_msg.header.stamp - last_fix_stamp > fix_lost_duration:
         state = STATE_FIX_REGAINING
         fix_regained_stamp = fix_msg.header.stamp
+        rospy.loginfo("Fix lost")
     last_fix_stamp = fix_msg.header.stamp
 
-    if state == STATE_FIX_REGAINING and fix_msg.header.stamp - fix_regained_stamp > fix_regain_cooldown:
+    if state == STATE_FIX_REGAINING and fix_msg.header.stamp > fix_regained_stamp + fix_reconvergence_duration:
         state = STATE_HAS_FIX
         fix_regained_stamp = None
+        rospy.loginfo("Fix regained")
 
     rospy.loginfo_throttle_identical(20.0, "Fix state: " + state_names[state])
 
     if state != STATE_HAS_FIX:
-        return
+        return None
 
     cov = list(fix_msg.position_covariance)
+    has_corrections = rospy.Time.now() - status_msg.last_corrections_time < max_corrections_age
 
     fix_quality = FIX_QUALITY_OK
-    if rospy.Time.now() - status_msg.last_corrections_time > max_correction_age:
+    if not has_corrections:
         fix_quality = max(fix_quality, FIX_QUALITY_DEGRADED)
     if status_msg.satellites_used < 4:
         fix_quality = max(fix_quality, FIX_QUALITY_BAD)
     elif status_msg.satellites_used < 5:
         fix_quality = max(fix_quality, FIX_QUALITY_DEGRADED)
+    elif status_msg.satellites_used < 15:
+        fix_quality = max(fix_quality, FIX_QUALITY_AVERAGE)
+    if status_msg.integer_ambiguity_ratio < 1:
+        fix_quality = max(fix_quality, FIX_QUALITY_DEGRADED)
+    elif status_msg.integer_ambiguity_ratio < 1.8:
+        fix_quality = max(fix_quality, FIX_QUALITY_AVERAGE)
     if fix_msg.status.status == NavSatStatus.STATUS_NO_FIX:
         fix_quality = max(fix_quality, FIX_QUALITY_BAD)
     if max(cov[0], cov[4]) > max_cov:
@@ -102,15 +190,25 @@ def cb(fix_msg, status_msg):
     rospy.loginfo_throttle_identical(20.0, "Fix quality: " + fix_quality_names[fix_quality])
 
     if fix_quality == FIX_QUALITY_BAD:
-        return
+        return None
 
-    multiplier = 1 if fix_quality == FIX_QUALITY_OK else degraded_fix_cov_multiplier
+    min_lat_cov = min_fix_lat_cov if fix_msg.status.status in RTK_FIX_STATUSES else min_float_lat_cov
+    min_lon_cov = min_fix_lon_cov if fix_msg.status.status in RTK_FIX_STATUSES else min_float_lon_cov
+    min_alt_cov = min_fix_alt_cov if fix_msg.status.status in RTK_FIX_STATUSES else min_float_alt_cov
+
+    multipliers = {
+        FIX_QUALITY_OK: 1,
+        FIX_QUALITY_AVERAGE: average_fix_cov_multiplier,
+        FIX_QUALITY_DEGRADED: degraded_fix_cov_multiplier,
+    }
+    multiplier = multipliers[fix_quality]
+
     cov[0] = multiplier * max(cov[0], min_lat_cov)
     cov[4] = multiplier * max(cov[4], min_lon_cov)
     cov[8] = multiplier * max(cov[8], min_alt_cov)
     fix_msg.position_covariance = tuple(cov)
 
-    pub.publish(fix_msg)
+    return fix_msg
 
 
 last_cb_stamp = rospy.Time.now()
@@ -118,9 +216,10 @@ last_fix_stamp = None
 fix_regained_stamp = None
 state = STATE_NO_FIX
 
+fix_only_sub = rospy.Subscriber("gps/fix", NavSatFix, fix_only_cb, queue_size=10)
 fix_sub = Subscriber("gps/fix", NavSatFix, queue_size=10)
 fix_status_sub = Subscriber("gps/fix_status", NavSatDetailedStatus, queue_size=10)
 sub = TimeSynchronizer((fix_sub, fix_status_sub), queue_size=10)
-sub.registerCallback(cb)
+sub.registerCallback(fix_with_status_cb)
 
 rospy.spin()

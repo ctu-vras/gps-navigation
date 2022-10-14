@@ -20,7 +20,8 @@ from math import sin, cos, pi
 from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion, quaternion_inverse
 from numpy import deg2rad
 import numpy as np
-from tf.transformations import euler_from_quaternion
+from tf.transformations import euler_from_quaternion, quaternion_matrix
+
 
 MAX_DIST_FROM_START = 3.
 
@@ -67,12 +68,19 @@ class WaypointsToPath():
             self.tfBuffer2)
         self.odom_base_link_trans = None
 
+
+        self.tfBuffer3 = tf2_ros.Buffer()
+        self.listener_odom_utm = tf2_ros.TransformListener(
+            self.tfBuffer3)
+        self.odom_utm_trans = None
+
     def update_waypoints(self,msg):
         """ Waypoints sub handler. """
         self.waypoints = np.array([[p.x,p.y] for p in msg.points])
         
-        self.path_utm_msg = self.set_path_msg(self.waypoints, "utm")
-        self.pub_path_utm.publish(self.path_utm_msg)
+        if self.odom_base_link_trans is not None:
+            self.path_utm_msg = self.set_path_msg(self.waypoints, "utm")
+            self.pub_path_utm.publish(self.path_utm_msg)
 
     def update_azimuth(self, msg):
         """ Azimuth sub handler. """
@@ -80,13 +88,33 @@ class WaypointsToPath():
     
     def original_waypoints_to_path(self,msg):
         points = np.array([[p.x,p.y] for p in msg.points])
-        path_msg = self.set_path_msg(points, "utm")
-        self.pub_original_waypoints_path.publish(path_msg)
+
+        if self.odom_base_link_trans is not None:
+            path_msg = self.set_path_msg(points, "utm")
+            self.pub_original_waypoints_path.publish(path_msg)
 
     def processed_waypoints_to_path(self,msg):
         points = np.array([[p.x,p.y] for p in msg.points])
-        path_msg = self.set_path_msg(points, "utm")
-        self.pub_processed_waypoints_path.publish(path_msg)
+
+        if self.odom_base_link_trans is not None:
+            path_msg = self.set_path_msg(points, "utm")
+            self.pub_processed_waypoints_path.publish(path_msg)
+
+    def rotate(self,points,trans):
+        R = quaternion_matrix([trans.transform.rotation.x,
+                                    trans.transform.rotation.y,
+                                    trans.transform.rotation.z,
+                                    trans.transform.rotation.w])   
+        R = R[:2,:2]
+        points = np.matmul(R,points.T)
+        points = points.T
+        return points
+
+    def transform_points(self,points,trans):
+        points = self.rotate(points,trans)
+        points[:,0] += trans.transform.translation.x
+        points[:,1] += trans.transform.translation.y
+        return points
 
     def get_utm_odom_rot(self):
         """ Get angle by how much to rotate utm frame to align with odom frame, resp. rotation of odom frame in utm frame. """
@@ -128,19 +156,23 @@ class WaypointsToPath():
                     self.odom_frame, 'base_link', rospy.Time())
             except:
                 pass
-            # utm is not an actual tf trame, just an imaginary frame
+            try:
+                self.odom_utm_trans = self.tfBuffer3.lookup_transform(
+                    self.odom_frame, 'utm', rospy.Time())
+            except:
+                pass
 
             if self.waypoints is not None and self.waypoints.size > 0 and self.gps_utm is not None:                
                 rospy.loginfo_once("OK publishing waypoints.")
-                self.gps_to_target_utm_frame = self.waypoints - \
-                    np.array([self.gps_utm.easting, self.gps_utm.northing])
-                self.gps_to_target_odom_frame = self.utm_to_odom_rotate(
-                    self.gps_to_target_utm_frame)
+                #self.gps_to_target_utm_frame = self.waypoints - \
+                #    np.array([self.gps_utm.easting, self.gps_utm.northing])
+                #self.gps_to_target_odom_frame = self.utm_to_odom_rotate(
+                #    self.gps_to_target_utm_frame)
 
-                self.path_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
-                                        self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
-
-                self.path_msg = self.set_path_msg(self.path_arr, self.odom_frame)
+                #self.path_arr = np.array([self.gps_to_target_odom_frame[:, 0] + self.odom_gps_trans.transform.translation.x,
+                #                        self.gps_to_target_odom_frame[:, 1] + self.odom_gps_trans.transform.translation.y]).T
+                self.waypoints = self.transform_points(self.waypoints,self.odom_utm_trans)
+                self.path_msg = self.set_path_msg(self.waypoints, self.odom_frame)
                 self.pub_path.publish(self.path_msg)
             else:
                 rospy.loginfo_once("No waypoints for path or no fix yet.")
@@ -204,7 +236,8 @@ class WaypointsToPath():
                     self.odom_frame, 'gps', rospy.Time())
                 self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
                     self.odom_frame, 'base_link', rospy.Time())
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            except Exception as e:
+                print(e)
                 rate.sleep()
                 continue
         rospy.loginfo("Transformations obtained.")

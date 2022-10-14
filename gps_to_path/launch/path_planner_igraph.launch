@@ -2,12 +2,13 @@
     <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_spot_2.gpx" />
     <arg name="run_ntrip_relay" default="true" />
     <arg name="robot_base_frame" default="base_link" />
+    <arg name="odom_frame" default="gps_odom" />
     <arg name="use_osm" default="true" />
     <arg name="repeat" default="false" />
     <arg name="flip" default="false" />
     <arg name="trav_obstacle_field" default="cost" />
-    <arg name="trav_frame" default="os_lidar" />
-    <arg name="max_height" default="0.5"/>
+    <arg name="trav_topic" default="geometric_traversability_raw" />
+    <arg name="max_height" default="1.0"/>
     <arg name="min_height" default="-1."/>
         
 
@@ -52,11 +53,14 @@
     	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
         <param name="goal_reached_distance" type="double" value="2."/>
         <param name="publish_pcd" type="bool" value="true"/>
-        <param name="trav_max_dist" type="double" value="5."/>	
-        <param name="trav_radius" type="double" value="0.5"/>
-        <param name="untrav_point_cost" type="double" value="100."/>
+        <param name="trav_max_dist" type="double" value="20."/>	
+        <param name="points_absence_radius" type="double" value="2."/>	
+        <param name="trav_radius" type="double" value="0.25"/>
+        <param name="untrav_cost" type="double" value="100."/>
+        <param name="absence_cost" type="double" value="1000."/>
+        <param name="max_traversable_cost" type="double" value="100."/>
         <param name="long_term_memory_longevity" type="double" value="0.997" />
-        <param name="short_term_memory_longevity" type="double" value="0.8"/>
+        <param name="short_term_memory_longevity" type="double" value="0.9"/>
         <param name="trav_inheritance_radius" type="double" value="0.71"/>	
         <param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
         <param name="max_goal_untrav_cost" type="double" value="500."/>
@@ -68,31 +72,41 @@
         <param name="next_waypoint_proximity_switch" type="bool" value="true"/>
         <param name="min_time_near_goal" type="double" value="1."/>
         <param name="flip" type="bool" value="$(arg flip)"/>
+
+        <param name="max_height" type="double" value="$(arg max_height)"/>
+        <param name="min_height" type="double" value="$(arg min_height)"/>
+        <param name="max_age" type="double" value="1."/>	
+        <param name="trav_obstacle_field" type="string" value="$(arg trav_obstacle_field)"/>
+        <param name="trav_topic" type="string" value="$(arg trav_topic)"/>
+        <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+        <param name="max_relative_path_cost_change" type="double" value="0.5"/>	
     </node>
 
 <!-- PATH -->
     <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
+        <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
     </node>
 
 <!-- TRAVERSABILITY PROCESSING -->
-    <node pkg="gps_to_path" type="trav_to_obstacles" name="trav_to_obstacles" output="screen">
+    <!-- <node pkg="gps_to_path" type="trav_to_obstacles_bag" name="trav_to_obstacles_bag" output="screen">
 
-    <remap from="cloud_segmentation/lidar_cloud" to="geometric_traversability_raw" />
+        <remap from="cloud_segmentation/lidar_cloud" to="geometric_traversability_raw" />
 
-	<param name="max_height" type="double" value="$(arg max_height)"/>
-	<param name="min_height" type="double" value="$(arg min_height)"/>
-	<param name="max_dist" type="double" value="7." />
-	<param name="min_dist" type="double" value="0.5"/>
-	<param name="max_age" type="double" value="1."/>	
-	<param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
-	<param name="trav_obstacle_field" type="string" value="$(arg trav_obstacle_field)"/>
-        <param name="trav_frame" type="string" value="$(arg trav_frame)"/>
-    </node>
+        <param name="max_height" type="double" value="$(arg max_height)"/>
+        <param name="min_height" type="double" value="$(arg min_height)"/>
+        <param name="max_dist" type="double" value="7." />
+        <param name="min_dist" type="double" value="0.5"/>
+        <param name="max_age" type="double" value="1."/>	
+        <param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
+        <param name="trav_obstacle_field" type="string" value="$(arg trav_obstacle_field)"/>
+        <param name="trav_topic" type="string" value="$(arg trav_topic)"/>
+    </node> -->
 
 
 
 <!-- OSM PCD VISUALIZATION -->
     <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
+        <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
     </node>
 
 </launch>    

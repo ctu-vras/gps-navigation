@@ -269,6 +269,9 @@ class PathAnalysis:
             way_to_store.nodes = way.nodes
             way_to_store.tags = way.tags
 
+            if way_to_store.tags is None:
+                way_to_store.tags = dict()
+
             if is_area:
                 way_to_store.line = geometry.Polygon(coords)
             else:
@@ -299,6 +302,7 @@ class PathAnalysis:
                         new_way.id = int(-10**15*random())
                         while new_way.id in self.ways.keys():
                             new_way.id = int(-10**15*random())
+                        # tady zlobi ten update
                         new_way.nodes = ways[i].nodes + ways[j].nodes[1:] 
                         new_way.tags = ways[i].tags.update(ways[j].tags)
                         new_way.line = combined_line
@@ -774,7 +778,6 @@ class PathAnalysis:
             # Generate lattice of points.
             graph_range =  INIT_WIDTH + 2*increase_graph
             graph_points, points_line, dist_from_line = points_to_graph_points(start_point, goal_point, density=density, width=graph_range)
-
             # From OSM objects get those which are near the points.
             objects_in_area = self.get_reduced_objects(graph_points.bounds[0],
                                                         graph_points.bounds[1],
@@ -809,9 +812,12 @@ class PathAnalysis:
             road_points = []
             no_footways = []
             graph_points_costs = []
+
+            dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
+            dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER
             
             if self.use_osm:
-                graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)       
+                graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)       
 
                 not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
                 if self.road_crossing:
@@ -821,10 +827,9 @@ class PathAnalysis:
                     road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
 
                 no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
-
-            dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
-            dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS)
-
+            else:
+                graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS)]
+            
             costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, self.use_osm)
 
             #edge_cost_tuples = np.concatenate((edges,costs),axis=1)

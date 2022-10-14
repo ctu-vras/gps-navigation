@@ -81,7 +81,6 @@ def points_to_graph_points(point1, point2, density=1, width=10):
 
     all_points = np.zeros((points_in_line*(perpendicular_increase*2+1),2))
     dist_from_line = np.zeros((points_in_line*(perpendicular_increase*2+1),1))
-
     #start_index = points_in_line*num_points + increase      # index of the original point 1 (start)
     #goal_index = points_in_line*(num_points+1)-1 - increase # index of the original point 2 (goal)
 
@@ -96,9 +95,9 @@ def points_to_graph_points(point1, point2, density=1, width=10):
         neg_line_points = point_line - normal_vec*density*(i+1)
         all_points[points_in_line*(perpendicular_increase+i+1):points_in_line*(perpendicular_increase+i+2),:] = pos_line_points
         all_points[points_in_line*(perpendicular_increase-i-1):points_in_line*(perpendicular_increase-i),:] = neg_line_points
-        dist_from_line[points_in_line*(perpendicular_increase+i+1):points_in_line*(perpendicular_increase+i+2)] = dist_line + i + 1
-        dist_from_line[points_in_line*(perpendicular_increase-i-1):points_in_line*(perpendicular_increase-i)] = dist_line + i + 1
-
+        dist_from_line[points_in_line*(perpendicular_increase+i+1):points_in_line*(perpendicular_increase+i+2)] = dist_line + (i + 1) * density
+        dist_from_line[points_in_line*(perpendicular_increase-i-1):points_in_line*(perpendicular_increase-i)] = dist_line + (i + 1) * density
+    
     """ if increase:
         plt.scatter(all_points[:,0], all_points[:,1])
         plt.savef

@@ -829,7 +829,7 @@ class PathAnalysis:
 
                 no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
             else:
-                graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS)]
+                graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER]
             
             costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, self.use_osm)
 

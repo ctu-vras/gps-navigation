@@ -173,6 +173,8 @@ class PathPlanner():
         self.original_path_cost = 0
         self.shortest_path_vertices = None
 
+        self.current_sub_graph_ind = 0
+
 
         #fig,self.ax = plt.subplots()
         #plt.show()
@@ -218,7 +220,10 @@ class PathPlanner():
     
     def update_trav(self,msg):
         self.trav_frame = msg.header.frame_id
-
+        
+        # BAG ONLY ~~~~~~~~~
+        #if self.time_diff is None:
+        #    self.time_diff = rospy.Time.now() - msg.header.stamp
         try:
             self.odom_robot_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.robot_base_frame, rospy.Time())
@@ -230,12 +235,8 @@ class PathPlanner():
                 "utm", self.odom_frame, rospy.Time())
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            rospy.logwarn("Cannot obtain transform.")
+            rospy.logwarn_once("Cannot obtain transform.")
             return
-        
-        # BAG ONLY ~~~~~~~~~
-        #if self.time_diff is None:
-        #    self.time_diff = rospy.Time.now() - msg.header.stamp
 
         t = rospy.Time.now()
 
@@ -276,13 +277,14 @@ class PathPlanner():
         # Obtain graph which start point is the last goal point you visited.
         
         if self.current_sub_graph is None:
-            self.current_sub_graph = self.sub_graphs.pop(0)
+            self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
             self.subgraph_start_time = rospy.Time.now()
-                
+            self.current_sub_graph_changed = True
+
         goal_point = self.get_current_goal_point()
 
-        if self.sub_graphs:
-            next_goal_point = self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+        if self.current_sub_graph_ind < len(self.sub_graphs) - 1:
+            next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
         else:
             next_goal_point = None
 
@@ -320,7 +322,7 @@ class PathPlanner():
 
     def next_waypoint(self):
         # No more waypoints. Finish.
-        if not self.sub_graphs:
+        if self.current_sub_graph_ind == len(self.sub_graphs) - 1:
             rospy.loginfo("Last goal point reached.")
             rospy.loginfo("Path planner finished.")
             
@@ -344,7 +346,8 @@ class PathPlanner():
         
         # Pop next subgraph.
         else:
-            self.current_sub_graph = self.sub_graphs.pop(0)
+            self.current_sub_graph_ind += 1
+            self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
             self.current_sub_graph_changed = True
         
         self.near_goal_point_time = -1
@@ -441,6 +444,7 @@ class PathPlanner():
 
             if self.absence_mask is None:
                 self.absence_mask = np.full((len(graph_points)), True)
+                self.absence_mask[graph_points_absence_radius_inds] = False # When init, clear the area around robot.
 
             # Inheritance of trav mask between near vertices of previous and new subgraph when subgraph changes.
             if self.mean_trav_cost_mask is not None and self.current_sub_graph_changed == True:
@@ -460,6 +464,8 @@ class PathPlanner():
 
                 self.mean_trav_cost_mask = new_mask
                 self.absence_mask = new_absence_mask
+
+                self.absence_mask[graph_points_absence_radius_inds] = False # When init, clear the area around robot.
 
                 self.current_sub_graph_changed = False
 
@@ -532,7 +538,10 @@ class PathPlanner():
 
             #except Exception as e:
             #    print(e)
-        
+        else:
+            cost_shape = graph_dict['graph_points_costs'][0].reshape(-1).shape
+            cost_placeholder = np.zeros(cost_shape)
+            self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],cost_placeholder,cost_placeholder,cost_placeholder)
 
         # Else triggers if no or empty trav msg has arrived yet. In that case we simply use the base weights.
         # Try except here for initialization if the variable has not been initialized yet.
@@ -545,7 +554,7 @@ class PathPlanner():
         # Check how the cost of the last published path changed in comparison to its original cost.
         # If it is relatively more expensive than some threshold, try replanning.
         replan = True
-        if self.shortest_path_vertices is not None:
+        if self.shortest_path_vertices is not None and len(self.shortest_path_vertices) > 0:
             shortest_path_graph_points = [graph_points[v] for v in self.shortest_path_vertices]
             robot_on_path_index = self.get_nearest_graph_point_index(shortest_path_graph_points, copy.copy(self.current_robot_position))
 
@@ -557,7 +566,7 @@ class PathPlanner():
                 edge = graph.get_eid(v1,v2)
                 current_path_cost += graph.es[edge]["total_weight"]
 
-            if (current_path_cost/original_path_cost_sum <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) > 5:
+            if (current_path_cost/min([original_path_cost_sum,0.0001]) <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) > 5:
                 replan = False
                 
             """ print(">././>?>?>/./>?>/./>?././")
@@ -584,6 +593,12 @@ class PathPlanner():
                 #print(graph.es[edge]["total_weight"])
                 #cost += graph.es[edge]["total_weight"]
                 self.original_path_cost[i] = graph.es[edge]["total_weight"]
+            
+            if np.sum(self.original_path_cost) >= float('inf'):
+                # Publish empty path (stop the robot).
+                rospy.logwarn("Infinite path cost. Publishing empty path.")
+                self.shortest_path_vertices = []
+                self.original_path_cost = 0.0001
 
             #print(cost)
             #print("----------------------")
@@ -632,7 +647,6 @@ class PathPlanner():
             dist_cost = points_cost[0].reshape(-1)
             total_cost = dist_cost + mean_trav_cost_mask * self.untrav_cost + absence_cost_mask
             costs = [total_cost,dist_cost,np.zeros(dist_cost.shape),np.zeros(dist_cost.shape),mean_trav_cost_mask * self.untrav_cost, absence_cost_mask, trav_and_absence_mask]
-        
         #total_cost = total_cost.astype(np.int16)
         #points = self.utm_to_base_frame(points)
 
@@ -643,7 +657,6 @@ class PathPlanner():
 
             robot_z = self.odom_robot_trans.transform.translation.z + self.utm_odom_trans.transform.translation.z
             points = np.concatenate((points,robot_z * np.ones((points.shape[0],1))), axis=1)
-            
             try:
                 self.odom_utm_trans = self.tf_buffer_4.lookup_transform(
                         self.odom_frame, "utm", rospy.Time())
@@ -844,8 +857,17 @@ class PathPlanner():
         self.pub_original_waypoints.publish(original_waypoints_msg)
         
     def run(self):
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(100)
         while not rospy.is_shutdown() and not self.finished:
+            try:
+                self.odom_robot_trans = self.tf_buffer.lookup_transform(
+                    self.odom_frame, self.robot_base_frame, rospy.Time())
+
+                self.utm_odom_trans = self.tf_buffer_3.lookup_transform(
+                    "utm", self.odom_frame, rospy.Time())
+
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                rospy.logwarn_once("Cannot obtain transform.")
 
             if self.osm_planner_initialized:
                 self.get_current_sub_graph()
@@ -897,6 +919,9 @@ class PathPlanner():
                     self.publish_pcd = False
 
         # When finished send one empty waypoints msg to overwrite the previous msg.
+        self.publish_empty_path()
+
+    def publish_empty_path(self):
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
         header.frame_id = "utm"

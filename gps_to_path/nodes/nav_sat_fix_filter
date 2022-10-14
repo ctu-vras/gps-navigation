@@ -13,7 +13,7 @@ import rospy
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from gps_to_path.msg import NavSatDetailedStatus
 
-rospy.init_node("limit_fix_accuracy")
+rospy.init_node("nav_sat_fix_filter")
 
 min_cov = rospy.get_param("~min_cov", 1e-3)
 max_cov = rospy.get_param("~max_cov", 10)
@@ -48,7 +48,7 @@ fix_quality_names = {
     FIX_QUALITY_BAD: "BAD",
 }
 
-pub = rospy.Publisher("gps/fix_limited_accuracy", NavSatFix, queue_size=10)
+pub = rospy.Publisher("gps/fix_filtered", NavSatFix, queue_size=10)
 
 
 def cb(fix_msg, status_msg):

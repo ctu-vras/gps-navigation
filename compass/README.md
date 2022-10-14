@@ -137,6 +137,10 @@ may be required to re-estimate the bias from time to time even during runtime.
   - If you specify both `~initial_lat` and `~initial_lon`, the node does not need to receive the GPS fix messages.
 - `~initial_alt` (double, default 0): Altitude in meters (it is usually okay to omit it and use the default).
 - `~initial_year` (int, no default, optional): If set, overrides the current time for declination computation.
+- `~magnetic_declination` (double, no default, optional, radians): If this parameter is set, the magnetic models are
+                                                                   ignored and this value for declination is forced.
+                                                                   This can be useful either if you know the value
+                                                                   in advance or in simulation.
 - `~magnetic_models_path` (string, defaults to the pre-installed directory): Directory with WMM magnetic field
      models. You usually do not need to use other than the preinstalled models. But if you do, specify the path to
      the custom models directory here.
@@ -146,7 +150,7 @@ may be required to re-estimate the bias from time to time even during runtime.
 
 ## Node visualize\_azimuth
 
-This node visualizes an `Azimuth` messages in RViz converting them to a pose.
+This node visualizes `Azimuth` messages in RViz converting them to a pose.
 
 ### Subscribed topics
 

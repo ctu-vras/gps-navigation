@@ -9,9 +9,16 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0 0 0 0 0 0 imu gps" />             
 
     <!-- LLH FROM GPS TO FIX -->
-    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
-        <param name="port" type="string" value="/dev/ttyACM0" />   
+    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
+        <param name="port" type="string" value="/dev/ttyACM_gps" />   
         <param name="baud" type="int" value="115200" />
+    </node>
+
+    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
+    </node>
+
+    <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
+	    <param name="sound_period" type="int" value="30" />
     </node>
 
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">

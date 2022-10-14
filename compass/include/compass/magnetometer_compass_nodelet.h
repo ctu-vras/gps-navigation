@@ -162,6 +162,10 @@ struct MagnetometerCompassNodeletPrivate;
  * - `~initial_alt` (double, default 0): Altitude in meters (it is usually okay to omit it and use the default).
  * - `~initial_year` (int, no default, optional): If set, overrides the current time for declination computation.
  * - `~initial_variance` (double, default 0): Variance of the measurement used at startup (in rad^2).
+ * - `~magnetic_declination` (double, no default, optional, radians): If this parameter is set, the magnetic models are
+ *                                                                    ignored and this value for declination is forced.
+ *                                                                    This can be useful either if you know the value
+ *                                                                    in advance or in simulation.
  * - `~magnetic_models_path` (string, defaults to the pre-installed directory): Directory with WMM magnetic field
  *      models. You usually do not need to use other than the preinstalled models. But if you do, specify the path to
  *      the custom models directory here.
@@ -240,6 +244,9 @@ protected:
   
   //! \brief Last computed magnetic declination. If invalid, no declination has been computed yet.
   tf2::Quaternion lastMagneticDeclination {0, 0, 0, 0};
+  
+  //! \brief Whether the magnetic declination value has been forced by the user (in such case, do not update it).
+  bool magneticDeclinationForced {false};
   
   //! \brief Last received GPS fix.
   sensor_msgs::NavSatFix lastFix;

@@ -140,7 +140,7 @@ class Way():
 RESERVE = 50 # meters
 
 class PathAnalysis:
-    def __init__(self, coords_file, road_crossing, current_robot_position, use_osm=True,use_solitary_nodes=True, flip=False):
+    def __init__(self, coords_file, road_crossing, current_robot_position=None, use_osm=True,use_solitary_nodes=True, flip=False):
         
         self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
@@ -162,7 +162,8 @@ class PathAnalysis:
         if self.flip:
             self.waypoints = np.flip(self.waypoints, 0)
 
-        self.waypoints = np.concatenate([current_robot_position,self.waypoints])
+        if current_robot_position is not None:
+            self.waypoints = np.concatenate([current_robot_position,self.waypoints])
         
         self.max_x = np.max(self.waypoints[:,0]) + RESERVE
         self.min_x = np.min(self.waypoints[:,0]) - RESERVE
@@ -269,6 +270,9 @@ class PathAnalysis:
             way_to_store.nodes = way.nodes
             way_to_store.tags = way.tags
 
+            if way_to_store.tags is None:
+                way_to_store.tags = dict()
+
             if is_area:
                 way_to_store.line = geometry.Polygon(coords)
             else:
@@ -299,6 +303,7 @@ class PathAnalysis:
                         new_way.id = int(-10**15*random())
                         while new_way.id in self.ways.keys():
                             new_way.id = int(-10**15*random())
+                        # tady zlobi ten update
                         new_way.nodes = ways[i].nodes + ways[j].nodes[1:] 
                         new_way.tags = ways[i].tags.update(ways[j].tags)
                         new_way.line = combined_line
@@ -649,7 +654,7 @@ class PathAnalysis:
         interval = round(dist/density)
 
         start_index = np.where(points_validity==True)[0][0]         # First start point is the first valid point
-        goal_points.append(points_line[start_index])
+        goal_points.append(points_line[int(start_index)])
 
         goal_index = min(start_index+interval, len(points_line), self.get_min_index(original_waypoint_indices, start_index))
 
@@ -659,7 +664,7 @@ class PathAnalysis:
             else:
                 goal_index = len(points_line)-1
 
-            current_validity = points_validity[start_index:goal_index+1]
+            current_validity = points_validity[int(start_index):int(goal_index+1)]
 
             if np.sum(current_validity) == len(current_validity):
                 pass
@@ -680,10 +685,10 @@ class PathAnalysis:
                 else:               # large obstacle until the end (no more goal points)        
                     break
             
-            goal_points.append(points_line[goal_index])
+            goal_points.append(points_line[int(goal_index)])
 
             for area in self.barriers:
-                if area.line.contains(points_line[goal_index]):
+                if area.line.contains(points_line[int(goal_index)]):
                     rospy.loginfo("point bad")
 
             if goal_index == len(points_line)-1:
@@ -774,7 +779,6 @@ class PathAnalysis:
             # Generate lattice of points.
             graph_range =  INIT_WIDTH + 2*increase_graph
             graph_points, points_line, dist_from_line = points_to_graph_points(start_point, goal_point, density=density, width=graph_range)
-
             # From OSM objects get those which are near the points.
             objects_in_area = self.get_reduced_objects(graph_points.bounds[0],
                                                         graph_points.bounds[1],
@@ -809,9 +813,12 @@ class PathAnalysis:
             road_points = []
             no_footways = []
             graph_points_costs = []
+
+            dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
+            dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER
             
             if self.use_osm:
-                graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)       
+                graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)       
 
                 not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
                 if self.road_crossing:
@@ -821,10 +828,9 @@ class PathAnalysis:
                     road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
 
                 no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
-
-            dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
-            dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS)
-
+            else:
+                graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS)]
+            
             costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, self.use_osm)
 
             #edge_cost_tuples = np.concatenate((edges,costs),axis=1)

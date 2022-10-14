@@ -19,6 +19,8 @@ from numpy.lib import recfunctions as rfn
 from scipy.spatial import KDTree
 from itertools import chain
 import math
+import tf2_ros
+from tf.transformations import quaternion_matrix
 
 def dist(p1,p2):
     p1 = np.array(p1)
@@ -35,7 +37,9 @@ class PathPlanner():
                 goal_reached_distance,
                 trav_max_dist,
                 trav_radius,
-                untrav_point_cost,
+                untrav_cost,
+                absence_cost,
+                max_traversable_cost,
                 long_term_memory_longevity,
                 short_term_memory_longevity,
                 trav_inheritance_radius,
@@ -48,7 +52,15 @@ class PathPlanner():
                 repeat,
                 next_waypoint_proximity_switch,
                 min_time_near_goal,
-                flip):
+                flip,
+                points_absence_radius,
+                max_height,
+                min_height,
+                max_age,
+                trav_obstacle_field,
+                trav_topic,
+                odom_frame,
+                max_relative_path_cost_change):
 
         self.finished = False
 
@@ -57,8 +69,12 @@ class PathPlanner():
         self.goal_reached_distance = goal_reached_distance
 
         self.trav_max_dist = trav_max_dist
+        self.points_absence_radius = points_absence_radius
+
         self.trav_radius = trav_radius
-        self.untrav_point_cost = untrav_point_cost
+        self.untrav_cost = untrav_cost
+        self.absence_cost = absence_cost
+        self.max_traversable_cost = max_traversable_cost
 
         self.long_term_memory_longevity = long_term_memory_longevity
         self.short_term_memory_longevity = short_term_memory_longevity
@@ -76,6 +92,17 @@ class PathPlanner():
         self.flip = flip
 
         self.next_waypoint_proximity_switch = next_waypoint_proximity_switch
+
+        self.max_height = max_height
+        self.min_height = min_height
+        self.max_age = max_age
+        self.odom_frame = odom_frame
+
+        self.trav_obstacle_field = trav_obstacle_field
+        self.trav_frame = None
+        self.trav_topic = trav_topic
+
+        self.max_relative_path_cost_change = max_relative_path_cost_change
 
         self.min_time_near_goal = min_time_near_goal
         self.near_goal_point_time = -1
@@ -95,14 +122,22 @@ class PathPlanner():
         self.azimuth = None
 
         self.sub_trav = rospy.Subscriber(
-            "trav_obstacles_pcd", PointCloud2, self.update_trav, queue_size=10)
-        self.untrav_points = None
+            self.trav_topic, PointCloud2, self.update_trav, queue_size=10)
+        self.traversability_points = None
 
         self.untrav_mask = None
 
-        self.pub_waypoints = rospy.Publisher(
-            'waypoints', Waypoints, queue_size=10)
+        self.pub_path_waypoints = rospy.Publisher(
+            'path_waypoints', Waypoints, queue_size=10)
         self.waypoints_msg = Waypoints()
+
+        self.pub_original_waypoints = rospy.Publisher(
+            'original_waypoints', Waypoints, queue_size=10, latch=True)
+
+        self.pub_processed_waypoints = rospy.Publisher(
+            'processed_waypoints', Waypoints, queue_size=10, latch=True)
+
+        self.static_waypoints_published = False
 
         self.osm_planner_initialized = False
 
@@ -113,17 +148,108 @@ class PathPlanner():
 
         self.is_on_road_pub = rospy.Publisher('is_on_road', Bool, queue_size=10)
 
+
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        self.odom_robot_trans = None
+
+        self.tf_buffer_2 = tf2_ros.Buffer()
+        self.tf_listener_2 = tf2_ros.TransformListener(self.tf_buffer_2)
+        self.odom_lidar_trans = None
+
+        self.tf_buffer_3 = tf2_ros.Buffer()
+        self.tf_listener_3 = tf2_ros.TransformListener(self.tf_buffer_3)
+        self.utm_odom_trans = None
+
+        self.tf_buffer_4 = tf2_ros.Buffer()
+        self.tf_listener_4 = tf2_ros.TransformListener(self.tf_buffer_4)
+        self.odom_utm_trans = None
+
+        self.time_diff = None
+
+        self.mean_trav_cost_mask = None
+        self.absence_mask = None
+
+        self.original_path_cost = 0
+        self.shortest_path_vertices = None
+
+
         #fig,self.ax = plt.subplots()
         #plt.show()
         #self.art = None
         #self.art1=None
         #self.art2=None
+
+    def rotate(self,points,trans):
+        R = quaternion_matrix([trans.transform.rotation.x,
+                                    trans.transform.rotation.y,
+                                    trans.transform.rotation.z,
+                                    trans.transform.rotation.w])   
+        R = R[:3,:3]
+        points = np.matmul(R,points.T)
+        points = points.T
+        return points
+
+    def transform_points(self,points,trans):
+        points = self.rotate(points,trans)
+        points[:,0] += trans.transform.translation.x
+        points[:,1] += trans.transform.translation.y
+        points[:,2] += trans.transform.translation.z
+        return points
+    
+    def process_points(self,points):
+        # Input: n rows, 4 cols (x,y,z,cost)
+        points = points[points[:,0]!=-1.]                   # Get rid of (-1,-1,-1) points.
+
+        points_xyz = self.transform_points(points[:,:3],self.odom_lidar_trans)
+
+        points = np.concatenate((points_xyz, points[:,3].reshape(-1,1)),axis=1)
+        
+        points_height_wrt_robot = points[:,2] - self.odom_robot_trans.transform.translation.z
+        
+        points = points[(points_height_wrt_robot < self.max_height) &
+                        (points_height_wrt_robot > self.min_height)]
+
+
+        utm_points_xyz = self.transform_points(points[:,:3],self.utm_odom_trans)
+        utm_points = np.concatenate((utm_points_xyz, points[:,3].reshape(-1,1)),axis=1)
+
+        return utm_points
     
     def update_trav(self,msg):
-        pcd_arr = ros_numpy.numpify(msg)
-        pcd_arr = rfn.structured_to_unstructured(pcd_arr)
-        self.untrav_points = pcd_arr
+        self.trav_frame = msg.header.frame_id
 
+        try:
+            self.odom_robot_trans = self.tf_buffer.lookup_transform(
+                self.odom_frame, self.robot_base_frame, rospy.Time())
+
+            self.odom_lidar_trans = self.tf_buffer_2.lookup_transform(
+                self.odom_frame, self.trav_frame, rospy.Time())
+
+            self.utm_odom_trans = self.tf_buffer_3.lookup_transform(
+                "utm", self.odom_frame, rospy.Time())
+
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            rospy.logwarn("Cannot obtain transform.")
+            return
+        
+        # BAG ONLY ~~~~~~~~~
+        #if self.time_diff is None:
+        #    self.time_diff = rospy.Time.now() - msg.header.stamp
+
+        t = rospy.Time.now()
+
+        if self.odom_robot_trans is not None and \
+        self.odom_lidar_trans is not None and \
+        self.utm_odom_trans is not None and \
+        abs((msg.header.stamp - t).to_sec()) < self.max_age:    # BAG: abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:
+            pcd_struct = ros_numpy.numpify(msg)
+            pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
+            #pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types
+            #pcd_arr = pcd_arr[:,:3]
+
+            self.traversability_points = self.process_points(pcd_arr)
+        
     def update_fix(self,msg):
         utm_fix = utm.fromLatLong(msg.latitude,msg.longitude)
         self.current_robot_position = np.array([[utm_fix.easting, utm_fix.northing]])
@@ -187,9 +313,7 @@ class PathPlanner():
             self.next_waypoint()
             
                     
-    def get_nearest_graph_point_index(self, graph_dict, position):
-        graph_points = graph_dict['graph_points']
-
+    def get_nearest_graph_point_index(self, graph_points, position):
         distances = dist(position,graph_points)
         nearest_index = np.argmin(distances)
         return nearest_index
@@ -227,6 +351,9 @@ class PathPlanner():
         self.near_next_waypoint_time = -1
         self.subgraph_start_time = rospy.Time.now()
 
+        self.original_path_cost = 0
+        self.shortest_path_vertices = None
+
     def search_graph(self):
         """ 
         Search current sub graph from current robot position to goal point.
@@ -234,6 +361,8 @@ class PathPlanner():
             If found path a list of points (i.e. a path).
             If no path found, or goal point untraversable returns None.
         """
+        t = time.time()
+        t1 = time.time()
 
         graph_dict = self.current_sub_graph
 
@@ -241,51 +370,97 @@ class PathPlanner():
 
         graph = graph_dict["graph"]
 
-        start_index = self.get_nearest_graph_point_index(graph_dict, copy.copy(self.current_robot_position))
+        graph_points = graph_dict['graph_points']
+
+        start_index = self.get_nearest_graph_point_index(graph_points, copy.copy(self.current_robot_position))
         
         # -------- TRAV ---------
-        if self.untrav_points is not None:
+        traversability_points = copy.copy(self.traversability_points)
+        if traversability_points is not None and traversability_points.size > 0:
+        #try:
+            traversability_points[[np.where(np.isnan(traversability_points[:,3]))],3] = 0
+
             graph_points = graph_dict['graph_points']
 
             nearest_robot_point = graph_points[start_index]
             graph_tree = KDTree(graph_points)
-            nearest_graph_points_ind = graph_tree.query_ball_point(nearest_robot_point, r=self.trav_max_dist)
 
-            nearest_graph_points = KDTree(graph_points[nearest_graph_points_ind])
+            nearest_graph_points_inds = graph_tree.query_ball_point(nearest_robot_point, r=self.trav_max_dist)
+            graph_points_absence_radius_inds = graph_tree.query_ball_point(nearest_robot_point, r=self.points_absence_radius)
+
+            nearest_graph_points = graph_points[nearest_graph_points_inds]
+            nearest_graph_points_tree = KDTree(nearest_graph_points)
+            #absence_radius_points = KDTree(graph_points[graph_points_absence_radius_inds])
+            #absence_radius_points = graph_points[graph_points_absence_radius_inds]
+            absence_in_nearest_correspondence = np.argwhere(np.isin(nearest_graph_points_inds,graph_points_absence_radius_inds,assume_unique=True)).ravel()
+            trav_tree = KDTree(traversability_points[:,:2])    # take x,y only
+
+            traversability_points_in_radius_ind = nearest_graph_points_tree.query_ball_tree(trav_tree, r=self.trav_radius)
+
+            #traversability_points_in_absence_radius_ind = absence_radius_points.query_ball_tree(trav_tree, r=self.trav_radius)
+        
+            # WORKS ONLY WITH COST BETWEEN 0 AND 1 (or binary 0/1)
+            near_mean_trav_cost_mask = np.array([np.mean(traversability_points[inds,3]) if len(inds) > 0 else -1 for inds in traversability_points_in_radius_ind])
+
+            traversability_score_in_absence_radius_ind = near_mean_trav_cost_mask[absence_in_nearest_correspondence]
+            #near_absence_mask = np.array([True if inds==-1 else False for inds in traversability_score_in_absence_radius_ind])
+            near_absence_mask = traversability_score_in_absence_radius_ind == -1
+
+            no_lidar_points = np.where([near_mean_trav_cost_mask == -1])
+            nearest_graph_points_inds = np.delete(nearest_graph_points_inds, no_lidar_points)
+            near_mean_trav_cost_mask = np.delete(near_mean_trav_cost_mask, no_lidar_points)
+            #near_mean_trav_cost_mask[near_mean_trav_cost_mask == -1] = 0
+            #near_absence_mask = np.array([False if len(inds) > 0 else True for inds in traversability_points_in_absence_radius_ind])
             
-            trav_tree = KDTree(self.untrav_points)
-
-            untrav_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
+            #num_trav_points_mask = np.array([len(a) for a in traversability_points_in_radius_ind])
 
             #untrav_mask = np.zeros(len(graph_points))
-            #untrav_mask[nearest_graph_points_ind] = [len(a) for a in untrav_points_in_radius_ind]
+            #untrav_mask[nearest_graph_points_ind] = [len(a) for a in traversability_points_in_radius_ind]
 
             #near_points_untrav_mask = np.zeros(len(nearest_graph_points_ind))
-            near_points_untrav_mask = np.array([len(a) for a in untrav_points_in_radius_ind])
+            #near_points_untrav_mask = np.array([len(a) for a in traversability_points_in_radius_ind])
 
             # Near graph vertices cost is equal to number of nearby untrav points and the rest of the mask is zeros.
             #untrav_mask[nearest_graph_points_ind] = near_points_untrav_mask
+            
+            #except:
+            #    trav_tree = KDTree(graph_points)
+            #    traversability_points_in_radius_ind = nearest_graph_points.query_ball_tree(trav_tree, r=self.trav_radius)
+            #    near_points_untrav_mask = np.array([0 for a in traversability_points_in_radius_ind])
 
+            # Initialization of absence mask.
+            #if self.absence_mask is None:
+            #    absence_mask = np.zeros(len(graph_points)) * self.absence_default_cost
+            #    self.absence_mask = absence_mask
+            #    self.current_sub_graph_changed = False
             # Initialization of trav mask.
-            if self.untrav_mask is None:
-                untrav_mask = np.zeros(len(graph_points))
-                self.untrav_mask = untrav_mask
+            if self.mean_trav_cost_mask is None:             
+                mean_trav_cost_mask = np.zeros(len(graph_points))
+                self.mean_trav_cost_mask = mean_trav_cost_mask
                 self.current_sub_graph_changed = False
 
+            if self.absence_mask is None:
+                self.absence_mask = np.full((len(graph_points)), True)
+
             # Inheritance of trav mask between near vertices of previous and new subgraph when subgraph changes.
-            if self.untrav_mask is not None and self.current_sub_graph_changed == True:
+            if self.mean_trav_cost_mask is not None and self.current_sub_graph_changed == True:
                 previous_points_tree = KDTree(self.previous_points)
                 dists,inds = previous_points_tree.query(graph_points)
 
                 new_mask = np.zeros((len(graph_points)))
+                new_absence_mask = np.full((len(graph_points)), True)
+
                 new_mask_inds = np.arange(len(new_mask))
 
                 inds = inds[dists <= self.trav_inheritance_radius]
                 new_mask_inds = new_mask_inds[dists <= self.trav_inheritance_radius]
 
-                new_mask[new_mask_inds] = self.untrav_mask[inds]
+                new_mask[new_mask_inds] = self.mean_trav_cost_mask[inds]
+                new_absence_mask[new_mask_inds] = self.absence_mask[inds]
 
-                self.untrav_mask = new_mask
+                self.mean_trav_cost_mask = new_mask
+                self.absence_mask = new_absence_mask
+
                 self.current_sub_graph_changed = False
 
             # Trav update.
@@ -306,10 +481,17 @@ class PathPlanner():
             #print(self.untrav_mask[nearest_graph_points_ind])
             #print((1-self.short_term_memory_longevity))
             #print(near_points_untrav_mask)
-            self.untrav_mask[nearest_graph_points_ind] = self.short_term_memory_longevity * self.untrav_mask[nearest_graph_points_ind] + (1-self.short_term_memory_longevity) * near_points_untrav_mask
+            
+            self.absence_mask[graph_points_absence_radius_inds] = np.logical_and(self.absence_mask[graph_points_absence_radius_inds], near_absence_mask)
+            
+            absence_cost_mask = np.zeros(len(graph_points))
+            absence_cost_mask[graph_points_absence_radius_inds] = self.absence_mask[graph_points_absence_radius_inds]*self.absence_cost
+
+            #near_mean_trav_cost_mask[near_mean_trav_cost_mask == -1] = 0
+            self.mean_trav_cost_mask[nearest_graph_points_inds] = self.short_term_memory_longevity * self.mean_trav_cost_mask[nearest_graph_points_inds] + (1-self.short_term_memory_longevity) * near_mean_trav_cost_mask
 
             # The whole mask ages.
-            self.untrav_mask = self.long_term_memory_longevity * self.untrav_mask
+            self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask
             
             self.previous_points = graph_points # previous points used when the subgraph changes (trav inheritance)
 
@@ -319,14 +501,16 @@ class PathPlanner():
             #edge_points_1 = graph_points[edges[:,0]]
             #edge_points_2 = graph_points[edges[:,1]]
 
-            untrav_cost = (self.untrav_mask[edges[:,0]] + self.untrav_mask[edges[:,1]]) * self.untrav_point_cost / 2
-            untrav_cost = untrav_cost.T.reshape(-1,1)
+            trav_and_absence_mask = self.mean_trav_cost_mask * self.untrav_cost + absence_cost_mask
+            trav_and_absence_mask[trav_and_absence_mask >= self.max_traversable_cost] = float('inf')  # oprahovani
 
-            # Publish the graph as pcd for vizualization.
-            if self.use_osm:
-                self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],self.untrav_mask)
+            untrav_cost = (trav_and_absence_mask[edges[:,0]] + trav_and_absence_mask[edges[:,1]]) / 2
+            untrav_cost = untrav_cost.T.reshape(-1,1)
             
-            graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight'] + untrav_cost  # SLOWNESS CULPRIT
+            total_cost = graph_dict['graph'].es['weight'] + untrav_cost
+            graph_dict['graph'].es['total_weight'] = total_cost  # SLOWNESS CULPRIT
+            # Publish the graph as pcd for vizualization.
+            self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],self.mean_trav_cost_mask,absence_cost_mask,trav_and_absence_mask)
 
             #if self.art1 is not None:
             #    self.art1.remove()
@@ -336,47 +520,82 @@ class PathPlanner():
             #self.art2 = self.ax.scatter(self.current_robot_position[:,0],self.current_robot_position[:,1],c='red',s=50)
             #plt.draw()
             #plt.pause(0.001)
-        # -----------------------
+            # -----------------------
             #print(graph_dict['start_index_graph'],goal_index_graph)
             # If waypoint (current goal point) is untraversable - choose the point on the line along the gas pipe.
-            if self.untrav_mask[goal_index_graph] > self.max_goal_untrav_cost:
+            if self.mean_trav_cost_mask[goal_index_graph] > self.max_goal_untrav_cost:
                 rospy.logwarn("Waypoint {}/{} is untraversable. Moving goal one point closer.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
                 graph_dict['goal_index_graph'] -= 1
     
                 #self.next_waypoint()
                 return None
 
-        else:
-            # Else triggers if no trav msg has arrived yet. In that case we simply use the base weights.
-            # Try except here for initialization if the variable has not been initialized yet.
-            try:
-                graph_dict['graph'].es['total_weight']
-            except:
-                graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight']
+            #except Exception as e:
+            #    print(e)
         
-        shortest_path_vertices = graph.get_shortest_paths(start_index,
-                                                            goal_index_graph,
-                                                            weights="total_weight",
-                                                            output="vpath")[0]
 
-        cost = 0
-        for i in range(len(shortest_path_vertices)-1):
-            v1 = shortest_path_vertices[i]
-            v2 = shortest_path_vertices[i+1]
-            edge = graph.get_eid(v1,v2)
-            #print(graph.es[edge]["total_weight"])
-            cost += graph.es[edge]["total_weight"]
+        # Else triggers if no or empty trav msg has arrived yet. In that case we simply use the base weights.
+        # Try except here for initialization if the variable has not been initialized yet.
+        try:
+            graph_dict['graph'].es['total_weight']
+        except:
+            graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight']
 
-        #print(cost)
-        #print("----------------------")
+
+        # Check how the cost of the last published path changed in comparison to its original cost.
+        # If it is relatively more expensive than some threshold, try replanning.
+        replan = True
+        if self.shortest_path_vertices is not None:
+            shortest_path_graph_points = [graph_points[v] for v in self.shortest_path_vertices]
+            robot_on_path_index = self.get_nearest_graph_point_index(shortest_path_graph_points, copy.copy(self.current_robot_position))
+
+            original_path_cost_sum = np.sum(self.original_path_cost[robot_on_path_index:])
+            current_path_cost = 0
+            for i in range(len(self.shortest_path_vertices[robot_on_path_index:])-1):
+                v1 = self.shortest_path_vertices[robot_on_path_index+i]
+                v2 = self.shortest_path_vertices[robot_on_path_index+i+1]
+                edge = graph.get_eid(v1,v2)
+                current_path_cost += graph.es[edge]["total_weight"]
+
+            if (current_path_cost/original_path_cost_sum <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) > 5:
+                replan = False
+                
+            """ print(">././>?>?>/./>?>/./>?././")
+            print(dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]))
+            print(robot_on_path_index)
+            print(self.shortest_path_vertices)
+            print(original_path_cost_sum)
+            print(current_path_cost)
+            print(">././>?>?>/./>?>/./>?././") """
         
-        # Maximum cost is very hard to balance. For now not used.
-        #if cost > self.max_path_cost:
-        #    rospy.logwarn("Path to waypoint {}/{} is too expensive ({}). Moving onto the next waypoint.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs, cost))
-        #    self.next_waypoint()
-        #    return None
+        if replan:
+            # Replan.
+            self.shortest_path_vertices = graph.get_shortest_paths(start_index,
+                                                                goal_index_graph,
+                                                                weights="total_weight",
+                                                                output="vpath")[0]
 
-        path = [graph_dict["graph_points"][v] for v in shortest_path_vertices]
+            cost = 0
+            self.original_path_cost = np.zeros(len(self.shortest_path_vertices)-1)
+            for i in range(len(self.shortest_path_vertices)-1):
+                v1 = self.shortest_path_vertices[i]
+                v2 = self.shortest_path_vertices[i+1]
+                edge = graph.get_eid(v1,v2)
+                #print(graph.es[edge]["total_weight"])
+                #cost += graph.es[edge]["total_weight"]
+                self.original_path_cost[i] = graph.es[edge]["total_weight"]
+
+            #print(cost)
+            #print("----------------------")
+            
+            # Maximum cost is very hard to balance. For now not used.
+            #if cost > self.max_path_cost:
+            #    rospy.logwarn("Path to waypoint {}/{} is too expensive ({}). Moving onto the next waypoint.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs, cost))
+            #    self.next_waypoint()
+            #    return None
+
+        path = [graph_points[v] for v in self.shortest_path_vertices]
+        print("TOTAL TIME: {}".format(time.time()-t1))
         return path
 
     def utm_to_base_frame(self, points):
@@ -388,33 +607,75 @@ class PathPlanner():
         points = np.matmul(R,points.T).T
 
         return points
+    
+    def inverse_transform_matrix(self,rotation_m,translation_m):
+        trans_m = np.concatenate((rotation_m,translation_m),axis=1)
+        trans_m = np.concatenate((trans_m,np.array([0,0,0,1]).reshape(1,4)),axis=0)
+        try:
+            inv_trans_m = np.linalg.inv(trans_m)
+            inv_trans_m = inv_trans_m[:3,:3]
+            return inv_trans_m
 
-    def publish_graph_pcd(self,points,points_cost,untrav_mask):
-        dist_cost = points_cost[1].reshape(-1)
-        road_cost = points_cost[2].reshape(-1)
-        no_footway_cost = points_cost[3].reshape(-1)
-        total_cost = points_cost[0].reshape(-1) + untrav_mask
-        costs = [total_cost,dist_cost,road_cost,no_footway_cost,untrav_mask * self.untrav_point_cost]
+        except Exception as e:
+            print(e)
+            return np.eye(3)
+
+    def publish_graph_pcd(self,points,points_cost,mean_trav_cost_mask,absence_cost_mask,trav_and_absence_mask):
+        if self.use_osm and len(points_cost) >= 4: # it should have 4 items
+            dist_cost = points_cost[1].reshape(-1)
+            road_cost = points_cost[2].reshape(-1)
+            no_footway_cost = points_cost[3].reshape(-1)
+            osm_costs_added = points_cost[0].reshape(-1)
+            total_cost = osm_costs_added + mean_trav_cost_mask * self.untrav_cost + absence_cost_mask
+            costs = [total_cost,dist_cost,road_cost,no_footway_cost,mean_trav_cost_mask * self.untrav_cost, absence_cost_mask, trav_and_absence_mask]
+        else:
+            dist_cost = points_cost[0].reshape(-1)
+            total_cost = dist_cost + mean_trav_cost_mask * self.untrav_cost + absence_cost_mask
+            costs = [total_cost,dist_cost,np.zeros(dist_cost.shape),np.zeros(dist_cost.shape),mean_trav_cost_mask * self.untrav_cost, absence_cost_mask, trav_and_absence_mask]
+        
         #total_cost = total_cost.astype(np.int16)
-        points = self.utm_to_base_frame(points)
-        self.set_graph_pcd_msg(points,costs)
-        self.pub_graph_pcd.publish(self.graph_pcd_msg)
+        #points = self.utm_to_base_frame(points)
 
-    def generate_waypoints_msg(self):
+        #points = self.transform_points(np.concatenate((points,np.zeros((points.shape[0],1))), axis=1), self.utm_odom_trans)
+        #print(points)
+
+        if self.odom_robot_trans is not None and self.utm_odom_trans is not None:
+
+            robot_z = self.odom_robot_trans.transform.translation.z + self.utm_odom_trans.transform.translation.z
+            points = np.concatenate((points,robot_z * np.ones((points.shape[0],1))), axis=1)
+            
+            try:
+                self.odom_utm_trans = self.tf_buffer_4.lookup_transform(
+                        self.odom_frame, "utm", rospy.Time())
+
+                points = self.transform_points(points, self.odom_utm_trans)
+
+                self.set_graph_pcd_msg(points,costs,self.odom_frame)
+                self.pub_graph_pcd.publish(self.graph_pcd_msg)
+            except:
+                self.set_graph_pcd_msg(points,costs,"utm")
+                self.pub_graph_pcd.publish(self.graph_pcd_msg)
+
+
+    def generate_waypoints_msg(self, points):
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
         header.frame_id = "utm"
 
-        self.waypoints_msg.header = header
-        self.waypoints_msg.points = []
+        msg = Waypoints()
 
-        for w in self.waypoints:
+        msg.header = header
+        msg.points = []
+
+        for w in points:
             p = Point()
             p.x = w[0]
             p.y = w[1]
             p.z = 0
 
-            self.waypoints_msg.points.append(p)
+            msg.points.append(p)
+
+        return msg
     
     def get_osm_points(self):
         osm_objects = { 'roads':self.roads,
@@ -453,7 +714,7 @@ class PathPlanner():
         self.roads    =  np.array(list(self.osm_planner.roads))
         self.footways =  np.array(list(self.osm_planner.footways))
         self.untraversables =  np.array(list(self.osm_planner.barriers))
-        self.all_goal_points = self.osm_planner.all_goal_points
+        self.all_goal_points = copy.copy(self.osm_planner.all_goal_points)
         self.all_goal_points = self.squarify(self.all_goal_points)
 
         self.osm_points = self.get_osm_points()
@@ -495,7 +756,7 @@ class PathPlanner():
 
         self.osm_pcd_msg.header = header
 
-    def set_graph_pcd_msg(self, points, costs):
+    def set_graph_pcd_msg(self, points, costs, frame):
 
         """ if self.art is not None:
             self.art.remove()
@@ -507,26 +768,32 @@ class PathPlanner():
             ('x', np.float32),
             ('y', np.float32),
             ('z', np.float32),
-            ('total_cost', np.uint16),
-            ('dist_cost', np.uint16),
-            ('road_cost', np.uint16),
-            ('no_footway_cost', np.uint16),
-            ('untrav_cost', np.uint16)])
+            ('total_cost', np.float32),
+            ('dist_cost', np.float32),
+            ('road_cost', np.float32),
+            ('no_footway_cost', np.float32),
+            ('untrav_cost', np.float32),
+            ('absence_cost', np.float32),
+            ('forbidden_cost', np.float32)
+            ])
 
         pcd_data['x'] = points[:, 0]
         pcd_data['y'] = points[:, 1]
-        pcd_data['z'] = np.zeros((points[:, 1].shape))
+        pcd_data['z'] = points[:, 2] #np.zeros((points[:, 1].shape))
         pcd_data['total_cost'] =  costs[0]
         pcd_data['dist_cost'] =  costs[1]
         pcd_data['road_cost'] =  costs[2]
         pcd_data['no_footway_cost'] =  costs[3]
         pcd_data['untrav_cost'] =  costs[4]
+        pcd_data['absence_cost'] =  costs[5]
+        pcd_data['forbidden_cost'] =  costs[6]
 
         self.graph_pcd_msg = ros_numpy.msgify(PointCloud2, pcd_data)
 
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
-        header.frame_id = self.robot_base_frame
+        #header.frame_id = self.robot_base_frame
+        header.frame_id = frame
 
         self.graph_pcd_msg.header = header
     
@@ -564,7 +831,17 @@ class PathPlanner():
         is_on_road_msg.header = header
         is_on_road_msg.data = is_on_road
 
-        self.is_on_road_pub.publish(is_on_road_msg)        
+        self.is_on_road_pub.publish(is_on_road_msg)      
+
+    def publish_static_waypoints(self):
+        processed_waypoints_msg = Waypoints()
+        original_waypoints_msg = Waypoints()
+
+        processed_waypoints_msg = self.generate_waypoints_msg(np.array(list(geometry.LineString(self.osm_planner.all_goal_points).xy)).T)
+        original_waypoints_msg = self.generate_waypoints_msg(self.osm_planner.waypoints[1:,:]) # First point is starting robot position - throw away.
+
+        self.pub_processed_waypoints.publish(processed_waypoints_msg)
+        self.pub_original_waypoints.publish(original_waypoints_msg)
         
     def run(self):
         rate = rospy.Rate(10)
@@ -579,8 +856,13 @@ class PathPlanner():
                     self.publish_robot_is_on_road()
                 
                 if self.waypoints is not None:
-                    self.generate_waypoints_msg()
-                    self.pub_waypoints.publish(self.waypoints_msg)
+                    self.waypoints_msg = self.generate_waypoints_msg(self.waypoints)
+                    self.pub_path_waypoints.publish(self.waypoints_msg)
+                
+                # Pulbish original and processed (OSM, max_dist...) waypoints. 
+                if not self.static_waypoints_published:
+                    self.publish_static_waypoints()
+                    self.static_waypoints_published = True
 
                 rate.sleep()
 
@@ -621,7 +903,7 @@ class PathPlanner():
 
         self.waypoints_msg.header = header
         self.waypoints_msg.points = []
-        self.pub_waypoints.publish(self.waypoints_msg)
+        self.pub_path_waypoints.publish(self.waypoints_msg)
 
 def main():
     rospy.init_node('path_planner')
@@ -629,9 +911,12 @@ def main():
     gpx_assignment = rospy.get_param('~gpx_assignment', "$(find gps_to_path)/data/coords.gpx")
     goal_reached_distance = rospy.get_param('~goal_reached_distance', 1.)
     publish_pcd = rospy.get_param('~publish_pcd', True)
-    trav_max_dist = rospy.get_param('~trav_max_dist', 5.)
+    trav_max_dist = rospy.get_param('~trav_max_dist', 10.)
+    points_absence_radius = rospy.get_param('~points_absence_radius', 2.)
     trav_radius = rospy.get_param('~trav_radius', 0.5)
-    untrav_point_cost = rospy.get_param('~untrav_point_cost', 10.)
+    untrav_cost = rospy.get_param('~untrav_cost', 10.)
+    absence_cost = rospy.get_param('~absence_cost', 1000.)
+    max_traversable_cost = rospy.get_param('~max_traversable_cost', 50.)
     long_term_memory_longevity = rospy.get_param('~long_term_memory_longevity', 0.997)
     short_term_memory_longevity = rospy.get_param('~short_term_memory_longevity', 0.8)
     trav_inheritance_radius = rospy.get_param('~trav_inheritance_radius', 0.71)    # graph_lattice_size * sqrt(2)/2 is recommended
@@ -645,13 +930,22 @@ def main():
     next_waypoint_proximity_switch = rospy.get_param('~next_waypoint_proximity_switch', False)
     min_time_near_goal = rospy.get_param('~min_time_near_goal', 1.)
     flip = rospy.get_param('~flip', False)
+    max_height = rospy.get_param('~max_height', 1.)
+    min_height = rospy.get_param('~min_height', 0.05)
+    max_age = rospy.get_param('~max_age', 1.)
+    trav_obstacle_field = rospy.get_param('~trav_obstacle_field', "obstacle")
+    trav_topic = rospy.get_param('~trav_topic', "cloud_segmentation/lidar_cloud")
+    odom_frame = rospy.get_param('~odom_frame', "gps_odom")
+    max_relative_path_cost_change = rospy.get_param('~max_relative_path_cost_change', 1.1)
 
     node = PathPlanner(gpx_assignment,
                         publish_pcd,
                         goal_reached_distance,
                         trav_max_dist,
                         trav_radius,
-                        untrav_point_cost,
+                        untrav_cost,
+                        absence_cost,
+                        max_traversable_cost,
                         long_term_memory_longevity,
                         short_term_memory_longevity,
                         trav_inheritance_radius,
@@ -664,8 +958,15 @@ def main():
                         repeat,
                         next_waypoint_proximity_switch,
                         min_time_near_goal,
-                        flip
-                        )
+                        flip,
+                        points_absence_radius,
+                        max_height,
+                        min_height,
+                        max_age,
+                        trav_obstacle_field,
+                        trav_topic,
+                        odom_frame,
+                        max_relative_path_cost_change)
 
     node.run()
 

@@ -133,9 +133,18 @@ void MagnetometerCompassNodelet::onInit()
 
   this->frame = pnh.param("frame", std::string("base_link"));
   this->magAzimuthLowPass = pnh.param("low_pass_ratio", this->magAzimuthLowPass);
-  this->magneticModelsPath = pnh.param(
-    "magnetic_models_path", ros::package::getPath("compass") + "/data/magnetic");
-  this->forcedMagneticModelName = pnh.param("magnetic_model", std::string());
+  if (pnh.hasParam("magnetic_declination"))
+  {
+    const auto declination = pnh.param("magnetic_declination", 0.0);
+    this->lastMagneticDeclination.setRPY(0, 0, declination);
+    this->magneticDeclinationForced = true;
+  }
+  else
+  {
+    this->magneticModelsPath = pnh.param(
+      "magnetic_models_path", ros::package::getPath("compass") + "/data/magnetic");
+    this->forcedMagneticModelName = pnh.param("magnetic_model", std::string());
+  }
   
   this->variance = pnh.param("initial_variance", this->variance);
 
@@ -183,9 +192,12 @@ void MagnetometerCompassNodelet::onInit()
     msg.longitude = pnh.param("initial_lon", this->lastFix.longitude);
     msg.altitude = pnh.param("initial_alt", this->lastFix.altitude);
 
+    auto computedValues = "declination and grid convergence";
+    if (this->magneticDeclinationForced)
+      computedValues = "grid convergence";
     ROS_INFO(
-      "Initial GPS coords for computation of declination and grid convergence are %.6f, %.6f, altitude %.0f m, year %u",
-      msg.latitude, msg.longitude, msg.altitude, getYear(msg.header.stamp));
+      "Initial GPS coords for computation of %s are %.6f, %.6f, altitude %.0f m, year %u",
+      computedValues, msg.latitude, msg.longitude, msg.altitude, getYear(msg.header.stamp));
     
     this->fixCb(msg);
   }
@@ -197,7 +209,7 @@ void MagnetometerCompassNodelet::onInit()
   
   bool publish = this->data->publishMagUnbiased;
 
-  // Read the publish_* paramters and set up the selected publishers
+  // Read the publish_* parameters and set up the selected publishers
   this->data->magPublishers.init(nh, pnh, this->frame, "publish", "compass",
     compass_msgs::Azimuth::REFERENCE_MAGNETIC, "mag");
   publish |= this->data->magPublishers.publish;
@@ -224,42 +236,6 @@ void MagnetometerCompassNodelet::onInit()
   
   this->data->fixSub = nh.subscribe("gps/fix", 10, &MagnetometerCompassNodelet::fixCb, this);
   this->data->magBiasSub = nh.subscribe("imu/mag_bias", 10, &MagnetometerCompassNodelet::magBiasCb, this);
-  
-//  geometry_msgs::TransformStamped t;
-//  t.header.stamp.sec = ros::WallTime::now().sec;
-//  t.header.frame_id = "base_link";
-//  t.child_frame_id = "imu";
-//  tf2::Quaternion q;
-//  q.setRPY(M_PI, 0, M_PI_2);
-//  tf2::convert(q, t.transform.rotation);
-//  this->tf.setTransform(t, "", true);
-
-//  sensor_msgs::MagneticField bias;
-//  bias.magnetic_field.x = 10;
-//  bias.magnetic_field.y = 1;
-//  bias.magnetic_field.z = -2;
-//  this->magBiasCb(bias);
-//  
-//  sensor_msgs::NavSatFix msg;
-//  msg.header.stamp.sec = ros::WallTime::now().sec;
-//  msg.latitude = 52;
-//  msg.longitude = 15.5;
-//  msg.altitude = 400;
-//  this->fixCb(msg);
-//  
-//  sensor_msgs::Imu imuMsg;
-//  imuMsg.header.stamp.sec = ros::WallTime::now().sec;
-//  imuMsg.header.frame_id = "imu";
-//  imuMsg.orientation.w = 1;
-//  
-//  sensor_msgs::MagneticField mag;
-//  mag.header.stamp.sec = ros::WallTime::now().sec;
-//  mag.header.frame_id = "imuMsg";
-//  mag.magnetic_field.x = 100;
-//  mag.magnetic_field.y = 10;
-//  mag.magnetic_field.z = -20;
-//  
-//  this->imuMagCb(imuMsg, mag); 
 }
 
 void AzimuthPublishersConfigForOrientation::init(ros::NodeHandle& nh, ros::NodeHandle& pnh,
@@ -601,7 +577,8 @@ double MagnetometerCompassNodelet::getMagneticDeclination(const sensor_msgs::Nav
 void MagnetometerCompassNodelet::fixCb(const sensor_msgs::NavSatFix& fix)
 {
   this->lastFix = fix;
-  this->lastMagneticDeclination.setRPY(0, 0, this->getMagneticDeclination(fix));
+  if (!this->magneticDeclinationForced)
+    this->lastMagneticDeclination.setRPY(0, 0, this->getMagneticDeclination(fix));
 }
 
 void MagnetometerCompassNodelet::magBiasCb(const sensor_msgs::MagneticField& bias)

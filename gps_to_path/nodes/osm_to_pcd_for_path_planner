@@ -23,7 +23,9 @@ import osm_types
 import time
 
 class OsmToPcd:
-    def __init__(self):
+    def __init__(self, odom_frame):
+        self.odom_frame = odom_frame
+
         self.osm_pcd = {}
 
         self.osm_points = { 'roads':np.array([]).reshape((0,2)),
@@ -45,7 +47,7 @@ class OsmToPcd:
                         }
 
         self.osm_pcd_utm = None
-        self.sub_fix = rospy.Subscriber("osm_pcd_utm", PointCloud2, self.handle_osm_pcd_utm, queue_size=10)
+        self.sub_osm_pcd_utm = rospy.Subscriber("osm_pcd_utm", PointCloud2, self.handle_osm_pcd_utm, queue_size=10)
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
@@ -128,12 +130,12 @@ class OsmToPcd:
         if self.odom_gps_trans and self.odom_base_link_trans:
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
-                    'odom', 'gps', rospy.Time())
+                    self.odom_frame, 'gps', rospy.Time())
             except:
                 pass
             try:
                 self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
-                    'odom', 'base_link', rospy.Time())
+                    self.odom_frame, 'base_link', rospy.Time())
             except:
                 pass
 
@@ -209,7 +211,7 @@ class OsmToPcd:
 
         header = std_msgs.msg.Header()
         header.stamp = rospy.Time.now()
-        header.frame_id = "odom"
+        header.frame_id = self.odom_frame
 
         self.osm_pcd_msg.header = header
 
@@ -219,9 +221,9 @@ class OsmToPcd:
         while (not self.odom_gps_trans) or (not self.odom_base_link_trans):
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
-                    'odom', 'gps', rospy.Time())
+                    self.odom_frame, 'gps', rospy.Time())
                 self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
-                    'odom', 'base_link', rospy.Time())
+                    self.odom_frame, 'base_link', rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()
                 continue
@@ -234,8 +236,10 @@ class OsmToPcd:
 
 def main():
     rospy.init_node('osm_to_pcd_for_path_planner')
-    
-    osm_to_pcd = OsmToPcd()
+
+    odom_frame = rospy.get_param('~odom_frame', "gps_odom")
+
+    osm_to_pcd = OsmToPcd(odom_frame)
 
     osm_to_pcd.run()
 

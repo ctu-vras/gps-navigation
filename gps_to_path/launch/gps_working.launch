@@ -1,0 +1,60 @@
+<launch>    
+    <arg name="gpx_file" default="$(find gps_to_path)/data/kn_aerial.gpx" />
+    <arg name="circular_path" default="true" />
+    <arg name="reversed_path" default="false" />
+    <arg name="repeat" default="false" />
+    <arg name="start_from_nearest_point" default="true" />
+    <arg name="run_ntrip_relay" default="true" />
+
+    <!-- STATIC TRANSFORMS -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher_4" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
+
+    <!-- LLH FROM GPS TO FIX -->
+    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
+        <param name="port" type="string" value="/dev/ttyACM_gps" />
+        <param name="baud" type="int" value="115200" />
+    </node>
+
+    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
+    </node>
+
+    <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
+	    <param name="sound_period" type="int" value="10" />
+    </node>
+
+    <!-- NTRIP CORRECTIONS -->>
+    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">
+        <param name="host" value="ntrip.pecny.cz" />
+        <param name="port" value="2101" />
+        <param name="num_threads" value="2" />
+    </node>
+
+   <!-- FAKE GPS -->
+   <!--node pkg="gps_to_path" type="fake_gps" name="fake_gps" /-->
+
+   <!-- AZIMUTH -->
+   <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
+	<param name="measuring_time" value="30" />
+   </node>
+   <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
+	<!--param name="x_mean" value="-0.01" /-->
+        <!--param name="y_mean" value="0.155" /-->
+        <!--param name="z_mean" value="0.24" /-->
+   </node>
+
+    <!-- PATH -->
+    <node pkg="gps_to_path" type="gps_to_path" name="gps_to_path" output="screen">
+	<param name="num_published_path_points" type="int" value="100"/>
+	<param name="gpx_file" type="string" value="$(arg gpx_file)"/>
+	<param name="circular" type="bool" value="$(arg circular_path)"/>	
+	<param name="reversed_path" type="bool" value="$(arg reversed_path)"/>
+	<param name="path_points_density" type="double" value="0.1"/>
+	<param name="repeat" type="bool" value="$(arg repeat)" />
+	<param name="start_from_nearest_point" type="bool" value="$(arg start_from_nearest_point)" />
+    </node>
+
+    <!-- OSM TO PCD -->
+    <!--node pkg="gps_to_path" type="osm_to_pcd" name="osm_to_pcd" output="screen">
+        <param name="points_density" type="int" value="2" /> 
+    </node-->
+</launch>

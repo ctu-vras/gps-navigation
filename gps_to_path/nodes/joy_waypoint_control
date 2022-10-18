@@ -29,7 +29,7 @@ class JoyWaypointControl(object):
         rospy.loginfo('Joy buttons for incrementing waypoint index: %s.',
                       ', '.join(['%i' % b for b in self.increment_buttons]))
 
-        # Previous "previous waypoint", "next waypoint" action state.
+        # Previous decrement, increment action state.
         self.prev_state = None  # (False, False)
 
         self.ctr_pub = rospy.Publisher('waypoint', Int8, queue_size=1)

@@ -35,11 +35,11 @@ class JoyWaypointControl(object):
         self.ctr_pub = rospy.Publisher('waypoint', Int8, queue_size=1)
         self.joy_sub = rospy.Subscriber("joy", Joy, self.on_joy, queue_size=1)
 
-    def prev_waypoint_active(self, msg):
+    def decrement_buttons_active(self, msg):
         assert isinstance(msg, Joy)
         return all(msg.buttons[i] for i in self.decrement_buttons)
 
-    def next_waypoint_active(self, msg):
+    def increment_buttons_active(self, msg):
         assert isinstance(msg, Joy)
         return all(msg.buttons[i] for i in self.increment_buttons)
 
@@ -51,7 +51,7 @@ class JoyWaypointControl(object):
                                    age, self.max_age)
             return
 
-        state = self.prev_waypoint_active(msg), self.next_waypoint_active(msg)
+        state = self.decrement_buttons_active(msg), self.increment_buttons_active(msg)
 
         if not self.prev_state:
             self.prev_state = state

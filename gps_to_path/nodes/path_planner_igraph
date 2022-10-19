@@ -12,6 +12,9 @@ from stamped_msgs.msg import Float64, Bool
 import std_msgs.msg
 from geodesy import utm
 import numpy as np
+
+from visualization_msgs.msg import Marker
+
 import osm_analysis_igraph
 import shapely.geometry as geometry
 import copy
@@ -120,6 +123,7 @@ class PathPlanner():
         self.sub_fix = rospy.Subscriber(
             "fix", NavSatFix, self.update_fix, queue_size=10)
         self.current_robot_position = None
+        self.current_robot_altitude = 0
 
         self.sub_azimuth = rospy.Subscriber("mag_azimuth", Float64, self.update_azimuth, queue_size=10)
         self.azimuth = None
@@ -142,6 +146,9 @@ class PathPlanner():
 
         self.pub_processed_waypoints = rospy.Publisher(
             'processed_waypoints', Waypoints, queue_size=10, latch=True)
+
+        self.current_waypoint_marker_pub = rospy.Publisher(
+            'current_waypoint', Marker, queue_size=1, latch=True)
 
         self.static_waypoints_published = False
 
@@ -262,6 +269,7 @@ class PathPlanner():
     def update_fix(self,msg):
         utm_fix = utm.fromLatLong(msg.latitude,msg.longitude)
         self.current_robot_position = np.array([[utm_fix.easting, utm_fix.northing]])
+        self.current_robot_altitude = msg.altitude
 
     def update_azimuth(self, msg):
         self.azimuth = msg.data
@@ -349,6 +357,7 @@ class PathPlanner():
 
                     # ... with current position of robot to first waypoint.
                     self.sub_graphs.insert(0, current_pos_to_start_point_graph)
+                    sub_graph_ind = 0
 
                 else:
                     self.finished = True
@@ -365,6 +374,26 @@ class PathPlanner():
 
             self.original_path_cost = []
             self.shortest_path_vertices = None
+
+            marker = Marker()
+            marker.header.stamp = rospy.Time.now()
+            marker.header.frame_id = "utm"
+            marker.id = "current_waypoint"
+            marker.action = Marker.ADD
+            marker.pose.position.z = self.current_robot_altitude
+            marker.scale.x = marker.scale.y = marker.scale.z = 2
+            marker.color.a = 1
+            if self.finished:
+                marker.type = Marker.SPHERE
+                marker.pose.position.x, marker.pose.position.y = np.ravel(self.current_robot_position)
+                marker.color.g = 1
+            else:
+                marker.type = Marker.CUBE
+                sub_graph = self.sub_graphs[sub_graph_ind]
+                current_waypoint = geometry.Point(np.ravel(sub_graph['graph_points'][sub_graph['goal_index_graph']]))
+                marker.pose.position.x, marker.pose.position.y = current_waypoint
+                marker.color.red = 1
+            self.current_waypoint_marker_pub.publish(marker)
 
     def search_graph(self):
         """ 

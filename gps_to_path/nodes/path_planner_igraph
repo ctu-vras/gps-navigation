@@ -227,11 +227,11 @@ class PathPlanner():
             rospy.logwarn("Cannot skip waypoint. Planner not yet initialized.")
             return
 
-        old_waypoint_offset = copy.copy(self.waypoint_offset)
-        self.waypoint_offset += msg.data - 1  # next_waypoint() always advances by 1, so we subtract it here
+        if msg.data == 0:
+            return
 
-        if old_waypoint_offset != self.waypoint_offset:
-            self.next_waypoint()
+        self.waypoint_offset += msg.data - 1  # next_waypoint() always advances by 1, so we subtract it here
+        self.next_waypoint()
     
     def update_trav(self,msg):
         self.trav_frame = msg.header.frame_id

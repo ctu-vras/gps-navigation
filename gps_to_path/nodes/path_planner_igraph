@@ -392,7 +392,7 @@ class PathPlanner():
                 sub_graph = self.sub_graphs[sub_graph_ind]
                 current_waypoint = np.ravel(sub_graph['graph_points'][sub_graph['goal_index_graph']])
                 marker.pose.position.x, marker.pose.position.y = current_waypoint
-                marker.color.red = 1
+                marker.color.r = 1
             self.current_waypoint_marker_pub.publish(marker)
 
     def search_graph(self):

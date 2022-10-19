@@ -119,14 +119,10 @@ class PathPlanner():
         
         self.graph_mutex = Lock()
 
-        # In the future replace FIX with FUSED LOCALIZATION
         self.sub_fix = rospy.Subscriber(
-            "fix", NavSatFix, self.update_fix, queue_size=10)
+            "gps/filtered", NavSatFix, self.update_fix, queue_size=10)
         self.current_robot_position = None
         self.current_robot_altitude = 0
-
-        self.sub_azimuth = rospy.Subscriber("mag_azimuth", Float64, self.update_azimuth, queue_size=10)
-        self.azimuth = None
 
         self.sub_trav = rospy.Subscriber(
             self.trav_topic, PointCloud2, self.update_trav, queue_size=10)
@@ -271,9 +267,6 @@ class PathPlanner():
         self.current_robot_position = np.array([[utm_fix.easting, utm_fix.northing]])
         self.current_robot_altitude = msg.altitude
 
-    def update_azimuth(self, msg):
-        self.azimuth = msg.data
-    
     def reached_goal_point(self,robot_position,goal_point):
         robot_position_temp = copy.copy(robot_position)
 
@@ -661,16 +654,6 @@ class PathPlanner():
             path = [graph_points[v] for v in self.shortest_path_vertices]
             print("TOTAL TIME: {}".format(time.time()-t1))
             return path
-
-    def utm_to_base_frame(self, points):
-        points = points - self.current_robot_position
-
-        angle = -np.deg2rad(self.azimuth) - math.pi/2
-        R = np.array([[np.cos(angle),-np.sin(angle)],
-                        [np.sin(angle),np.cos(angle)]])
-        points = np.matmul(R,points.T).T
-
-        return points
     
     def inverse_transform_matrix(self,rotation_m,translation_m):
         trans_m = np.concatenate((rotation_m,translation_m),axis=1)

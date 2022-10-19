@@ -810,9 +810,11 @@ class PathAnalysis:
             #graph_points = graph_points.geoms
             #print(type(graph_points))
             #print(dist_from_line.shape)
-            barrier_points_mask = self.get_contain_mask(graph_points, objects_in_area['barriers'])
 
             if self.use_osm:
+
+                barrier_points_mask = self.get_contain_mask(graph_points, objects_in_area['barriers'])
+
                 road_points_mask = []
 
                 if self.road_crossing:
@@ -837,6 +839,7 @@ class PathAnalysis:
             road_points = []
             no_footways = []
             graph_points_costs = []
+            barrier_points = []
 
             dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
             dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER

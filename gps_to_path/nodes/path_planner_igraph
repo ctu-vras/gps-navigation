@@ -291,44 +291,47 @@ class PathPlanner():
 
     def get_current_sub_graph(self):
         # Obtain graph which start point is the last goal point you visited.
-        
-        if self.current_sub_graph is None:
-            self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
-            self.subgraph_start_time = rospy.Time.now()
-            self.current_sub_graph_changed = True
+        call_next_waypoint = False
+        with self.graph_mutex:
+            if self.current_sub_graph is None:
+                self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
+                self.subgraph_start_time = rospy.Time.now()
+                self.current_sub_graph_changed = True
+    
+            goal_point = self.get_current_goal_point()
+            
+            if self.current_sub_graph_ind < len(self.sub_graphs) - 1:
+                next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+            else:
+                next_goal_point = None
+    
+            if self.reached_goal_point(self.current_robot_position, goal_point):
+                if self.near_goal_point_time <= 0:
+                    self.near_goal_point_time = rospy.Time.now().to_sec()
+    
+                if rospy.Time.now().to_sec() - self.near_goal_point_time >= self.min_time_near_goal:
+                    rospy.loginfo("Goal point {}/{} reached.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
+                    call_next_waypoint = True
+                    self.near_goal_point_time = -1.  
+            # Switch to next goal_point if nearby it.
+            elif next_goal_point is not None and self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
+                if self.near_next_waypoint_time <= 0:
+                    self.near_next_waypoint_time = rospy.Time.now().to_sec()
+    
+                if rospy.Time.now().to_sec() - self.near_next_waypoint_time >= self.min_time_near_goal:
+                    call_next_waypoint = True
+                    self.near_next_waypoint_time = -1.      
+    
+            if (rospy.Time.now() - self.subgraph_start_time).to_sec() > self.max_subgraph_time:
+                rospy.loginfo("Subgraph timed out after {}. Goal point {}/{} not reached. Moving onto the next one".format(
+                    round((rospy.Time.now() - self.subgraph_start_time).to_sec(),2),
+                    self.num_sub_graphs-len(self.sub_graphs),
+                    self.num_sub_graphs))
+    
+                call_next_waypoint = True
 
-        goal_point = self.get_current_goal_point()
-        
-        if self.current_sub_graph_ind < len(self.sub_graphs) - 1:
-            next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
-        else:
-            next_goal_point = None
-
-        if self.reached_goal_point(self.current_robot_position, goal_point):
-            if self.near_goal_point_time <= 0:
-                self.near_goal_point_time = rospy.Time.now().to_sec()
-
-            if rospy.Time.now().to_sec() - self.near_goal_point_time >= self.min_time_near_goal:
-                rospy.loginfo("Goal point {}/{} reached.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
-                self.next_waypoint()
-                self.near_goal_point_time = -1.  
-        # Switch to next goal_point if nearby it.
-        elif next_goal_point is not None and self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
-            if self.near_next_waypoint_time <= 0:
-                self.near_next_waypoint_time = rospy.Time.now().to_sec()
-
-            if rospy.Time.now().to_sec() - self.near_next_waypoint_time >= self.min_time_near_goal:
-                self.next_waypoint()    
-                self.near_next_waypoint_time = -1.      
-
-        if (rospy.Time.now() - self.subgraph_start_time).to_sec() > self.max_subgraph_time:
-            rospy.loginfo("Subgraph timed out after {}. Goal point {}/{} not reached. Moving onto the next one".format(
-                round((rospy.Time.now() - self.subgraph_start_time).to_sec(),2),
-                self.num_sub_graphs-len(self.sub_graphs),
-                self.num_sub_graphs))
-
+        if call_next_waypoint:
             self.next_waypoint()
-        
                     
     def get_nearest_graph_point_index(self, graph_points, position):
         distances = dist(position,graph_points)

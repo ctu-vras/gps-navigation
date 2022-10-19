@@ -1185,8 +1185,8 @@ class PathAnalysis:
         return np.sqrt(np.sum(np.square(p1-p2),axis=1))
 
     def get_points_costs(self,road_points_mask,footway_points_mask,barrier_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss,barrier_loss):
-        road_points = road_points_mask * ~footway_points_mask
-        barrier_points = (barrier_points_mask * ~np.sum(road_points,axis=0) * ~footway_points_mask).reshape(-1,1)
+        road_points = (road_points_mask * ~footway_points_mask).reshape(-1,1)
+        barrier_points = (barrier_points_mask * ~road_points_mask * ~footway_points_mask).reshape(-1,1)
         no_footway_points = (out_of_max_dist_mask * ~footway_points_mask).reshape(-1,1)
         
         if self.road_crossing:

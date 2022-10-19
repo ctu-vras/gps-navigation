@@ -60,18 +60,16 @@ class WaypointsToPath():
         self.pub_processed_waypoints_path = rospy.Publisher('processed_waypoints_path', Path, queue_size=10, latch=True)
 
         self.tfBuffer = tf2_ros.Buffer()
-        self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
+        self.listener_odom_gps = tf2_ros.TransformListener(
+            self.tfBuffer)
         self.odom_gps_trans = None
 
-        self.tfBuffer2 = tf2_ros.Buffer()
         self.listener_odom_base_link = tf2_ros.TransformListener(
-            self.tfBuffer2)
+            self.tfBuffer)
         self.odom_base_link_trans = None
 
-
-        self.tfBuffer3 = tf2_ros.Buffer()
         self.listener_odom_utm = tf2_ros.TransformListener(
-            self.tfBuffer3)
+            self.tfBuffer)
         self.odom_utm_trans = None
 
     def update_waypoints(self,msg):
@@ -151,17 +149,17 @@ class WaypointsToPath():
         except Exception as e:
             rospy.logerr_throttle(1.0, str(e))
         try:
-            self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+            self.odom_base_link_trans = self.tfBuffer.lookup_transform(
                 self.odom_frame, 'base_link', rospy.Time())
         except Exception as e:
             rospy.logerr_throttle(1.0, str(e))
         try:
-            self.odom_utm_trans = self.tfBuffer3.lookup_transform(
+            self.odom_utm_trans = self.tfBuffer.lookup_transform(
                 self.odom_frame, 'utm', rospy.Time())
         except Exception as e:
             rospy.logerr_throttle(1.0, str(e))
 
-        if self.odom_gps_trans and self.odom_base_link_trans:
+        if self.odom_gps_trans and self.odom_base_link_trans and self.odom_utm_trans:
             if self.waypoints is not None and self.waypoints.size > 0 and self.gps_utm is not None:                
                 rospy.loginfo_once("OK publishing waypoints.")
                 #self.gps_to_target_utm_frame = self.waypoints - \
@@ -234,8 +232,10 @@ class WaypointsToPath():
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
                     self.odom_frame, 'gps', rospy.Time())
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                self.odom_base_link_trans = self.tfBuffer.lookup_transform(
                     self.odom_frame, 'base_link', rospy.Time())
+                self.odom_utm_trans = self.tfBuffer.lookup_transform(
+                    self.odom_frame, 'utm', rospy.Time())
             except Exception as e:
                 print(e)
                 rate.sleep()

@@ -378,7 +378,8 @@ class PathPlanner():
             marker = Marker()
             marker.header.stamp = rospy.Time.now()
             marker.header.frame_id = "utm"
-            marker.id = "current_waypoint"
+            marker.id = 0
+            marker.ns = "current_waypoint"
             marker.action = Marker.ADD
             marker.pose.position.z = self.current_robot_altitude
             marker.scale.x = marker.scale.y = marker.scale.z = 2

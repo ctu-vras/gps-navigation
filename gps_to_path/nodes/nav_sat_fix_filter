@@ -22,20 +22,20 @@ from gps_to_path.msg import NavSatDetailedStatus
 
 rospy.init_node("nav_sat_fix_filter")
 
-min_fix_cov = rospy.get_param("~min_fix_cov", 1e-6)
-min_float_cov = rospy.get_param("~min_float_cov", 1e-3)
-max_cov = rospy.get_param("~max_cov", 10)
+min_fix_cov = float(rospy.get_param("~min_fix_cov", 1e-5))
+min_float_cov = float(rospy.get_param("~min_float_cov", 1e-3))
+max_cov = float(rospy.get_param("~max_cov", 10))
 
-min_fix_lat_cov = rospy.get_param("~min_fix_lat_cov", min_fix_cov)
-min_fix_lon_cov = rospy.get_param("~min_fix_lon_cov", min_fix_cov)
-min_fix_alt_cov = rospy.get_param("~min_fix_alt_cov", min_fix_cov)
+min_fix_lat_cov = float(rospy.get_param("~min_fix_lat_cov", min_fix_cov))
+min_fix_lon_cov = float(rospy.get_param("~min_fix_lon_cov", min_fix_cov))
+min_fix_alt_cov = float(rospy.get_param("~min_fix_alt_cov", min_fix_cov))
 
-min_float_lat_cov = rospy.get_param("~min_float_lat_cov", min_float_cov)
-min_float_lon_cov = rospy.get_param("~min_float_lon_cov", min_float_cov)
-min_float_alt_cov = rospy.get_param("~min_float_alt_cov", min_float_cov)
+min_float_lat_cov = float(rospy.get_param("~min_float_lat_cov", min_float_cov))
+min_float_lon_cov = float(rospy.get_param("~min_float_lon_cov", min_float_cov))
+min_float_alt_cov = float(rospy.get_param("~min_float_alt_cov", min_float_cov))
 
-average_fix_cov_multiplier = rospy.get_param("~average_fix_cov_multiplier", 10)
-degraded_fix_cov_multiplier = rospy.get_param("~degraded_fix_cov_multiplier", 100)
+average_fix_cov_multiplier = float(rospy.get_param("~average_fix_cov_multiplier", 10))
+degraded_fix_cov_multiplier = float(rospy.get_param("~degraded_fix_cov_multiplier", 100))
 
 fix_lost_duration = rospy.Duration(rospy.get_param("~fix_lost_duration", 1.0))
 fix_reconvergence_duration = rospy.Duration(rospy.get_param("~fix_reconvergence_duration", 20.0))

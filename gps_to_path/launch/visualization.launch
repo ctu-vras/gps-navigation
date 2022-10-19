@@ -28,6 +28,17 @@
         <remap from="~fix" to="gps/fix_filtered" />
     </node>
 
+    <node name="fix_smoothed_to_utm" pkg="gps_to_path" type="fix_to_utm">
+        <param name="publish_pose" value="true" />
+        <param name="publish_odom" value="true" />
+        <param name="publish_path" value="true" />
+        <param name="path_min_distance" value="0.25" />
+        <param name="path_frame_id" value="utm_local" />
+        <param name="z_offset" value="$(arg utm_z_offset)" />
+        <param name="utm_zone" value="$(arg utm_zone)" if="$(eval utm_zone != '')" />
+        <remap from="~fix" to="gps/filtered" />
+    </node>
+
     <node name="gpx_visualize" pkg="gps_to_path" type="gpx_visualize">
         <param name="z_offset" value="$(arg utm_z_offset)" />
         <param name="utm_zone" value="$(arg utm_zone)" if="$(eval utm_zone != '')" />
@@ -38,6 +49,13 @@
     
     <node name="visualize_azimuth" pkg="compass" type="visualize_azimuth">
         <remap from="~azimuth" to="compass/true/enu/rad" />
+    </node>
+
+    <node name="gps_odom_path" pkg="nav_utils" type="tf_to_path">
+        <param name="parent_frame" value="gps_odom" />
+        <param name="child_frame" value="base_link" />
+        <param name="stamp_trigger_frame" value="gps_odom" />
+        <remap from="path" to="gps_odom_path" />
     </node>
 
     <node name="osm_visualize" pkg="gps_to_path" type="osm_visualize" if="$(arg osm_vis)">

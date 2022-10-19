@@ -6,6 +6,15 @@
         
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
 
+<node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
+	<param name="measuring_time" value="30" />
+   </node>
+   <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
+	<!--param name="x_mean" value="-0.01" /-->
+        <!--param name="y_mean" value="0.155" /-->
+        <!--param name="z_mean" value="0.24" /-->
+   </node>
+
     <group unless="$(arg fake_driver)">
         <!-- LLH FROM GPS TO FIX -->
         <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen" respawn="true">        

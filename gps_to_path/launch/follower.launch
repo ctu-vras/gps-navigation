@@ -15,8 +15,8 @@
           respawn="true" respawn_delay="1.0" output="screen">
 
         <rosparam subst_value="true">
-            map_frame: odom
-            odom_frame: odom
+            map_frame: gps_odom
+            odom_frame: gps_odom
             robot_frame: base_link
             control_freq: 10.0
             goal_reached_dist: 1.

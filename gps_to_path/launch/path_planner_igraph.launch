@@ -1,8 +1,8 @@
 <launch>      
-    <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_final_demo_husky_east.gpx" />
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/old/kn_aerial.gpx" />
     <arg name="run_ntrip_relay" default="true" />
     <arg name="robot_base_frame" default="base_link" />
-    <arg name="odom_frame" default="odom" />
+    <arg name="odom_frame" default="gps_odom" />
     <arg name="use_osm" default="true" />
     <arg name="repeat" default="false" />
     <arg name="flip" default="false" />
@@ -10,7 +10,7 @@
     <arg name="trav_topic" default="geometric_traversability_raw" />
     <arg name="max_height" default="1.0"/>
     <arg name="min_height" default="-1."/>
-    <arg name="run_gps_drivers" default="true" />
+    <arg name="run_gps_drivers" default="false" />
 
     <include file="$(dirname)/gps_drivers.launch" if="$(arg run_gps_drivers)" pass_all_args="true" />
 

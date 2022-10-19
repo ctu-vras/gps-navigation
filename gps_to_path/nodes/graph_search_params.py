@@ -1,4 +1,4 @@
-INIT_WIDTH = 50          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+INIT_WIDTH = 30          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
 
 DENSITY = 0.5             # In meters. How dense is the graph (distance between neighboring nodes).
 DIST_COST_MULTIPLIER = 6
@@ -28,7 +28,7 @@ NO_FOOTWAY_LOSS = 10   # Penalization of an edge at least MAX_DIST_LOSS far and 
                         # (((The graph search will prefer walking along footways ONCE IT IS FAR from the
                         # desired trajectory anyway.)))
 
-BARRIER_LOSS = 100
+BARRIER_LOSS = 1000
                     
 MAX_DETOUR_COUNTER = 3  #  CURRENTLY NOT BEING USED.
 

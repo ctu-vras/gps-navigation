@@ -21,8 +21,8 @@ class FakeGps():
     def set_msg(self):
         #self.msg.latitude = 50.0904047 #50.076673857412935
         #self.msg.longitude = 14.1332572 #14.41751975802257
-        self.msg.latitude = 50.0934817 #50.076673857412935
-        self.msg.longitude = 14.1322394
+        self.msg.latitude = 50.07656871 #50.076673857412935
+        self.msg.longitude = 14.41787879
         #50.0934817N, 14.1322394E
         self.msg.altitude = 200.0
 

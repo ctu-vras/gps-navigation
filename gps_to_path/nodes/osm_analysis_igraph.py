@@ -259,6 +259,8 @@ class PathAnalysis:
 
             # Keep track of IDs of each node, so that in parse_nodes we can distinguish them from solitary nodes.
             ids = [node.id for node in way.nodes]
+            if self.way_node_ids is None:
+                self.way_node_ids = dict()
             self.way_node_ids.update(ids)              
             
             # Distinguish areas and non-areas (we use a single class for both cases).
@@ -305,6 +307,11 @@ class PathAnalysis:
                             new_way.id = int(-10**15*random())
                         # tady zlobi ten update
                         new_way.nodes = ways[i].nodes + ways[j].nodes[1:] 
+                        
+                        if ways[i].tags is None:
+                            ways[i].tags = dict()
+                        if ways[j].tags is None:
+                            ways[j].tags = dict()
                         new_way.tags = ways[i].tags.update(ways[j].tags)
                         new_way.line = combined_line
   
@@ -355,6 +362,11 @@ class PathAnalysis:
                     #    way.line = geometry.Polygon(way.line.exterior.coords, [self.ways[inner_id].line.exterior.coords for inner_id in inner_ids if self.ways[inner_id].is_area])
 
                     way.in_out = "outer"
+                    
+                    if way.tags is None:
+                        way.tags = dict()
+                    if rel.tags is None:
+                        rel.tags = dict()
                     way.tags.update(rel.tags)
                     self.ways[id] = way
 
@@ -659,6 +671,8 @@ class PathAnalysis:
         goal_index = min(start_index+interval, len(points_line), self.get_min_index(original_waypoint_indices, start_index))
 
         while True:
+            start_index = int(start_index)
+            goal_index = int(goal_index)
             if goal_index < len(points_line)-1:
                 pass
             else:

@@ -1,8 +1,8 @@
  <launch>      
-    <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_spot_2.gpx" />
+    <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_final_demo_husky_east.gpx" />
     <arg name="run_ntrip_relay" default="true" />
     <arg name="robot_base_frame" default="base_link" />
-    <arg name="odom_frame" default="gps_odom" />
+    <arg name="odom_frame" default="odom" />
     <arg name="use_osm" default="true" />
     <arg name="repeat" default="false" />
     <arg name="flip" default="false" />
@@ -16,7 +16,7 @@
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
 
 <!-- LLH FROM GPS TO FIX -->
-    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
+<!--    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
         <param name="port" type="string" value="/dev/ttyACM_gps" />   
         <param name="baud" type="int" value="115200" />
     </node>
@@ -27,7 +27,7 @@
     <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
 	    <param name="sound_period" type="int" value="30" />
     </node>
-
+-->
 <!-- NTRIP CORRECTIONS -->
     <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">
         <param name="host" value="ntrip.pecny.cz" />
@@ -38,7 +38,7 @@
     </node>
 
 <!-- FAKE GPS -->
-    <!--node pkg="gps_to_path" type="fake_gps" name="fake_gps" /-->
+    <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
 
 <!-- AZIMUTH -->
     <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">

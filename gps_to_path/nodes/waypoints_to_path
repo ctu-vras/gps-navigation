@@ -230,7 +230,7 @@ class WaypointsToPath():
         """ Run loop of object. """
         rate = rospy.Rate(10)
 
-        while (not self.odom_gps_trans) or (not self.odom_base_link_trans):
+        while (not self.odom_utm_trans) or (not self.odom_gps_trans) or (not self.odom_base_link_trans):
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
                     self.odom_frame, 'gps', rospy.Time())

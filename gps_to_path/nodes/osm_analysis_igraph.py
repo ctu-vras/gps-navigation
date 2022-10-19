@@ -62,6 +62,19 @@ MAX_OBSTACLE_DIST = 10
 MAX_REL_MEMBERS = 1000
 OBSTACLE_RADIUS = 2
 
+
+class ContextThreadPool(ThreadPool):
+
+    def __init__(self, processes=None, initializer=None, initargs=()):
+        super(ContextThreadPool, self).__init__(processes, initializer, initargs)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.terminate()
+
+
 class PointInformation():
     def __init__(self,x=0,y=0):
         self.x = x
@@ -759,7 +772,7 @@ class PathAnalysis:
         def gen(start_goal_pair):
             return self.generate_graph(*start_goal_pair)
         num_threads = 8
-        with ThreadPool(num_threads) as pool:
+        with ContextThreadPool(num_threads) as pool:
             async_result = pool.map_async(gen, start_goal_pairs)
 
             prev_num_finished = 0

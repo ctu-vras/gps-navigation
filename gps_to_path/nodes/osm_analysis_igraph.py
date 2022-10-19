@@ -749,7 +749,7 @@ class PathAnalysis:
 
         self.all_goal_points = copy(goal_points[1:])
 
-        num_sub_graphs = len(goal_points)
+        num_sub_graphs = len(self.all_goal_points)
 
         rospy.loginfo("{} - Goal points ({}) generated".format(round(time.time()-t,3), num_sub_graphs))
 

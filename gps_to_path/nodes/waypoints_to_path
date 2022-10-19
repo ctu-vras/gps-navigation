@@ -60,16 +60,9 @@ class WaypointsToPath():
         self.pub_processed_waypoints_path = rospy.Publisher('processed_waypoints_path', Path, queue_size=10, latch=True)
 
         self.tfBuffer = tf2_ros.Buffer()
-        self.listener_odom_gps = tf2_ros.TransformListener(
-            self.tfBuffer)
+        self.tf_listener = tf2_ros.TransformListener(self.tfBuffer)
         self.odom_gps_trans = None
-
-        self.listener_odom_base_link = tf2_ros.TransformListener(
-            self.tfBuffer)
         self.odom_base_link_trans = None
-
-        self.listener_odom_utm = tf2_ros.TransformListener(
-            self.tfBuffer)
         self.odom_utm_trans = None
 
     def update_waypoints(self,msg):

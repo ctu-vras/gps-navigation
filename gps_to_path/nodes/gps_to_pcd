@@ -58,12 +58,8 @@ class GpsToPcd():
         self.pub_path_wgs.publish(self.wgs_msg)
 
         self.tfBuffer = tf2_ros.Buffer()
-        self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
+        self.tf_listener = tf2_ros.TransformListener(self.tfBuffer)
         self.odom_gps_trans = None
-
-        self.tfBuffer2 = tf2_ros.Buffer()
-        self.listener_odom_base_link = tf2_ros.TransformListener(
-            self.tfBuffer2)
         self.odom_base_link_trans = None
 
     def get_wgs_msg(self):
@@ -119,7 +115,7 @@ class GpsToPcd():
             except:
                 pass
             try:
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                self.odom_base_link_trans = self.tfBuffer.lookup_transform(
                     'odom', 'base_link', rospy.Time())
             except:
                 pass
@@ -204,7 +200,7 @@ class GpsToPcd():
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
                     'odom', 'gps', rospy.Time())
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                self.odom_base_link_trans = self.tfBuffer.lookup_transform(
                     'odom', 'base_link', rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()

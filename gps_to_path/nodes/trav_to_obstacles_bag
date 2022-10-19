@@ -51,13 +51,7 @@ class TravToObstacles:
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.odom_robot_trans = None
-
-        self.tf_buffer_2 = tf2_ros.Buffer()
-        self.tf_listener_2 = tf2_ros.TransformListener(self.tf_buffer_2)
         self.odom_lidar_trans = None
-
-        self.tf_buffer_3 = tf2_ros.Buffer()
-        self.tf_listener_3 = tf2_ros.TransformListener(self.tf_buffer_3)
         self.utm_odom_trans = None
 
         self.time_diff = None
@@ -127,10 +121,10 @@ class TravToObstacles:
             self.odom_robot_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.robot_base_frame, rospy.Time())
 
-            self.odom_lidar_trans = self.tf_buffer_2.lookup_transform(
+            self.odom_lidar_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.trav_frame, rospy.Time())
 
-            self.utm_odom_trans = self.tf_buffer_3.lookup_transform(
+            self.utm_odom_trans = self.tf_buffer.lookup_transform(
                 "utm", self.odom_frame, rospy.Time())
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
@@ -230,7 +224,7 @@ class TravToObstacles:
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
                     'odom', 'gps', rospy.Time())
-                self.odom_base_frame_trans = self.tfBuffer2.lookup_transform(
+                self.odom_base_frame_trans = self.tfBuffer.lookup_transform(
                     'odom', 'base_frame', rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()

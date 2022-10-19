@@ -69,12 +69,8 @@ class GpsToPath():
         self.pub_path_wgs.publish(self.wgs_msg)
 
         self.tfBuffer = tf2_ros.Buffer()
-        self.listener_odom_gps = tf2_ros.TransformListener(self.tfBuffer)
+        self.tf_listener = tf2_ros.TransformListener(self.tfBuffer)
         self.odom_gps_trans = None
-
-        self.tfBuffer2 = tf2_ros.Buffer()
-        self.listener_odom_base_link = tf2_ros.TransformListener(
-            self.tfBuffer2)
         self.odom_base_link_trans = None
 
     def get_wgs_msg(self):
@@ -134,7 +130,7 @@ class GpsToPath():
             except:
                 pass
             try:
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                self.odom_base_link_trans = self.tfBuffer.lookup_transform(
                     'odom', 'base_link', rospy.Time())
             except:
                 pass
@@ -151,7 +147,7 @@ class GpsToPath():
                         point.pose.position.y = northing
                         point.pose.position.z = self.gps_msg.altitude
                         try:
-                            odom_point = self.tfBuffer2.transform(point, "odom", rospy.Duration(0.1))
+                            odom_point = self.tfBuffer.transform(point, "odom", rospy.Duration(0.1))
                             odom_points.append((odom_point.pose.position.x, odom_point.pose.position.y))
                         except tf2_py.TransformException as e:
                             rospy.logerr_throttle(1.0, str(e))
@@ -267,7 +263,7 @@ class GpsToPath():
             try:
                 self.odom_gps_trans = self.tfBuffer.lookup_transform(
                     'odom', 'gps', rospy.Time())
-                self.odom_base_link_trans = self.tfBuffer2.lookup_transform(
+                self.odom_base_link_trans = self.tfBuffer.lookup_transform(
                     'odom', 'base_link', rospy.Time())
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 rate.sleep()

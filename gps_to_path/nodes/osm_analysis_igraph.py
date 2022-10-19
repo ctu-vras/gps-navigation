@@ -1,6 +1,8 @@
 from __future__ import division
 
 from math import floor
+from multiprocessing.pool import ThreadPool
+
 import rospy
 #from matplotlib.patches import Polygon
 import overpy
@@ -743,43 +745,46 @@ class PathAnalysis:
         # The initial start point for now is the first goal point.
         # Once it is known the current position of the robot will be added as a starting point.
         #start_point = geometry.Point(current_robot_position)
-        start_point = goal_points.pop(0)
+        #start_point = goal_points.pop(0)
 
-        self.all_goal_points = copy(goal_points)
+        self.all_goal_points = copy(goal_points[1:])
 
         num_sub_graphs = len(goal_points)
-        graph_counter = 0
-        self.sub_graphs = [None]*num_sub_graphs
-        path = []   # A path based on OSM only -- not the actual path that is then used. 
 
-        rospy.loginfo("{} - Goal points ({}) generated".format(round(time.time()-t,3), len(goal_points)))
+        rospy.loginfo("{} - Goal points ({}) generated".format(round(time.time()-t,3), num_sub_graphs))
+
+        start_goal_pairs = [(goal_points[i], goal_points[i + 1]) for i in range(num_sub_graphs)]
 
         # Generate graph for each pair of subsequent points.
-        while goal_points and not rospy.is_shutdown():
-            goal_point = goal_points.pop(0)
+        def gen(start_goal_pair):
+            return self.generate_graph(*start_goal_pair)
+        num_threads = 8
+        pool = ThreadPool(num_threads)
+        async_result = pool.map_async(gen, start_goal_pairs)
 
-            graph_dict = self.generate_graph(start_point,goal_point)
+        prev_num_finished = 0
+        while not rospy.is_shutdown() and not async_result.ready():
+            num_left = async_result._number_left
+            num_finished = len(start_goal_pairs) - num_left
+            if num_finished != prev_num_finished:
+                rospy.loginfo("Finished {}/{} sub-graphs.".format(num_finished,num_sub_graphs))
+            prev_num_finished = num_finished
+            async_result.wait(1)
+        self.sub_graphs = async_result.get()
 
+        path = []   # A path based on OSM only -- not the actual path that is then used. 
+        for i, graph_dict in enumerate(self.sub_graphs):
             graph = graph_dict['graph']
             graph_points = graph_dict['graph_points']
             graph_range = graph_dict['graph_range']
             shortest_path_vertices = graph_dict['shortest_path_vertices']
 
-            if graph:
-                rospy.loginfo("Finished {}/{} sub-graphs.".format(graph_counter+1,num_sub_graphs))
-            else:
-                rospy.loginfo("Sub-graph did not find solution in range {} m.".format(graph_range))
+            if not graph:
+                rospy.loginfo("Sub-graph {} did not find solution in range {} m.".format(i, graph_range))
 
             path += [graph_points[v] for v in shortest_path_vertices]
-                    
-            self.sub_graphs[graph_counter] = graph_dict
-            
-            graph_counter += 1
-
-            start_point = goal_point
 
         self.path = np.array(path)
-    
 
     def generate_graph(self,start_point,goal_point):
         """ Generate a lattice of points between and around a start point and a goal point and

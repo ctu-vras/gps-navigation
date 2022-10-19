@@ -282,14 +282,15 @@ class PathPlanner():
 
     def get_current_sub_graph(self):
         # Obtain graph which start point is the last goal point you visited.
-        
+        rospy.loginfo("0A")
+
         if self.current_sub_graph is None:
             self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
             self.subgraph_start_time = rospy.Time.now()
             self.current_sub_graph_changed = True
 
         goal_point = self.get_current_goal_point()
-
+        rospy.loginfo("0B")
         if self.current_sub_graph_ind < len(self.sub_graphs) - 1:
             next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
         else:
@@ -303,7 +304,7 @@ class PathPlanner():
                 rospy.loginfo("Goal point {}/{} reached.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
                 self.next_waypoint()
                 self.near_goal_point_time = -1.  
-        
+            rospy.loginfo("0C")
         # Switch to next goal_point if nearby it.
         elif next_goal_point is not None and self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
             if self.near_next_waypoint_time <= 0:
@@ -320,7 +321,7 @@ class PathPlanner():
                 self.num_sub_graphs))
 
             self.next_waypoint()
-            
+        rospy.loginfo("0D")   
                     
     def get_nearest_graph_point_index(self, graph_points, position):
         distances = dist(position,graph_points)
@@ -330,7 +331,7 @@ class PathPlanner():
     def next_waypoint(self):
         # No more waypoints. Finish.
         sub_graph_ind = self.current_sub_graph_ind + self.waypoint_offset
-        if sub_graph_ind == len(self.sub_graphs) - 1:
+        if sub_graph_ind >= len(self.sub_graphs) - 1:
             rospy.loginfo("Last goal point reached.")
             rospy.loginfo("Path planner finished.")
             
@@ -374,6 +375,8 @@ class PathPlanner():
         """
         t = time.time()
         t1 = time.time()
+        
+        rospy.loginfo("1A")
 
         graph_dict = self.current_sub_graph
 
@@ -384,6 +387,8 @@ class PathPlanner():
         graph_points = graph_dict['graph_points']
 
         start_index = self.get_nearest_graph_point_index(graph_points, copy.copy(self.current_robot_position))
+
+        rospy.loginfo("1B")
         
         # -------- TRAV ---------
         traversability_points = copy.copy(self.traversability_points)
@@ -547,6 +552,7 @@ class PathPlanner():
             #except Exception as e:
             #    print(e)
         else:
+            rospy.loginfo("1C")
             cost_shape = graph_dict['graph_points_costs'][0].reshape(-1).shape
             cost_placeholder = np.zeros(cost_shape)
             self.publish_graph_pcd(graph_points,graph_dict['graph_points_costs'],cost_placeholder,cost_placeholder,cost_placeholder)
@@ -558,6 +564,7 @@ class PathPlanner():
         except:
             graph_dict['graph'].es['total_weight'] = graph_dict['graph'].es['weight']
 
+        rospy.loginfo("1D")
 
         # Check how the cost of the last published path changed in comparison to its original cost.
         # If it is relatively more expensive than some threshold, try replanning.
@@ -584,7 +591,9 @@ class PathPlanner():
             print(original_path_cost_sum)
             print(current_path_cost)
             print(">././>?>?>/./>?>/./>?././") """
-        
+        rospy.loginfo("1E")
+
+
         if replan:
             # Replan.
             self.shortest_path_vertices = graph.get_shortest_paths(start_index,
@@ -878,13 +887,15 @@ class PathPlanner():
                 rospy.logwarn_once("Cannot obtain transform.")
 
             if self.osm_planner_initialized:
+                rospy.loginfo("A")
                 self.get_current_sub_graph()
                 self.waypoints = self.search_graph()
+                rospy.loginfo("B")
 
                 if self.osm_points['roads'].size != 0:
                     self.publish_robot_road_dist()
                     self.publish_robot_is_on_road()
-                
+                rospy.loginfo("C")
                 if self.waypoints is not None:
                     self.waypoints_msg = self.generate_waypoints_msg(self.waypoints)
                     self.pub_path_waypoints.publish(self.waypoints_msg)
@@ -895,7 +906,7 @@ class PathPlanner():
                     self.static_waypoints_published = True
 
                 rate.sleep()
-
+                rospy.loginfo("D")
             elif self.current_robot_position is not None:
                 rospy.loginfo("Planner initialization started.")
 

@@ -68,7 +68,13 @@
         <param name="trav_topic" type="string" value="$(arg trav_topic)"/>
     </node> -->
 
-
+<!-- Gamepad control of waypoints -->
+    <include file="$(find gps_to_path)/launch/joy_waypoint_control.launch">
+        <arg name="joy_topic" value="waypoint_control/joy" />
+        <arg name="waypoint_topic" value="step" />
+    </include>
+    <node name="waypoint_joy" pkg="topic_tools" type="relay" args="joy_secondary/joy waypoint_control/joy" />
+    <node name="waypoint_joy_tradr" pkg="topic_tools" type="relay" args="secondary_joy/joy waypoint_control/joy" />
 
 <!-- OSM PCD VISUALIZATION -->
     <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">

@@ -385,6 +385,7 @@ class PathPlanner():
             marker.ns = "current_waypoint"
             marker.action = Marker.ADD
             marker.pose.position.z = self.current_robot_altitude
+            marker.pose.orientation.w = 1
             marker.scale.x = marker.scale.y = marker.scale.z = 2
             marker.color.a = 1
             if self.finished:

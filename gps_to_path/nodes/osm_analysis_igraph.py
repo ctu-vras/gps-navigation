@@ -1186,7 +1186,7 @@ class PathAnalysis:
 
     def get_points_costs(self,road_points_mask,footway_points_mask,barrier_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss,barrier_loss):
         road_points = road_points_mask * ~footway_points_mask
-        barrier_points = barrier_points_mask * ~np.sum(road_points,axis=0) * ~footway_points_mask
+        barrier_points = (barrier_points_mask * ~np.sum(road_points,axis=0) * ~footway_points_mask).reshape(-1,1)
         no_footway_points = (out_of_max_dist_mask * ~footway_points_mask).reshape(-1,1)
         
         if self.road_crossing:
@@ -1207,12 +1207,7 @@ class PathAnalysis:
                                 no_footway_loss * no_footways +
                                 barrier_points * barrier_loss, (len(p1),1)) + dist_cost
             else:
-                print(np.min(barrier_points * barrier_loss))
-                print(np.min(no_footway_loss * no_footways))
-                print(np.min(np.reshape(vertices_dist_cost + \
-                    sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
-                    no_footway_loss * no_footways + barrier_points * barrier_loss, (len(p1),1)) + \
-                    dist_cost))
+
                 return np.reshape(vertices_dist_cost + \
                     sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
                     no_footway_loss * no_footways + barrier_points * barrier_loss, (len(p1),1)) + \

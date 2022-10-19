@@ -127,6 +127,9 @@ class PathPlanner():
 
         self.untrav_mask = None
 
+        self.sub_azimuth = rospy.Subscriber("step", std_msgs.msg.Int8, self.update_offset, queue_size=10)
+        self.waypoint_offset = 0
+
         self.pub_path_waypoints = rospy.Publisher(
             'path_waypoints', Waypoints, queue_size=10)
         self.waypoints_msg = Waypoints()
@@ -153,16 +156,13 @@ class PathPlanner():
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.odom_robot_trans = None
 
-        self.tf_buffer_2 = tf2_ros.Buffer()
-        self.tf_listener_2 = tf2_ros.TransformListener(self.tf_buffer_2)
+        self.tf_listener_2 = tf2_ros.TransformListener(self.tf_buffer)
         self.odom_lidar_trans = None
 
-        self.tf_buffer_3 = tf2_ros.Buffer()
-        self.tf_listener_3 = tf2_ros.TransformListener(self.tf_buffer_3)
+        self.tf_listener_3 = tf2_ros.TransformListener(self.tf_buffer)
         self.utm_odom_trans = None
 
-        self.tf_buffer_4 = tf2_ros.Buffer()
-        self.tf_listener_4 = tf2_ros.TransformListener(self.tf_buffer_4)
+        self.tf_listener_4 = tf2_ros.TransformListener(self.tf_buffer)
         self.odom_utm_trans = None
 
         self.time_diff = None
@@ -217,6 +217,13 @@ class PathPlanner():
         utm_points = np.concatenate((utm_points_xyz, points[:,3].reshape(-1,1)),axis=1)
 
         return utm_points
+
+    def update_offset(self,msg):
+        old_waypoint_offset = copy.copy(self.waypoint_offset)
+        self.waypoint_offset = msg.data
+
+        if old_waypoint_offset != self.waypoint_offset:
+            self.next_waypoint()
     
     def update_trav(self,msg):
         self.trav_frame = msg.header.frame_id
@@ -228,10 +235,10 @@ class PathPlanner():
             self.odom_robot_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.robot_base_frame, rospy.Time())
 
-            self.odom_lidar_trans = self.tf_buffer_2.lookup_transform(
+            self.odom_lidar_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.trav_frame, rospy.Time())
 
-            self.utm_odom_trans = self.tf_buffer_3.lookup_transform(
+            self.utm_odom_trans = self.tf_buffer.lookup_transform(
                 "utm", self.odom_frame, rospy.Time())
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
@@ -322,7 +329,8 @@ class PathPlanner():
 
     def next_waypoint(self):
         # No more waypoints. Finish.
-        if self.current_sub_graph_ind == len(self.sub_graphs) - 1:
+        sub_graph_ind = self.current_sub_graph_ind + self.waypoint_offset
+        if sub_graph_ind == len(self.sub_graphs) - 1:
             rospy.loginfo("Last goal point reached.")
             rospy.loginfo("Path planner finished.")
             
@@ -347,7 +355,7 @@ class PathPlanner():
         # Pop next subgraph.
         else:
             self.current_sub_graph_ind += 1
-            self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
+            self.current_sub_graph = self.sub_graphs[sub_graph_ind]
             self.current_sub_graph_changed = True
         
         self.near_goal_point_time = -1
@@ -658,7 +666,7 @@ class PathPlanner():
             robot_z = self.odom_robot_trans.transform.translation.z + self.utm_odom_trans.transform.translation.z
             points = np.concatenate((points,robot_z * np.ones((points.shape[0],1))), axis=1)
             try:
-                self.odom_utm_trans = self.tf_buffer_4.lookup_transform(
+                self.odom_utm_trans = self.tf_buffer.lookup_transform(
                         self.odom_frame, "utm", rospy.Time())
 
                 points = self.transform_points(points, self.odom_utm_trans)
@@ -863,7 +871,7 @@ class PathPlanner():
                 self.odom_robot_trans = self.tf_buffer.lookup_transform(
                     self.odom_frame, self.robot_base_frame, rospy.Time())
 
-                self.utm_odom_trans = self.tf_buffer_3.lookup_transform(
+                self.utm_odom_trans = self.tf_buffer.lookup_transform(
                     "utm", self.odom_frame, rospy.Time())
 
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):

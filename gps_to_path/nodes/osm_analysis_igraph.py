@@ -766,11 +766,12 @@ class PathAnalysis:
 
         rospy.loginfo("{} - Goal points ({}) generated".format(round(time.time()-t,3), num_sub_graphs))
 
-        start_goal_pairs = [(goal_points[i], goal_points[i + 1]) for i in range(num_sub_graphs)]
+        start_goal_pairs = [(goal_points[i], goal_points[i + 1], i) for i in range(num_sub_graphs)]
 
         # Generate graph for each pair of subsequent points.
         def gen(start_goal_pair):
-            return self.generate_graph(*start_goal_pair)
+            start, goal, i = start_goal_pair
+            return self.generate_graph(start, goal), i
         num_threads = 8
         with ContextThreadPool(num_threads) as pool:
             async_result = pool.map_async(gen, start_goal_pairs)
@@ -783,7 +784,10 @@ class PathAnalysis:
                     rospy.loginfo("Finished {}/{} sub-graphs.".format(num_finished,num_sub_graphs))
                 prev_num_finished = num_finished
                 async_result.wait(1)
-            self.sub_graphs = async_result.get()
+            sub_graphs = async_result.get()
+            self.sub_graphs = [None] * num_sub_graphs
+            for sub_graph, i in sub_graphs:
+                self.sub_graphs[i] = sub_graph
 
         path = []   # A path based on OSM only -- not the actual path that is then used. 
         for i, graph_dict in enumerate(self.sub_graphs):

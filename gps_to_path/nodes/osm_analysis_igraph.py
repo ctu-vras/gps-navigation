@@ -759,18 +759,18 @@ class PathAnalysis:
         def gen(start_goal_pair):
             return self.generate_graph(*start_goal_pair)
         num_threads = 8
-        pool = ThreadPool(num_threads)
-        async_result = pool.map_async(gen, start_goal_pairs)
+        with ThreadPool(num_threads) as pool:
+            async_result = pool.map_async(gen, start_goal_pairs)
 
-        prev_num_finished = 0
-        while not rospy.is_shutdown() and not async_result.ready():
-            num_left = async_result._number_left
-            num_finished = len(start_goal_pairs) - num_left
-            if num_finished != prev_num_finished:
-                rospy.loginfo("Finished {}/{} sub-graphs.".format(num_finished,num_sub_graphs))
-            prev_num_finished = num_finished
-            async_result.wait(1)
-        self.sub_graphs = async_result.get()
+            prev_num_finished = 0
+            while not rospy.is_shutdown() and not async_result.ready():
+                num_left = async_result._number_left
+                num_finished = len(start_goal_pairs) - num_left
+                if num_finished != prev_num_finished:
+                    rospy.loginfo("Finished {}/{} sub-graphs.".format(num_finished,num_sub_graphs))
+                prev_num_finished = num_finished
+                async_result.wait(1)
+            self.sub_graphs = async_result.get()
 
         path = []   # A path based on OSM only -- not the actual path that is then used. 
         for i, graph_dict in enumerate(self.sub_graphs):

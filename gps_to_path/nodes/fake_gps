@@ -2,7 +2,8 @@
 
 import rospy
 
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, NavSatStatus
+from gps_to_path.msg import NavSatDetailedStatus
 
 import random
 
@@ -11,7 +12,9 @@ class FakeGps():
 
     def __init__(self):
         self.publisher = rospy.Publisher("fix", NavSatFix, queue_size=10)
+        self.publisher_status = rospy.Publisher("fix_status", NavSatDetailedStatus, queue_size=10)
         self.msg = NavSatFix()
+        self.msg_status = NavSatDetailedStatus()
         self.c = 0
         self.set_msg()
 
@@ -32,16 +35,30 @@ class FakeGps():
 
         self.msg.header.stamp = rospy.Time.now()
         self.msg.header.frame_id = "gps"
-        self.msg.status.status = 0
-        self.msg.status.service = 1
+        self.msg.status.status = NavSatStatus.STATUS_FIX
+        self.msg.status.service = NavSatStatus.SERVICE_GPS
+
+        self.msg_status.header = self.msg.header
+        self.msg_status.integer_ambiguity_ratio = 2.0
+        self.msg_status.satellites_used = 20
+        self.msg_status.last_corrections_time = rospy.Time.now()
+        self.msg_status.gps_time.header = self.msg.header
+        self.msg_status.gps_time.time_ref = rospy.Time.now()
+
+    def update_message(self):
+        self.msg.header.stamp = rospy.Time.now()
+        self.msg_status.header.stamp = rospy.Time.now()
+        self.msg_status.last_corrections_time = rospy.Time.now()
+        self.msg_status.gps_time.time_ref = rospy.Time.now()
+        #self.msg.latitude += 0.000001 * random.random()
+        #self.msg.longitude += 0.000001 * random.random()
 
     def run(self):
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(5)
         while not rospy.is_shutdown():
-            self.msg.header.stamp = rospy.Time.now()
-            #self.msg.latitude += 0.000001 * random.random()
-            #self.msg.longitude += 0.000001 * random.random()
+            self.update_message()
             self.publisher.publish(self.msg)
+            self.publisher_status.publish(self.msg_status)
             rate.sleep()
 
 

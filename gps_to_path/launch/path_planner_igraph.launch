@@ -1,4 +1,4 @@
- <launch>      
+<launch>      
     <arg name="gpx_assignment" default="$(find gps_to_path)/data/unhost_final_demo_husky_east.gpx" />
     <arg name="run_ntrip_relay" default="true" />
     <arg name="robot_base_frame" default="base_link" />
@@ -10,43 +10,9 @@
     <arg name="trav_topic" default="geometric_traversability_raw" />
     <arg name="max_height" default="1.0"/>
     <arg name="min_height" default="-1."/>
-        
+    <arg name="run_gps_drivers" default="true" />
 
-<!-- STATIC TRANSFORMS -->
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
-
-<!-- LLH FROM GPS TO FIX -->
-<!--    <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen">        
-        <param name="port" type="string" value="/dev/ttyACM_gps" />   
-        <param name="baud" type="int" value="115200" />
-    </node>
-
-    <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen">        
-    </node>
-
-    <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen">        
-	    <param name="sound_period" type="int" value="30" />
-    </node>
--->
-<!-- NTRIP CORRECTIONS -->
-    <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">
-        <param name="host" value="ntrip.pecny.cz" />
-        <param name="port" value="2101" />
-        <param name="num_threads" value="2" />
-        <param name="sigkill_timeout" value="30" />
-        <param name="sigkill_on_stream_stop" value="true" />
-    </node>
-
-<!-- FAKE GPS -->
-    <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
-
-<!-- AZIMUTH -->
-    <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
-        <param name="measuring_time" value="30" />
-    </node>
-
-    <node pkg="gps_to_path" type="mag_field_to_azimuth" name="mag_field_to_azimuth">
-    </node>
+    <include file="$(dirname)/gps_drivers.launch" if="$(arg run_gps_drivers)" pass_all_args="true" />
 
 <!-- PATH PLANNER -->
     <node pkg="gps_to_path" type="path_planner_igraph" name="path_planner_igraph" output="screen">

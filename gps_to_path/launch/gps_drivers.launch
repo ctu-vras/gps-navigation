@@ -1,0 +1,38 @@
+<launch>      
+    <arg name="run_ntrip_relay" default="true" />
+    <arg name="sound_fix_alerts" default="true" />
+
+    <arg name="fake_driver" default="false" doc="If true, a fake GPS position is published just to satify the nodes that need some GPS." />
+        
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
+
+    <group unless="$(arg fake_driver)">
+        <!-- LLH FROM GPS TO FIX -->
+        <node pkg="gps_to_path" type="llh_publisher" name="llh_publisher" output="screen" respawn="true">        
+            <param name="port" type="string" value="/dev/ttyACM_gps" />   
+            <param name="baud" type="int" value="115200" />
+        </node>
+    
+        <node pkg="gps_to_path" type="llh_to_fix" name="llh_to_fix" output="screen" respawn="true">        
+        </node>
+    
+        <node pkg="gps_to_path" type="sound_fix_cov" name="sound_fix_cov" output="screen" respawn="true" if="$(arg sound_fix_alerts)">        
+            <param name="sound_period" type="int" value="30" />
+        </node>
+    
+        <!-- NTRIP CORRECTIONS -->
+        <node name="ntrip_relay" pkg="http_relay" type="relay" if="$(arg run_ntrip_relay)" respawn="true">
+            <param name="host" value="ntrip.pecny.cz" />
+            <param name="port" value="2101" />
+            <param name="num_threads" value="2" />
+            <param name="sigkill_timeout" value="30" />
+            <param name="sigkill_on_stream_stop" value="true" />
+        </node>
+    </group>
+
+    <group if="$(arg fake_driver)">
+        <!-- FAKE GPS -->
+        <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+    </group>
+
+</launch>    

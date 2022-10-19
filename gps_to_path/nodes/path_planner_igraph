@@ -127,7 +127,7 @@ class PathPlanner():
 
         self.untrav_mask = None
 
-        self.sub_azimuth = rospy.Subscriber("step", std_msgs.msg.Int8, self.update_offset, queue_size=10)
+        self.sub_azimuth = rospy.Subscriber("step", std_msgs.msg.Int32, self.update_offset, queue_size=10)
         self.waypoint_offset = 0
 
         self.pub_path_waypoints = rospy.Publisher(
@@ -229,8 +229,8 @@ class PathPlanner():
         self.trav_frame = msg.header.frame_id
         
         # BAG ONLY ~~~~~~~~~
-        #if self.time_diff is None:
-        #    self.time_diff = rospy.Time.now() - msg.header.stamp
+        if self.time_diff is None:
+            self.time_diff = rospy.Time.now() - msg.header.stamp
         try:
             self.odom_robot_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.robot_base_frame, rospy.Time())
@@ -250,7 +250,7 @@ class PathPlanner():
         if self.odom_robot_trans is not None and \
         self.odom_lidar_trans is not None and \
         self.utm_odom_trans is not None and \
-        abs((msg.header.stamp - t).to_sec()) < self.max_age:    # BAG: abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:
+        abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:    # BAG: abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:
             pcd_struct = ros_numpy.numpify(msg)
             pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
             #pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types

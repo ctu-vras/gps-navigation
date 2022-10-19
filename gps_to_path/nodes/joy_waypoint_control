@@ -6,7 +6,7 @@ is pressed.
 """
 import rospy
 from sensor_msgs.msg import Joy
-from std_msgs.msg import Int8
+from std_msgs.msg import Int32
 
 
 class JoyWaypointControl(object):
@@ -32,7 +32,7 @@ class JoyWaypointControl(object):
         # Previous decrement, increment action state.
         self.prev_state = None  # (False, False)
 
-        self.ctr_pub = rospy.Publisher('waypoint', Int8, queue_size=1)
+        self.ctr_pub = rospy.Publisher('waypoint', Int32, queue_size=1)
         self.joy_sub = rospy.Subscriber("joy", Joy, self.on_joy, queue_size=1)
 
     def decrement_buttons_active(self, msg):

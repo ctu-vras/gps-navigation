@@ -801,8 +801,16 @@ class PathAnalysis:
                                                         reserve=OBJECTS_RESERVE)
             
             # Remove points inside "barriers".
-            graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
+            #print(np.array(graph_points.geoms).shape)
+            #print(dist_from_line.shape)
+            graph_points = tuple(graph_points.geoms)
+            #graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
+            #graph_points = np.array(graph_points.geoms)
             dist_from_line = np.array(dist_from_line)
+            #graph_points = graph_points.geoms
+            #print(type(graph_points))
+            #print(dist_from_line.shape)
+            barrier_points_mask = self.get_contain_mask(graph_points, objects_in_area['barriers'])
 
             if self.use_osm:
                 road_points_mask = []
@@ -813,6 +821,8 @@ class PathAnalysis:
                 else:
                     road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
                 
+                road_points_mask_combined = (np.sum(road_points_mask,axis=0)).astype(bool)
+
                 footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
 
                 out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
@@ -832,8 +842,8 @@ class PathAnalysis:
             dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER
             
             if self.use_osm:
-                graph_points_costs = self.get_points_costs(road_points_mask,footway_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS)       
-
+                graph_points_costs = self.get_points_costs(road_points_mask_combined,footway_points_mask,barrier_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS,BARRIER_LOSS)       
+                not_road_points = (~road_points_mask_combined[edges[:,0]] + ~road_points_mask_combined[edges[:,1]])
                 not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
                 if self.road_crossing:
                     for i in range(ROAD_CROSSINGS_RANKS):
@@ -842,11 +852,12 @@ class PathAnalysis:
                     road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
 
                 no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
+                
+                barrier_points = (barrier_points_mask[edges[:,0]] + barrier_points_mask[edges[:,1]]) * (not_road_points * not_footway_points)
             else:
                 graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER]
             
-            costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, self.use_osm)
-
+            costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, barrier_points, BARRIER_LOSS, self.use_osm)
             #edge_cost_tuples = np.concatenate((edges,costs),axis=1)
 
             #graph = igraph.Graph.TupleList(edge_cost_tuples, weights=True)
@@ -1170,31 +1181,38 @@ class PathAnalysis:
     def get_path_dist(self,p1,p2):
         return np.sqrt(np.sum(np.square(p1-p2),axis=1))
 
-    def get_points_costs(self,road_points_mask,footway_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss):
+    def get_points_costs(self,road_points_mask,footway_points_mask,barrier_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss,barrier_loss):
         road_points = road_points_mask * ~footway_points_mask
+        barrier_points = barrier_points_mask * ~np.sum(road_points,axis=0) * ~footway_points_mask
         no_footway_points = (out_of_max_dist_mask * ~footway_points_mask).reshape(-1,1)
         
         if self.road_crossing:
             road_costs = sum(road_points[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)).reshape(-1,1)
-            cost = dist_from_line + road_costs + no_footway_loss*no_footway_points
+            cost = dist_from_line + road_costs + no_footway_loss*no_footway_points + barrier_loss*barrier_points
         else:
-            cost = dist_from_line + road_loss*road_points + no_footway_loss*no_footway_points
-        return [cost,dist_from_line,road_costs,no_footway_loss*no_footway_points]
+            cost = dist_from_line + road_loss*road_points + no_footway_loss*no_footway_points + barrier_loss*barrier_points
+        return [cost,dist_from_line,road_costs,no_footway_loss*no_footway_points,barrier_loss*barrier_points]
         #return cost
     
-    def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss, use_osm=True):
+    def get_costs(self, p1, p2, roads, dist_cost, road_loss, no_footways, no_footway_loss, barrier_points, barrier_loss, use_osm=True):
         #return dist_cost
         vertices_dist_cost = np.sqrt(np.sum(np.square(p1-p2),axis=1))
         if use_osm:
             if type(roads) is not type(list()):  # list is when we use road crossing cost as we have multiple levels
-                return np.reshape(vertices_dist_cost + \
-                                roads * road_loss + \
-                                no_footway_loss * no_footways, (len(p1),1)) + \
-                                dist_cost
+                return np.reshape(vertices_dist_cost + 
+                                roads * road_loss + 
+                                no_footway_loss * no_footways +
+                                barrier_points * barrier_loss, (len(p1),1)) + dist_cost
             else:
+                print(np.min(barrier_points * barrier_loss))
+                print(np.min(no_footway_loss * no_footways))
+                print(np.min(np.reshape(vertices_dist_cost + \
+                    sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
+                    no_footway_loss * no_footways + barrier_points * barrier_loss, (len(p1),1)) + \
+                    dist_cost))
                 return np.reshape(vertices_dist_cost + \
                     sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
-                    no_footway_loss * no_footways, (len(p1),1)) + \
+                    no_footway_loss * no_footways + barrier_points * barrier_loss, (len(p1),1)) + \
                     dist_cost
         else:
             return np.reshape(vertices_dist_cost, (len(p1),1)) + dist_cost

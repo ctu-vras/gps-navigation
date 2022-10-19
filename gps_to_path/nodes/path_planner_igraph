@@ -222,6 +222,10 @@ class PathPlanner():
         return utm_points
 
     def update_offset(self,msg):
+        if not self.osm_planner_initialized:
+            rospy.logwarn("Cannot skip waypoint. Planner not yet initialized.")
+            return
+
         old_waypoint_offset = copy.copy(self.waypoint_offset)
         self.waypoint_offset += msg.data
 

@@ -6,9 +6,12 @@
 """Visualize a WGS84 trajectory saved in GPX format as a ROS :class:`nav_msgs.msg.Path` message.
 
 Command-line arguments:
- - `GPX_FILE` (string, required): Path to the GPX file to read.
+ - `GPX_FILE` (string): Path to the GPX file to read. Either this argument or ROS parameter `~gpx_file` have to be
+                        specified.
 
 ROS parameters:
+ - `~gpx_file` (string): Path to the GPX file to read. Either this ROS parameter or the positional argument have to be
+                         specified.
  - `~circular` (bool, default False): Whether last point should be connected with the first one.
  - `~reverse` (bool, default False): Whether to reverse the path.
  - `~z_offset` (float, default 0.0): Offset of altitude to add to the read waypoints.
@@ -112,7 +115,7 @@ class GpxVisualizer(cras.Node):
     def __init__(self, gpx_file):
         super(GpxVisualizer, self).__init__()
 
-        self._gpx_file = gpx_file
+        self._gpx_file = gpx_file if gpx_file is not None else cras.get_param("~gpx_file")
         self._circular = cras.get_param("~circular", False)
         self._reverse = cras.get_param("~reverse", False)
         self._z_offset = cras.get_param("~z_offset", 0.0)
@@ -214,8 +217,8 @@ class GpxVisualizer(cras.Node):
 if __name__ == "__main__":
     argv = rospy.myargv(sys.argv)
 
-    if len(argv) != 2:
-        print("Wrong number of arguments passed.\nUsage: gpx_visualize PATH_TO_GPX_FILE "
+    if len(argv) > 2:
+        print("Wrong number of arguments passed.\nUsage: gpx_visualize [PATH_TO_GPX_FILE|_gpx_file:=PATH_TO_GPX_FILE] "
               "[_circular:=0] [_reverse:=0] [_skip_start:=0] [_skip_end:=0] [_utm_zone:=42] [_frame_id:=utm] "
               "[_path_frame_id:=utm]",
               file=sys.stderr)
@@ -223,5 +226,5 @@ if __name__ == "__main__":
 
     rospy.init_node("gpx_visualize")
 
-    vis = GpxVisualizer(argv[1])
+    vis = GpxVisualizer(argv[1] if len(sys.argv) == 2 else None)
     vis.run()

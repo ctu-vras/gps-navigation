@@ -772,9 +772,9 @@ class PathAnalysis:
         def gen(start_goal_pair):
             start, goal, i = start_goal_pair
             return self.generate_graph(start, goal), i
-        num_threads = 8
+        num_threads = 4
         with ContextThreadPool(num_threads) as pool:
-            async_result = pool.map_async(gen, start_goal_pairs)
+            async_result = pool.map_async(gen, start_goal_pairs, chunksize=1)
 
             prev_num_finished = 0
             while not rospy.is_shutdown() and not async_result.ready():

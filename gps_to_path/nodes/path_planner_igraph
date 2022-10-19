@@ -301,7 +301,7 @@ class PathPlanner():
             goal_point = self.get_current_goal_point()
             
             if self.current_sub_graph_ind < len(self.sub_graphs) - 1:
-                next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[0]['goal_index_graph']]
+                next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[self.current_sub_graph_ind + 1]['goal_index_graph']]
             else:
                 next_goal_point = None
     

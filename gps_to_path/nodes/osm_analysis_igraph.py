@@ -860,7 +860,19 @@ class PathAnalysis:
                     rospy.logerr(str(e))
                     use_osm = False
 
-            graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
+            try:
+                graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
+            except Exception as e:
+                rospy.logerr(str(e))
+                graph_dict = {'graph':None,
+                              'shortest_path_vertices':None,
+                              'graph_points':None,
+                              'graph_range':graph_range,
+                              'start_index_graph':0,
+                              'goal_index_graph':0,
+                              'graph_points_costs':None
+                              }
+                return graph_dict
 
             edges = self.generate_edges(graph_points, 1.5*density)
             edge_points_1 = graph_points[edges[:,0]]

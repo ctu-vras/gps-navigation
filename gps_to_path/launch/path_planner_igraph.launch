@@ -55,6 +55,10 @@
 <!-- PATH -->
     <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
         <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+        <remap from="path" to="path_not_used"/>
+    </node>
+    <node pkg="gps_to_path" type="waypoints_to_path_simple" name="waypoints_to_path_simple" output="screen">
+        <param name="target_frame" value="$(arg odom_frame)"/>
     </node>
 
 <!-- TRAVERSABILITY PROCESSING -->

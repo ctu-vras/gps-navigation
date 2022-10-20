@@ -44,7 +44,7 @@
     <group if="$(arg fake_driver)">
         <!-- FAKE GPS -->
         <node pkg="gps_to_path" type="fake_gps" name="fake_gps">
-            <param name="gpx_file" value="$(arg fake_driver_gpx_file)" />
+            <param name="gpx_file" value="$(arg fake_driver_gpx_file)" if="$(eval fake_driver_gpx_file != '')" />
             <param name="gpx_waypoint_nr" value="$(arg fake_driver_gpx_waypoint_nr)" />
         </node>
     </group>

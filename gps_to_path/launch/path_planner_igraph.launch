@@ -11,8 +11,12 @@
     <arg name="max_height" default="1.0"/>
     <arg name="min_height" default="-1."/>
     <arg name="run_gps_drivers" default="false" />
+    <arg name="fake_driver" default="false" />
+    <arg name="fake_driver_from_gpx" default="true" />
 
-    <include file="$(dirname)/gps_drivers.launch" if="$(arg run_gps_drivers)" pass_all_args="true" />
+    <include file="$(dirname)/gps_drivers.launch" if="$(eval run_gps_drivers or fake_driver)" pass_all_args="true">
+        <arg name="fake_driver_gpx_file" value="$(arg gpx_assignment)" if="$(arg fake_driver_from_gpx)" />
+    </include>
 
 <!-- PATH PLANNER -->
     <node pkg="gps_to_path" type="path_planner_igraph" name="path_planner_igraph" output="screen">

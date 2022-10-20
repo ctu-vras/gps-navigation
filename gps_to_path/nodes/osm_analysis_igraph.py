@@ -772,22 +772,26 @@ class PathAnalysis:
         def gen(start_goal_pair):
             start, goal, i = start_goal_pair
             return self.generate_graph(start, goal), i
-        num_threads = 4
-        with ContextThreadPool(num_threads) as pool:
-            async_result = pool.map_async(gen, start_goal_pairs, chunksize=1)
-
-            prev_num_finished = 0
-            while not rospy.is_shutdown() and not async_result.ready():
-                num_left = async_result._number_left
-                num_finished = len(start_goal_pairs) - num_left
-                if num_finished != prev_num_finished:
-                    rospy.loginfo("Finished {}/{} sub-graphs.".format(num_finished,num_sub_graphs))
-                prev_num_finished = num_finished
-                async_result.wait(1)
-            sub_graphs = async_result.get()
-            self.sub_graphs = [None] * num_sub_graphs
-            for sub_graph, i in sub_graphs:
-                self.sub_graphs[i] = sub_graph
+        # num_threads = 4
+        # with ContextThreadPool(num_threads) as pool:
+        #     async_result = pool.map_async(gen, start_goal_pairs, chunksize=1)
+        # 
+        #     prev_num_finished = 0
+        #     while not rospy.is_shutdown() and not async_result.ready():
+        #         num_left = async_result._number_left
+        #         num_finished = len(start_goal_pairs) - num_left
+        #         if num_finished != prev_num_finished:
+        #             rospy.loginfo("Finished {}/{} sub-graphs.".format(num_finished,num_sub_graphs))
+        #         prev_num_finished = num_finished
+        #         async_result.wait(1)
+        #     sub_graphs = async_result.get()
+        #     self.sub_graphs = [None] * num_sub_graphs
+        #     for sub_graph, i in sub_graphs:
+        #         self.sub_graphs[i] = sub_graph
+        self.sub_graphs = [None] * num_sub_graphs
+        for start, goal, i in start_goal_pairs:
+            self.sub_graphs[i] = gen((start, goal, i))
+            rospy.loginfo("Finished {}/{} sub-graphs.".format(i, num_sub_graphs))
 
         path = []   # A path based on OSM only -- not the actual path that is then used. 
         for i, graph_dict in enumerate(self.sub_graphs):

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+import math
 
 import rospy
 import gpxpy
 
-from sensor_msgs.msg import NavSatFix, NavSatStatus
+from sensor_msgs.msg import NavSatFix, NavSatStatus, Joy
 from gps_to_path.msg import NavSatDetailedStatus
 
 import random
@@ -20,6 +21,7 @@ class FakeGps():
         self.msg_status = NavSatDetailedStatus()
         self.c = 0
         self.set_msg()
+        self.joy_sub = rospy.Subscriber("fake_gps/joy", Joy, self.on_joy, queue_size=1)
 
     def set_msg(self):
         #self.msg.latitude = 50.0904047 #50.076673857412935
@@ -65,6 +67,17 @@ class FakeGps():
         self.msg_status.gps_time.time_ref = rospy.Time.now()
         #self.msg.latitude += 0.000001 * random.random()
         #self.msg.longitude += 0.000001 * random.random()
+
+    def on_joy(self, msg):
+        self.msg.latitude += msg.axes[0]  # left joy left-right
+        self.msg.longitude += msg.axes[1]  # left joy top-down
+        self.msg.altitude += 10 * msg.axes[4]  # right joy top-down
+        if msg.axes[6] != 0:  # d-pad left-right
+            self.msg.position_covariance[0] *= math.pow(2, msg.axes[6])
+        if msg.axes[7] != 0:  # d-pad top-down
+            self.msg.position_covariance[4] *= math.pow(2, msg.axes[7])
+        if msg.buttons[0] != 0 or msg.buttons[3] != 0:  # A/Y
+            self.msg.position_covariance[8] *= math.pow(2, msg.buttons[3] - msg.buttons[0])
 
     def run(self):
         rate = rospy.Rate(5)

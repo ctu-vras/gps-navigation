@@ -94,7 +94,7 @@ def gpx_to_path_msg(gpx_file, header, circular=False, reverse=False, z_offset=0.
             cartesian_x, cartesian_y, utm_zone, _ = utm.from_latlon(waypoint.latitude, waypoint.longitude, utm_zone)
             pose.pose.position.x = cartesian_x
             pose.pose.position.y = cartesian_y
-            pose.pose.position.z = waypoint.elevation + z_offset
+            pose.pose.position.z = z_offset + (waypoint.elevation if waypoint.elevation is not None else 0)
             msg.poses.append(pose)
             if first_pose is None:
                 first_pose = pose

@@ -1,18 +1,33 @@
 # Unhost paths
-https://docs.google.com/document/d/1EATuN6nUMDcxek5O1ZXXLCy_q1Qzpz020aAbURKAkIs/edit
-https://en.mapy.cz/s/nunupunepo
+https://docs.google.com/document/d/1KzqRMCqWA9Lp7udVuo1rrv_zFBvToaIX2LB-wEFRZC4/edit?usp=drivesdk
 
 # TL;DR Most important stuff is here.
 
+### 20/10/2022 experiment
+ - graph_pcd - cost layers with osm might not be showing correctly, traversability ones should be fine (except total does not show the infinite costs of untraversable vertices)
+ - **balancing the graph costs** - there was not much done in this regard, so you will probably have to adjust some numbers, following are the parts of the total cost and their range and parameter which sets that range:
+1. Traversability cost - 0-200 - parametr untrav_cost
+2. Absence cost - 0 or 200 - parametr absence_cost
+3. Forbidden cost - 0 or infinity - if sum of previous two is larger than max_traversable_cost than inf
+4. Road cost - 900-1100 if I am not missing anything - set inside osm_analysis_igraph.py (inside function get_costs put multiplier in front of line: sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS))
+5. No footway cost - 0 or 10 - graph_search_params.py - NO_FOOTWAY_COST
+6. Barrier cost - 0 or 1000 - graph_search_params.py - BARRIER_COST
+
+Most notably road cost could be too high.
+
+There is no maximum cost of a path produced by the planner - even if the cost would be infinity.
+
+The planner only replans when the current path's cost becomes larger than max_relative_path_cost_change * original cost. I tried to balance this number (now :=5) but you will have to see how it works for you (larger means it will keep the current path longer, smaller will lead to frequent replanning)
+
 ### Branches:
- - Use **python2** branch on all robots even husky.
+ - Use **master** branch on all robots.
 
 ### Use path_planner_igraph.launch as in this example:<br /><br />
 **roslaunch gps_to_path path_planner_igraph.launch <br /> gpx_assignment:=~/gps_ws/src/gps-navigation/gps_to_path/data/unhost.gpx <br /> run_ntrip_relay:=true <br /> robot_base_frame:=base_link <br /> use_osm:=true <br /> flip:=false <br /> trav_obstacle_field:=cost <br /> trav_frame:=os_lidar  <br /> max_height:=1. <br /> min_height:=0.05 <br /> <br />**
  - Initialization takes some time because of use_osm:=true. If you want it to be much faster, set use_osm:=false. You lose OSM information, but usually, that should be fine. If the initialization gets **stuck on "Running query" inside terminal** you can set use_osm:=false or try and provide a better internet connection (e.g. ~/lte_on.sh on tradr).
  - **max_height should be around the height of the robot from base frame and min_height should be around the distance from base_frame to ground (only traversability point between these two values IN REGARD TO BASE_FRAME will be used, rest will be filtered out). Working values should be around (min 0.05, max 1.) for TRADR and (min -1., max 0.5) for SPOT (don't know for HUSKY)**
  - flip:=true if you need to reverse the order of waypoints.
- - **trav_obstacle_field:=obstacle AND trav_frame:=os_sensor IF cloud_segmentation/lidar_cloud trav_obstacle_field:=cost AND trav_frame:=os_lidar IF geometric_traversability_raw OR CHECK WITH TOMAS PETRICEK.**
+ - **trav_obstacle_field:=obstacle and trav_topic:=cloud_segmentation/lidar_cloud OR trav_obstacle_field:=cost AND trav_topic:=geometric_traversability_raw OR CHECK WITH TOMAS PETRICEK.**
  - TRAVERSABILITY IS NOT VITAL FOR THE PLANNER. It can run without it.
  - The whole traversability processing inside the planner node is in try/except for now. So if it suspiciously seems like the traversability is not doing anything, it could be that there is an repeated error, but it is not shown in the console or elsewhere.
  - If you get any error that crashes the planner and you can't fix it, you can always go back to **gps.launch**, which is the old planner (no traversability or OSM or graph search).

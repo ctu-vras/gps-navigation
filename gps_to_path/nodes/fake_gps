@@ -69,8 +69,8 @@ class FakeGps():
         #self.msg.longitude += 0.000001 * random.random()
 
     def on_joy(self, msg):
-        self.msg.latitude += msg.axes[0]  # left joy left-right
-        self.msg.longitude += msg.axes[1]  # left joy top-down
+        self.msg.latitude += 1e-5 * msg.axes[0]  # left joy left-right
+        self.msg.longitude += 1e-5 * msg.axes[1]  # left joy top-down
         self.msg.altitude += 10 * msg.axes[4]  # right joy top-down
         if msg.axes[6] != 0:  # d-pad left-right
             self.msg.position_covariance[0] *= math.pow(2, msg.axes[6])

@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+"""Converts Waypoints to Path messages."""
+import rospy
+from nav_msgs.msg import Path
+from geometry_msgs.msg import PoseStamped
+from gps_to_path.msg import Waypoints
+
+
+class WaypointsToPath(object):
+    def __init__(self):
+        self.path_pub = rospy.Publisher('path', Path, queue_size=2)
+        self.waypoints_sub = rospy.Subscriber('path_waypoints', Waypoints, self.convert, queue_size=2)
+
+    def convert(self, msg):
+        assert isinstance(msg, Waypoints)
+        path_msg = Path()
+        path_msg.header = msg.header
+        for pt in msg.points:
+            pose = PoseStamped()
+            pose.header = msg.header
+            pose.pose.orientation.w = 1.0
+            pose.pose.position = pt
+        self.path_pub.publish(path_msg)
+
+def main():
+    rospy.init_node('waypoints_to_path')
+    node = WaypointsToPath()
+    rospy.spin()
+
+
+if __name__ == '__main__':
+    main()

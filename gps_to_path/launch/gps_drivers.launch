@@ -3,6 +3,8 @@
     <arg name="sound_fix_alerts" default="true" />
 
     <arg name="fake_driver" default="false" doc="If true, a fake GPS position is published just to satify the nodes that need some GPS." />
+    <arg name="fake_driver_gpx_file" default="" />
+    <arg name="fake_driver_gpx_waypoint_nr" default="0" />
         
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" />             
 
@@ -41,7 +43,10 @@
 
     <group if="$(arg fake_driver)">
         <!-- FAKE GPS -->
-        <node pkg="gps_to_path" type="fake_gps" name="fake_gps" />
+        <node pkg="gps_to_path" type="fake_gps" name="fake_gps">
+            <param name="gpx_file" value="$(arg fake_driver_gpx_file)" />
+            <param name="gpx_waypoint_nr" value="$(arg fake_driver_gpx_waypoint_nr)" />
+        </node>
     </group>
 
 </launch>    

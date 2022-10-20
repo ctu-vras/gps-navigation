@@ -29,7 +29,7 @@ class FakeGps():
         #50.0934817N, 14.1322394E
         self.msg.altitude = 200.0
 
-        if self.gpx_file is not None:
+        if self.gpx_file is not None and len(self.gpx_file) > 0:
             with open(self.gpx_file, 'r') as gpx_f:
                 gpx_object = gpxpy.parse(gpx_f)
                 num_waypoints = len(gpx_object.waypoints)

@@ -803,7 +803,8 @@ class PathAnalysis:
             if not graph:
                 rospy.loginfo("Sub-graph {} did not find solution in range {} m.".format(i, graph_range))
 
-            path += [graph_points[v] for v in shortest_path_vertices]
+            if shortest_path_vertices is not None:
+                path += [graph_points[v] for v in shortest_path_vertices]
 
         self.path = np.array(path)
 

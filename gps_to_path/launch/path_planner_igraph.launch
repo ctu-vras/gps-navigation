@@ -53,8 +53,23 @@
     </node>
 
 <!-- PATH -->
+<!-- Legacy waypoints to path -->
+<!--
     <node pkg="gps_to_path" type="waypoints_to_path" name="waypoints_to_path" output="screen">
         <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+    </node>
+-->
+    <node name="path_waypoints_to_path" pkg="gps_to_path" type="waypoints_to_path_simple" output="screen">
+        <param name="target_frame" value="$(arg odom_frame)"/>
+        <param name="z_frame" value="base_link"/>
+        <remap from="waypoints" to="path_waypoints"/>
+        <remap from="path" to="path"/>
+    </node>
+    <node name="path_waypoints_to_path_utm" pkg="gps_to_path" type="waypoints_to_path_simple" output="screen">
+        <param name="target_frame" value="utm"/>
+        <param name="z_frame" value="base_link"/>
+        <remap from="waypoints" to="path_waypoints"/>
+        <remap from="path" to="path_utm"/>
     </node>
 
 <!-- TRAVERSABILITY PROCESSING -->

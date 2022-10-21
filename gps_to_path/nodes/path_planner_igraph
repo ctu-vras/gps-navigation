@@ -285,16 +285,17 @@ class PathPlanner():
     def get_current_sub_graph(self):
         # Obtain graph which start point is the last goal point you visited.
         call_next_waypoint = False
+        sub_graph_ind = self.current_sub_graph_ind + self.waypoint_offset
         with self.graph_mutex:
             if self.current_sub_graph is None:
-                self.current_sub_graph = self.sub_graphs[self.current_sub_graph_ind]
+                self.current_sub_graph = self.sub_graphs[sub_graph_ind]
                 self.subgraph_start_time = rospy.Time.now()
                 self.current_sub_graph_changed = True
     
             goal_point = self.get_current_goal_point()
             
-            if self.current_sub_graph_ind < len(self.sub_graphs) - 1:
-                next_goal_point = self.sub_graphs[self.current_sub_graph_ind + 1]['graph_points'][self.sub_graphs[self.current_sub_graph_ind + 1]['goal_index_graph']]
+            if sub_graph_ind < len(self.sub_graphs) - 1:
+                next_goal_point = self.sub_graphs[sub_graph_ind + 1]['graph_points'][self.sub_graphs[sub_graph_ind + 1]['goal_index_graph']]
             else:
                 next_goal_point = None
     
@@ -361,7 +362,7 @@ class PathPlanner():
             # Pop next subgraph.
             else:
                 self.current_sub_graph_ind += 1
-                self.current_sub_graph = self.sub_graphs[sub_graph_ind]
+                self.current_sub_graph = self.sub_graphs[sub_graph_ind+1]
                 self.current_sub_graph_changed = True
 
             self.near_goal_point_time = -1

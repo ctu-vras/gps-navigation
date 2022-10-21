@@ -443,7 +443,7 @@ class PathAnalysis:
 
             elif way.is_barrier(self.BARRIER_TAGS, self.NOT_BARRIER_TAGS, self.ANTI_BARRIER_TAGS):
                 if not way.is_area:
-                    way = self.line_to_polygon(way,width=4)
+                    way = self.line_to_polygon(way,width=2)
                 self.barriers.add(way)
 
             #else:
@@ -726,7 +726,15 @@ class PathAnalysis:
             start_index = goal_index
             goal_index = min(start_index+interval, len(points_line)-1, self.get_min_index(original_waypoint_indices, start_index))
 
+        inds_to_pop = []
 
+        for i in range(len(goal_points)-1):
+            if goal_points[i] == goal_points[i+1]:
+                inds_to_pop.append(i)
+
+        inds_to_pop.sort(reverse=True)
+        for i in inds_to_pop:
+            goal_points.pop(i)
         return goal_points
 
     def generate_edges(self, points, dist):
@@ -744,6 +752,8 @@ class PathAnalysis:
         # Generate line of points from given waypoints -- the desired path.
         points_line, original_waypoint_indices = points_arr_to_point_line(self.points,density=DENSITY)
         line = geometry.LineString(points_line)
+
+        #self.delete_far_objects(line,100)
 
         # Get untraversable areas along this line.
         barriers_along_point_line = self.get_barriers_along_line(line)
@@ -772,7 +782,7 @@ class PathAnalysis:
         def gen(start_goal_pair):
             start, goal, i = start_goal_pair
             return self.generate_graph(start, goal), i
-        num_threads = 4
+        """ num_threads = 4
         with ContextThreadPool(num_threads) as pool:
             async_result = pool.map_async(gen, start_goal_pairs, chunksize=1)
 
@@ -787,11 +797,11 @@ class PathAnalysis:
             sub_graphs = async_result.get()
             self.sub_graphs = [None] * num_sub_graphs
             for sub_graph, i in sub_graphs:
-                self.sub_graphs[i] = sub_graph
-        # self.sub_graphs = [None] * num_sub_graphs
-        # for start, goal, i in start_goal_pairs:
-        #     self.sub_graphs[i], i = gen((start, goal, i))
-        #     rospy.loginfo("Finished {}/{} sub-graphs.".format(i, num_sub_graphs))
+                self.sub_graphs[i] = sub_graph """
+        self.sub_graphs = [None] * num_sub_graphs
+        for start, goal, i in start_goal_pairs:
+            self.sub_graphs[i], i = gen((start, goal, i))
+            rospy.loginfo("Finished {}/{} sub-graphs.".format(i, num_sub_graphs))
 
         path = []   # A path based on OSM only -- not the actual path that is then used. 
         for i, graph_dict in enumerate(self.sub_graphs):
@@ -830,6 +840,9 @@ class PathAnalysis:
             # Remove points inside "barriers".
             #print(np.array(graph_points.geoms).shape)
             #print(dist_from_line.shape)
+            #print(np.array(start_point.coords))
+            #print(np.array(goal_point.coords))
+            #print(len(graph_points.geoms))
             graph_points = tuple(graph_points.geoms)
             #graph_points,dist_from_line = self.mask_points(graph_points.geoms, dist_from_line, objects_in_area['barriers'])
             #graph_points = np.array(graph_points.geoms)
@@ -858,12 +871,14 @@ class PathAnalysis:
                     out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
                     out_of_max_dist_mask = np.squeeze(out_of_max_dist_mask)
                 except Exception as e:
+                    print("A")
                     rospy.logerr(str(e))
                     use_osm = False
 
             try:
                 graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
             except Exception as e:
+                print("B")
                 rospy.logerr(str(e))
                 graph_dict = {'graph':None,
                               'shortest_path_vertices':None,
@@ -889,7 +904,7 @@ class PathAnalysis:
             
             if use_osm:
                 try:
-                    graph_points_costs = self.get_points_costs(road_points_mask_combined,footway_points_mask,barrier_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS,BARRIER_LOSS)       
+                    graph_points_costs = self.get_points_costs(road_points_mask,road_points_mask_combined,footway_points_mask,barrier_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS,BARRIER_LOSS)       
                     not_road_points = (~road_points_mask_combined[edges[:,0]] + ~road_points_mask_combined[edges[:,1]])
                     not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
                     if self.road_crossing:
@@ -902,6 +917,7 @@ class PathAnalysis:
                     
                     barrier_points = (barrier_points_mask[edges[:,0]] + barrier_points_mask[edges[:,1]]) * (not_road_points * not_footway_points)
                 except Exception as e:
+                    print("C")
                     rospy.logerr(str(e))
                     use_osm = False
                     graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER]
@@ -911,6 +927,7 @@ class PathAnalysis:
             try:
                 costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, barrier_points, BARRIER_LOSS, use_osm)
             except Exception as e:
+                print("D")
                 rospy.logerr(str(e))
                 use_osm = False
                 costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, barrier_points, BARRIER_LOSS, False)
@@ -946,7 +963,7 @@ class PathAnalysis:
             if shortest_path_vertices:
                 if (shortest_path_cost < MAX_COST_PER_METER * start_point.distance(goal_point)) or increase_graph > 0:
 
-                    rospy.loginfo("{} s - {} ps. - {}x{} m r.- Found path".format(round(time.time()-t,3), len(graph_points), graph_range, len(points_line.geoms)))
+                    rospy.loginfo("{} s - {} ps. - {}x{} m r.- Found path".format(round(time.time()-t,3), len(graph_points), graph_range, len(points_line.geoms)*density))
                     graph_dict = {'graph':graph,
                                     'shortest_path_vertices':shortest_path_vertices,
                                     'graph_points':graph_points,
@@ -1237,16 +1254,16 @@ class PathAnalysis:
     def get_path_dist(self,p1,p2):
         return np.sqrt(np.sum(np.square(p1-p2),axis=1))
 
-    def get_points_costs(self,road_points_mask,footway_points_mask,barrier_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss,barrier_loss):
-        road_points = (road_points_mask * ~footway_points_mask).reshape(-1,1)
-        barrier_points = (barrier_points_mask * ~road_points_mask * ~footway_points_mask).reshape(-1,1)
+    def get_points_costs(self,road_points_mask,road_points_mask_bool,footway_points_mask,barrier_points_mask,dist_from_line,out_of_max_dist_mask,road_loss,no_footway_loss,barrier_loss):
+        barrier_points = (barrier_points_mask * ~road_points_mask_bool * ~footway_points_mask).reshape(-1,1)
         no_footway_points = (out_of_max_dist_mask * ~footway_points_mask).reshape(-1,1)
         
         if self.road_crossing:
-            road_costs = sum(road_points[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)).reshape(-1,1)
+            road_costs = sum(road_points_mask[i] * road_loss * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)).reshape(-1)
+            road_costs = (road_costs * ~footway_points_mask).reshape(-1,1)
             cost = dist_from_line + road_costs + no_footway_loss*no_footway_points + barrier_loss*barrier_points
         else:
-            cost = dist_from_line + road_loss*road_points + no_footway_loss*no_footway_points + barrier_loss*barrier_points
+            cost = dist_from_line + road_loss*road_points_mask + no_footway_loss*no_footway_points + barrier_loss*barrier_points
         return [cost,dist_from_line,road_costs,no_footway_loss*no_footway_points,barrier_loss*barrier_points]
         #return cost
     
@@ -1255,18 +1272,43 @@ class PathAnalysis:
         vertices_dist_cost = np.sqrt(np.sum(np.square(p1-p2),axis=1))
         if use_osm:
             if type(roads) is not type(list()):  # list is when we use road crossing cost as we have multiple levels
-                return np.reshape(vertices_dist_cost + 
+                return np.reshape(vertices_dist_cost *(
                                 roads * road_loss + 
                                 no_footway_loss * no_footways +
-                                barrier_points * barrier_loss, (len(p1),1)) + dist_cost
+                                barrier_points * barrier_loss), (len(p1),1)) + dist_cost
             else:
 
                 return np.reshape(vertices_dist_cost + \
-                    sum(roads[i] * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
+                    sum(roads[i] * road_loss * np.linspace(900, 1100, ROAD_CROSSINGS_RANKS)[i] for i in range(ROAD_CROSSINGS_RANKS)) + \
                     no_footway_loss * no_footways + barrier_points * barrier_loss, (len(p1),1)) + \
                     dist_cost
         else:
             return np.reshape(vertices_dist_cost, (len(p1),1)) + dist_cost
+
+    def delete_far_objects(self,line,max_dist):
+
+        
+        check_polygon = line.buffer(max_dist)
+        check_polygon = prep(check_polygon)
+
+        check_road_polygons = [self.road_polygons[i] for i in range(len(self.road_polygons))]
+
+        check_us = [self.roads_list, self.footways_list, self.barriers_list]
+
+        check_func = lambda ob: check_polygon.intersects(ob.line)
+
+        for check_me in check_us:
+            print(len(check_me))
+            check_me = list(filter(check_func, check_me))
+            print(len(check_me))
+
+        check_func_poly = lambda ob: check_polygon.intersects(ob)
+
+        for check_poly in check_road_polygons:
+            print(len(check_poly))
+            check_poly = list(filter(check_func_poly, check_poly))
+            print(len(check_poly))
+
 
     def sets_to_lists(self):
         self.roads_list     = list(self.roads)

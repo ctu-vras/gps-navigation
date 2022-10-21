@@ -125,7 +125,7 @@ class PathPlanner():
         self.graph_mutex = Lock()
 
         self.sub_fix = rospy.Subscriber(
-            "gps/filtered", NavSatFix, self.update_fix, queue_size=10)
+            "fix", NavSatFix, self.update_fix, queue_size=10)
         self.current_robot_position = None
         self.current_robot_altitude = 0
 
@@ -239,8 +239,8 @@ class PathPlanner():
         self.trav_frame = msg.header.frame_id
         
         # BAG ONLY ~~~~~~~~~
-        #if self.time_diff is None:
-        #    self.time_diff = rospy.Time.now() - msg.header.stamp
+        if self.time_diff is None:
+            self.time_diff = rospy.Time.now() - msg.header.stamp
         try:
             self.odom_robot_trans = self.tf_buffer.lookup_transform(
                 self.odom_frame, self.robot_base_frame, rospy.Time())
@@ -260,7 +260,7 @@ class PathPlanner():
         if self.odom_robot_trans is not None and \
         self.odom_lidar_trans is not None and \
         self.utm_odom_trans is not None and \
-        abs((msg.header.stamp - t).to_sec()) < self.max_age:    # BAG: abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:
+        abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:    # BAG: abs((msg.header.stamp + self.time_diff - t).to_sec()) < self.max_age:
             pcd_struct = ros_numpy.numpify(msg)
             pcd_arr = rfn.structured_to_unstructured(pcd_struct[['x','y','z',self.trav_obstacle_field]])
             #pcd_arr = pcd_arr[np.where(pcd_arr[:,-1] > 0.5)]        # works for both trav types
@@ -271,7 +271,7 @@ class PathPlanner():
     def update_fix(self,msg):
         utm_fix = utm.fromLatLong(msg.latitude,msg.longitude)
         self.current_robot_position = np.array([[utm_fix.easting, utm_fix.northing]])
-        self.current_robot_altitude = msg.altitude
+        #self.current_robot_altitude = msg.altitude
 
     def reached_goal_point(self,robot_position,goal_point):
         robot_position_temp = copy.copy(robot_position)

@@ -1,0 +1,268 @@
+#!/usr/bin/env python
+
+import osm_analysis_igraph
+import rospy
+import numpy as np
+import pickle
+import shapely.geometry as geometry
+import copy
+from sensor_msgs.msg import NavSatFix,PointCloud2
+import osm_types
+import ros_numpy
+import std_msgs.msg
+from nav_msgs.msg import Path
+from geometry_msgs.msg import Point, Quaternion, PoseStamped, Pose
+from tf.transformations import quaternion_matrix
+
+import tf2_ros
+
+#BASE_POINT = np.array([[438006,5549044]])  # UNHOST
+#BASE_POINT = np.array([[459562,5553151]])   # CIMICKY HAJ
+
+class OsmVisualizer():
+    def __init__(self, fn, offset, do_transform_to_odom, odom_frame):
+        self.do_transform_to_odom = do_transform_to_odom
+        self.odom_frame = odom_frame
+        self.offset = offset
+        with open(fn, 'rb') as handle:
+            self.osm_planner = pickle.load(handle)
+
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+
+        self.tf = None
+
+    def get_osm_points(self):
+        osm_objects = { 'roads':self.roads,
+                        'untraversables':self.untraversables,
+                        'footways':self.footways,
+                        'all_goal_points':self.all_goal_points
+                        }
+
+        osm_points = { 'roads':np.array([]).reshape((0,3)),
+                        'untraversables':np.array([]).reshape((0,3)),
+                        'footways':np.array([]).reshape((0,3)),
+                        'all_goal_points':np.array([]).reshape((0,3))
+                        }
+
+        for key in osm_objects:
+            for ob in osm_objects[key]:
+                points = ob.to_pcd_points(filled=False)
+                points -= self.offset
+                
+                if self.do_transform_to_odom:
+                    points = self.transform_points(points, self.tf)
+                else:
+                    points = np.concatenate((points,np.zeros((points.shape[0],1))),axis=1)
+
+                osm_points[key] = np.concatenate([osm_points[key], points])
+        
+        return osm_points
+    
+    def squarify(self, points):
+        squarish = [None] * len(points)
+        for i,p in enumerate(points):
+            w = osm_analysis_igraph.Way()
+            x = p.x
+            y = p.y
+            p_squarish = geometry.Polygon([[x+1,y+1],[x-1,y+1],[x-1,y-1],[x+1,y-1]]) 
+            w.line = p_squarish
+            squarish[i] = w
+        return np.array(squarish)
+
+    def publish_osm_objects_pcd(self):
+            self.roads    =  np.array(list(self.osm_planner.roads))
+            self.footways =  np.array(list(self.osm_planner.footways))
+            self.untraversables =  np.array(list(self.osm_planner.barriers))
+            self.all_goal_points = copy.copy(self.osm_planner.all_goal_points)
+            self.all_goal_points = self.squarify(self.all_goal_points)
+
+            self.osm_points = self.get_osm_points()
+            self.pcd_msg = PointCloud2()
+            self.set_pcd_msg()
+            self.pub_pcd = rospy.Publisher('osm_pcd_utm', PointCloud2, queue_size=10, latch=True)
+            self.pub_pcd.publish(self.osm_pcd_msg)
+            rospy.loginfo("Publishing OSM data visualisation (osm_pcd_utm topic).")
+
+    def set_pcd_msg(self):
+        self.pcd_data = np.zeros(0, dtype=[
+                ('x', np.float32),
+                ('y', np.float32),
+                ('z', np.float32),
+                ('type', np.uint8)])
+
+        for key in self.osm_points:
+            osm_pcd_data = np.zeros(len(self.osm_points[key]), dtype=[
+                ('x', np.float32),
+                ('y', np.float32),
+                ('z', np.float32),
+                ('type', np.uint8)])
+
+            osm_pcd_data['x'] = self.osm_points[key][:, 0]
+            osm_pcd_data['y'] = self.osm_points[key][:, 1]
+            osm_pcd_data['z'] = self.osm_points[key][:, 2]#np.zeros((self.osm_points[key][:, 1].shape))
+            osm_pcd_data['type'] =  osm_types.OSM_TYPES[key] * np.ones((self.osm_points[key][:, 1].shape))
+
+            self.pcd_data = np.concatenate([self.pcd_data, osm_pcd_data])
+                
+        self.osm_pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+
+        frame = self.odom_frame if self.do_transform_to_odom else "utm"
+        header.frame_id = frame
+
+        self.osm_pcd_msg.header = header
+    
+    def generate_osm_path(self):
+        self.osm_path = []
+        for graph_dict in self.osm_planner.sub_graphs:
+    
+            start_index_graph = graph_dict["start_index_graph"]
+            goal_index_graph = graph_dict["goal_index_graph"]
+
+            graph = graph_dict["graph"]    
+            graph_points = graph_dict['graph_points']
+        
+            self.shortest_path_vertices = graph.get_shortest_paths(start_index_graph,
+                                                                    goal_index_graph,
+                                                                    weights="weight",
+                                                                    output="vpath")[0]
+
+            path = [graph_points[v] for v in self.shortest_path_vertices]
+            
+            self.osm_path += path
+
+        self.osm_path -= self.offset
+
+        if self.do_transform_to_odom:
+            self.osm_path = self.transform_points(self.osm_path, self.tf)
+        else:
+            self.osm_path = np.concatenate((self.osm_path,np.zeros((self.osm_path.shape[0],1))),axis=1)
+
+        self.osm_path
+
+    def rotate(self,points,trans):
+        R = quaternion_matrix([trans.transform.rotation.x,
+                                    trans.transform.rotation.y,
+                                    trans.transform.rotation.z,
+                                    trans.transform.rotation.w])   
+        R = R[:3,:3]
+        points = np.matmul(R,points.T)
+        points = points.T
+        return points
+
+    def transform_points(self,points,trans):
+        if points.shape[1] == 2:
+            points = np.concatenate((points,np.zeros((points.shape[0],1))),axis=1)
+
+        points = self.rotate(points,trans)
+
+        points[:,0] += trans.transform.translation.x
+        points[:,1] += trans.transform.translation.y
+        #points[:,2] += trans.transform.translation.z
+        return points
+
+    def get_pose(self, point):
+        """ Point (x,y) to pose msg. """
+        x = point[0]
+        y = point[1]
+        z = point[2]
+
+        point = Point()
+        quat = Quaternion()
+        pose_ob = Pose()
+        point.x = x
+        point.y = y
+        point.z = z
+        quat.x = 0.
+        quat.y = 0.
+        quat.z = 0.
+        quat.w = 1.
+        pose_ob.position = point
+        pose_ob.orientation = quat
+        return pose_ob
+
+    def get_pose_stamped(self, point):
+        """ Point (x,y) to stamped pose msg. """
+        pose = self.get_pose(point)
+        pose_stamped = PoseStamped()
+        pose_stamped.pose = pose
+        return pose_stamped
+
+    def set_path_msg(self, points, frame):
+        """ Prepare path msg to be published. """
+        poses = []
+
+        header = std_msgs.msg.Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = frame
+
+        msg = Path()
+
+        for point in points:
+            pose_stamped = self.get_pose_stamped(point)
+            pose_stamped.header = header
+            poses.append(pose_stamped)
+
+        msg.header = header
+        msg.poses = poses
+
+        return msg
+
+    def publish_osm_path(self):
+        self.pub_path = rospy.Publisher('osm_path', Path, queue_size=10, latch=True)
+
+        frame = self.odom_frame if self.do_transform_to_odom else "utm"
+
+        self.path_msg = self.set_path_msg(self.osm_path, frame)
+
+        self.pub_path.publish(self.path_msg)
+
+        rospy.loginfo("Publishing path based on OSM data (osm_path topic).")
+
+    def run(self):
+        while not rospy.is_shutdown():
+            rate = rospy.Rate(10)
+
+            if self.do_transform_to_odom:
+                try:
+                    #self.tf = self.tf_buffer.lookup_transform("utm", self.odom_frame, rospy.Time())
+                    self.tf = self.tf_buffer.lookup_transform(self.odom_frame, "utm", rospy.Time())
+                    #self.tf = ros_numpy.numpify(tf.transform)
+                except:
+                    rospy.logwarn_once("Waiting for utm -> {} transform.".format(self.odom_frame))
+
+            if not self.do_transform_to_odom or self.tf is not None:
+                self.generate_osm_path()
+                self.publish_osm_path()
+                self.publish_osm_objects_pcd()
+
+                while not rospy.is_shutdown():
+                    rate.sleep()
+            
+            rate.sleep()
+
+
+def main():
+    rospy.init_node('osm_visualizer')
+    
+    #fn = "/home/robot/0923/src/gps-navigation/gps_to_path/data/unhost_final_demo_spot_east_trimmed.osm_planner"
+    gpx_assignment = rospy.get_param('~gpx_assignment', "$(find gps_to_path)/data/coords.gpx")
+    offset = rospy.get_param('~offset', [0,0])
+    offset = list(map(float, offset.split(',')))
+    offset = np.array([offset])
+
+    do_transform_to_odom = rospy.get_param('~do_transform_to_odom', True)
+    odom_frame = rospy.get_param('~odom_frame', "gps_odom")
+
+    pickle_fn = gpx_assignment[:-3]+"osm_planner"
+
+    node = OsmVisualizer(pickle_fn,offset,do_transform_to_odom,odom_frame)
+
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

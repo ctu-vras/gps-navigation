@@ -1,4 +1,4 @@
-INIT_WIDTH = 30          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+INIT_WIDTH = 50          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
 
 DENSITY = 0.5             # In meters. How dense is the graph (distance between neighboring nodes).
 DIST_COST_MULTIPLIER = 6
@@ -20,7 +20,7 @@ MAX_COST_PER_METER = 10 # If the INITIAL solution of a sub-graph has a total cos
                         # (((If the graph has found a solution, but it is too expensive, we have it try once more
                         # in an extended range. Important for crossing roads.)))
 
-ROAD_LOSS = 1000        # Penalization of an edge with at least one vertex on a road.
+ROAD_LOSS = 0.2        # Penalization of an edge with at least one vertex on a road.
                         # (((Makes the graph search cross roads across footways - those are not considered
                         # as roads - or at least in the shortest manner possible.)))
 
@@ -28,7 +28,7 @@ NO_FOOTWAY_LOSS = 10   # Penalization of an edge at least MAX_DIST_LOSS far and 
                         # (((The graph search will prefer walking along footways ONCE IT IS FAR from the
                         # desired trajectory anyway.)))
 
-BARRIER_LOSS = 1000
+BARRIER_LOSS = 500
                     
 MAX_DETOUR_COUNTER = 3  #  CURRENTLY NOT BEING USED.
 

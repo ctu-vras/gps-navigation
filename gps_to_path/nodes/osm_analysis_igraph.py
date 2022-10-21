@@ -788,6 +788,10 @@ class PathAnalysis:
             self.sub_graphs = [None] * num_sub_graphs
             for sub_graph, i in sub_graphs:
                 self.sub_graphs[i] = sub_graph
+        # self.sub_graphs = [None] * num_sub_graphs
+        # for start, goal, i in start_goal_pairs:
+        #     self.sub_graphs[i], i = gen((start, goal, i))
+        #     rospy.loginfo("Finished {}/{} sub-graphs.".format(i, num_sub_graphs))
 
         path = []   # A path based on OSM only -- not the actual path that is then used. 
         for i, graph_dict in enumerate(self.sub_graphs):
@@ -799,7 +803,8 @@ class PathAnalysis:
             if not graph:
                 rospy.loginfo("Sub-graph {} did not find solution in range {} m.".format(i, graph_range))
 
-            path += [graph_points[v] for v in shortest_path_vertices]
+            if shortest_path_vertices is not None:
+                path += [graph_points[v] for v in shortest_path_vertices]
 
         self.path = np.array(path)
 
@@ -833,26 +838,42 @@ class PathAnalysis:
             #print(type(graph_points))
             #print(dist_from_line.shape)
 
-            if self.use_osm:
+            use_osm = self.use_osm
+            if use_osm:
+                try:
+                    barrier_points_mask = self.get_contain_mask(graph_points, objects_in_area['barriers'])
+    
+                    road_points_mask = []
+    
+                    if self.road_crossing:
+                        for i in range(len(self.road_polygons)):
+                            road_points_mask.append(self.get_contain_mask(graph_points, objects_in_area['road_polygons'+str(i)]))
+                    else:
+                        road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
+                    
+                    road_points_mask_combined = (np.sum(road_points_mask,axis=0)).astype(bool)
+    
+                    footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
+    
+                    out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
+                    out_of_max_dist_mask = np.squeeze(out_of_max_dist_mask)
+                except Exception as e:
+                    rospy.logerr(str(e))
+                    use_osm = False
 
-                barrier_points_mask = self.get_contain_mask(graph_points, objects_in_area['barriers'])
-
-                road_points_mask = []
-
-                if self.road_crossing:
-                    for i in range(len(self.road_polygons)):
-                        road_points_mask.append(self.get_contain_mask(graph_points, objects_in_area['road_polygons'+str(i)]))
-                else:
-                    road_points_mask = self.get_contain_mask(graph_points, objects_in_area['roads'])
-                
-                road_points_mask_combined = (np.sum(road_points_mask,axis=0)).astype(bool)
-
-                footway_points_mask = self.get_contain_mask(graph_points, objects_in_area['footways'])
-
-                out_of_max_dist_mask = dist_from_line >= MAX_DIST_LOSS
-                out_of_max_dist_mask = np.squeeze(out_of_max_dist_mask)
-
-            graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
+            try:
+                graph_points = np.array(list(geometry.LineString(graph_points).xy)).T # faster than list compr. or MultiPoint
+            except Exception as e:
+                rospy.logerr(str(e))
+                graph_dict = {'graph':None,
+                              'shortest_path_vertices':None,
+                              'graph_points':None,
+                              'graph_range':graph_range,
+                              'start_index_graph':0,
+                              'goal_index_graph':0,
+                              'graph_points_costs':None
+                              }
+                return graph_dict
 
             edges = self.generate_edges(graph_points, 1.5*density)
             edge_points_1 = graph_points[edges[:,0]]
@@ -866,23 +887,33 @@ class PathAnalysis:
             dist_cost = np.divide(dist_from_line[edges[:,0]] + dist_from_line[edges[:,1]], 2)
             dist_cost = np.minimum(dist_cost, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER
             
-            if self.use_osm:
-                graph_points_costs = self.get_points_costs(road_points_mask_combined,footway_points_mask,barrier_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS,BARRIER_LOSS)       
-                not_road_points = (~road_points_mask_combined[edges[:,0]] + ~road_points_mask_combined[edges[:,1]])
-                not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
-                if self.road_crossing:
-                    for i in range(ROAD_CROSSINGS_RANKS):
-                        road_points.append((road_points_mask[i][edges[:,0]] + road_points_mask[i][edges[:,1]]) * not_footway_points)
-                else:
-                    road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
-
-                no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
-                
-                barrier_points = (barrier_points_mask[edges[:,0]] + barrier_points_mask[edges[:,1]]) * (not_road_points * not_footway_points)
+            if use_osm:
+                try:
+                    graph_points_costs = self.get_points_costs(road_points_mask_combined,footway_points_mask,barrier_points_mask,np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER,out_of_max_dist_mask,ROAD_LOSS,NO_FOOTWAY_LOSS,BARRIER_LOSS)       
+                    not_road_points = (~road_points_mask_combined[edges[:,0]] + ~road_points_mask_combined[edges[:,1]])
+                    not_footway_points = (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]])
+                    if self.road_crossing:
+                        for i in range(ROAD_CROSSINGS_RANKS):
+                            road_points.append((road_points_mask[i][edges[:,0]] + road_points_mask[i][edges[:,1]]) * not_footway_points)
+                    else:
+                        road_points = (road_points_mask[edges[:,0]] + road_points_mask[edges[:,1]])
+    
+                    no_footways = (out_of_max_dist_mask[edges[:,0]] * out_of_max_dist_mask[edges[:,1]]) * (~footway_points_mask[edges[:,0]] + ~footway_points_mask[edges[:,1]]) 
+                    
+                    barrier_points = (barrier_points_mask[edges[:,0]] + barrier_points_mask[edges[:,1]]) * (not_road_points * not_footway_points)
+                except Exception as e:
+                    rospy.logerr(str(e))
+                    use_osm = False
+                    graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER]
             else:
                 graph_points_costs = [np.minimum(dist_from_line, MAX_DIST_LOSS) * DIST_COST_MULTIPLIER]
             
-            costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, barrier_points, BARRIER_LOSS, self.use_osm)
+            try:
+                costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, barrier_points, BARRIER_LOSS, use_osm)
+            except Exception as e:
+                rospy.logerr(str(e))
+                use_osm = False
+                costs = self.get_costs(edge_points_1, edge_points_2, road_points, dist_cost, ROAD_LOSS, no_footways, NO_FOOTWAY_LOSS, barrier_points, BARRIER_LOSS, False)
             #edge_cost_tuples = np.concatenate((edges,costs),axis=1)
 
             #graph = igraph.Graph.TupleList(edge_cost_tuples, weights=True)

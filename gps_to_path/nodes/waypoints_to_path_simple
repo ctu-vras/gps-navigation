@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+"""Converts Waypoints to Path messages."""
+import rospy
+from nav_msgs.msg import Path
+from geometry_msgs.msg import Point, PoseStamped
+from gps_to_path.msg import Waypoints
+import numpy as np
+from ros_numpy import msgify
+from tf2_ros import Buffer, TransformException, TransformListener
+
+
+class WaypointsToPath(object):
+    def __init__(self):
+        self.tf = Buffer()
+        self.tf_sub = TransformListener(self.tf)
+        self.target_frame = rospy.get_param('~target_frame', 'gps_odom')
+        self.path_pub = rospy.Publisher('path', Path, queue_size=2)
+        self.waypoints_sub = rospy.Subscriber('path_waypoints', Waypoints, self.convert, queue_size=2)
+
+    def convert(self, msg):
+        assert isinstance(msg, Waypoints)
+        try:
+            tf = self.tf.lookup_transform(self.target_frame, msg.header.frame_id, msg.header.stamp,
+                                          rospy.Duration.from_sec(1.0))
+            tf = msgify(tf.transform)
+        except TransformException as ex:
+            rospy.logerr('Could not transform from %s to %s at time %.3f.',
+                         msg.header.frame_id, self.target_frame, msg.header.stamp.to_sec())
+            return
+        path_msg = Path()
+        path_msg.header = msg.header
+        for pt in msg.points:
+            assert isinstance(pt, Point)
+            pose = PoseStamped()
+            pose.header = msg.header
+            pose.pose.orientation.w = 1.0
+            x = np.array([[pt.x], [pt.y], [pt.z], [1.0]])
+            y = np.matmul(tf, x)
+            pose.pose.position.x = y[0, 0]
+            pose.pose.position.y = y[1, 0]
+            pose.pose.position.z = y[2, 0]
+            path_msg.poses.append(pose)
+        self.path_pub.publish(path_msg)
+
+def main():
+    rospy.init_node('waypoints_to_path')
+    node = WaypointsToPath()
+    rospy.spin()
+
+
+if __name__ == '__main__':
+    main()

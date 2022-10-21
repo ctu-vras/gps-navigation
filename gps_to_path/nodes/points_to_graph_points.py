@@ -71,7 +71,7 @@ def points_to_graph_points(point1, point2, density=1, width=10):
     parallel_increase = int(round(width/4/density))
     
     if point1.bounds == point2.bounds:
-        return MultiPoint(np.array([point1.x, point1.y])),MultiPoint(np.array([point1.x, point1.y])),np.zeros((1,1))
+        return MultiPoint([[point1.x, point1.y]]),MultiPoint([[point1.x, point1.y]]),np.zeros((1,1))
     else:
         vec,point_line,dist_line = get_point_line(point1,point2,density,parallel_increase)
 

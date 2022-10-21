@@ -3,7 +3,8 @@
     <arg name="robot" default="ctu-robot"/>
     <arg name="robot_type" default="x1"/>
     <arg name="cmd_vel" default="$(anon priority_wrapper)/nav/cmd_vel" doc="Topic to which to publish velocity commands." if="$(eval robot == 'ctu-robot')"/>
-    <arg name="cmd_vel" default="/nav/cmd_vel" doc="Topic to which to publish velocity commands." unless="$(eval robot == 'ctu-robot')"/>
+    <arg name="cmd_vel" default="/nav/cmd_vel_slow" doc="Topic to which to publish velocity commands." if="$(eval robot == 'spot-3')"/>
+    <arg name="cmd_vel" default="/nav/cmd_vel" doc="Topic to which to publish velocity commands." unless="$(eval robot == 'ctu-robot' or robot == 'spot-3')"/>
     <arg name="path" default="path"
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
@@ -62,5 +63,12 @@
         <!-- Outputs -->
         <remap from="clearance" to="clearance"/>
         <remap from="cmd_vel" to="$(arg cmd_vel)"/>
+    </node>
+    
+    <node name="spot_cmd_vel_repeater" pkg="cras_topic_tools" type="repeat">
+        <remap from="~input" to="/nav/cmd_vel_slow" />
+        <remap from="~output" to="/nav/cmd_vel" />
+        <param name="rate" value="20.0" />
+        <param name="max_repeats" value="5" />
     </node>
 </launch>

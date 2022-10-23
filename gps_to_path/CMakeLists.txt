@@ -7,6 +7,7 @@ add_message_files(FILES
   LlhFix.msg
   MagShift.msg
   NavSatDetailedStatus.msg
+  NavSatFixQuality.msg
   Waypoints.msg
   Wgs.msg
   WgsArray.msg

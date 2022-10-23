@@ -18,7 +18,7 @@ from threading import Lock
 from message_filters import TimeSynchronizer, Subscriber
 import rospy
 from sensor_msgs.msg import NavSatFix, NavSatStatus
-from gps_to_path.msg import NavSatDetailedStatus
+from gps_to_path.msg import NavSatDetailedStatus, NavSatFixQuality
 
 rospy.init_node("nav_sat_fix_filter")
 
@@ -41,31 +41,23 @@ fix_lost_duration = rospy.Duration(rospy.get_param("~fix_lost_duration", 1.0))
 fix_reconvergence_duration = rospy.Duration(rospy.get_param("~fix_reconvergence_duration", 20.0))
 max_corrections_age = rospy.Duration(rospy.get_param("~max_corrections_age", 10.0))
 
-STATE_NO_FIX = 0
-STATE_HAS_FIX = 1
-STATE_FIX_REGAINING = 2
-
 state_names = {
-    STATE_NO_FIX: "NO_FIX",
-    STATE_HAS_FIX: "HAS_FIX",
-    STATE_FIX_REGAINING: "FIX_REGAINING",
+    NavSatFixQuality.STATE_NO_FIX: "NO_FIX",
+    NavSatFixQuality.STATE_HAS_FIX: "HAS_FIX",
+    NavSatFixQuality.STATE_FIX_RECONVERGING: "FIX_RECONVERGING",
 }
 
-FIX_QUALITY_OK = 0
-FIX_QUALITY_AVERAGE = 1
-FIX_QUALITY_DEGRADED = 2
-FIX_QUALITY_BAD = 3
-
 fix_quality_names = {
-    FIX_QUALITY_OK: "OK",
-    FIX_QUALITY_AVERAGE: "AVERAGE",
-    FIX_QUALITY_DEGRADED: "DEGRADED",
-    FIX_QUALITY_BAD: "BAD",
+    NavSatFixQuality.QUALITY_OK: "OK",
+    NavSatFixQuality.QUALITY_AVERAGE: "AVERAGE",
+    NavSatFixQuality.QUALITY_DEGRADED: "DEGRADED",
+    NavSatFixQuality.QUALITY_BAD: "BAD",
 }
 
 RTK_FIX_STATUSES = (NavSatStatus.STATUS_GBAS_FIX, NavSatStatus.STATUS_SBAS_FIX)
 
 pub = rospy.Publisher("gps/fix_filtered", NavSatFix, queue_size=10)
+pub_quality = rospy.Publisher("gps/fix_quality", NavSatFixQuality, queue_size=10)
 
 processed_stamps = deque(maxlen=10)
 processed_stamps_lock = Lock()
@@ -102,12 +94,13 @@ def fix_only_cb(fix_msg):
             status_msg.integer_ambiguity_ratio = 0
 
     # run the filter with the fake status message
-    filtered_fix = filter_fix(fix_msg, status_msg)
+    filtered_fix, fix_quality = filter_fix(fix_msg, status_msg)
 
     with processed_stamps_lock:
         if fix_msg.header.stamp not in processed_stamps:
             if filtered_fix is not None:
                 pub.publish(filtered_fix)
+            pub_quality.publish(fix_quality)
             processed_stamps.append(fix_msg.header.stamp)
 
 
@@ -120,12 +113,13 @@ def fix_with_status_cb(fix_msg, status_msg):
     # once we get a fix with status, we no longer need the fix_only version
     fix_only_sub.unregister()
 
-    filtered_fix = filter_fix(fix_msg, status_msg)
+    filtered_fix, fix_quality = filter_fix(fix_msg, status_msg)
 
     with processed_stamps_lock:
         if fix_msg.header.stamp not in processed_stamps:
             if filtered_fix is not None:
                 pub.publish(filtered_fix)
+            pub_quality.publish(fix_quality)
             processed_stamps.append(fix_msg.header.stamp)
 
 
@@ -140,66 +134,76 @@ def filter_fix(fix_msg, status_msg):
     global fix_regained_stamp
     global state
 
+    fix_quality_msg = NavSatFixQuality()
+    fix_quality_msg.header = fix_msg.header
+    fix_quality_msg.quality = NavSatFixQuality.QUALITY_BAD
+    fix_quality_msg.state = NavSatFixQuality.STATE_NO_FIX
+    fix_quality_msg.covariance_multiplier = float('nan')
+
     if last_cb_stamp > rospy.Time.now() + rospy.Duration(3):
         rospy.loginfo("ROS time jumped backwards, resetting.")
         last_fix_stamp = None
-        state = STATE_NO_FIX
+        state = NavSatFixQuality.STATE_NO_FIX
     last_cb_stamp = rospy.Time.now()
 
-    if state == STATE_NO_FIX:
-        state = STATE_HAS_FIX
+    if state == NavSatFixQuality.STATE_NO_FIX:
+        state = NavSatFixQuality.STATE_HAS_FIX
 
-    if state == STATE_HAS_FIX and last_fix_stamp is not None \
+    if state == NavSatFixQuality.STATE_HAS_FIX and last_fix_stamp is not None \
             and fix_msg.header.stamp - last_fix_stamp > fix_lost_duration:
-        state = STATE_FIX_REGAINING
+        state = NavSatFixQuality.STATE_FIX_RECONVERGING
         fix_regained_stamp = fix_msg.header.stamp
         rospy.loginfo("Fix lost")
     last_fix_stamp = fix_msg.header.stamp
 
-    if state == STATE_FIX_REGAINING and fix_msg.header.stamp > fix_regained_stamp + fix_reconvergence_duration:
-        state = STATE_HAS_FIX
+    if state == NavSatFixQuality.STATE_FIX_RECONVERGING and \
+            fix_msg.header.stamp > fix_regained_stamp + fix_reconvergence_duration:
+        state = NavSatFixQuality.STATE_HAS_FIX
         fix_regained_stamp = None
         rospy.loginfo("Fix regained")
 
     rospy.loginfo_throttle_identical(20.0, "Fix state: " + state_names[state])
 
-    if state != STATE_HAS_FIX:
-        return None
+    if state != NavSatFixQuality.STATE_HAS_FIX:
+        fix_quality_msg.state = state
+        return None, fix_quality_msg
 
     cov = list(fix_msg.position_covariance)
     has_corrections = rospy.Time.now() - status_msg.last_corrections_time < max_corrections_age
 
-    fix_quality = FIX_QUALITY_OK
+    fix_quality = NavSatFixQuality.QUALITY_OK
     if not has_corrections:
-        fix_quality = max(fix_quality, FIX_QUALITY_DEGRADED)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_DEGRADED)
     if status_msg.satellites_used < 4:
-        fix_quality = max(fix_quality, FIX_QUALITY_BAD)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_BAD)
     elif status_msg.satellites_used < 5:
-        fix_quality = max(fix_quality, FIX_QUALITY_DEGRADED)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_DEGRADED)
     elif status_msg.satellites_used < 15:
-        fix_quality = max(fix_quality, FIX_QUALITY_AVERAGE)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_AVERAGE)
     if status_msg.integer_ambiguity_ratio < 1:
-        fix_quality = max(fix_quality, FIX_QUALITY_DEGRADED)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_DEGRADED)
     elif status_msg.integer_ambiguity_ratio < 1.8:
-        fix_quality = max(fix_quality, FIX_QUALITY_AVERAGE)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_AVERAGE)
     if fix_msg.status.status == NavSatStatus.STATUS_NO_FIX:
-        fix_quality = max(fix_quality, FIX_QUALITY_BAD)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_BAD)
     if max(cov[0], cov[4]) > max_cov:
-        fix_quality = max(fix_quality, FIX_QUALITY_BAD)
+        fix_quality = max(fix_quality, NavSatFixQuality.QUALITY_BAD)
 
     rospy.loginfo_throttle_identical(20.0, "Fix quality: " + fix_quality_names[fix_quality])
 
-    if fix_quality == FIX_QUALITY_BAD:
-        return None
+    if fix_quality == NavSatFixQuality.QUALITY_BAD:
+        fix_quality_msg.state = state
+        fix_quality_msg.quality = fix_quality
+        return None, fix_quality_msg
 
     min_lat_cov = min_fix_lat_cov if fix_msg.status.status in RTK_FIX_STATUSES else min_float_lat_cov
     min_lon_cov = min_fix_lon_cov if fix_msg.status.status in RTK_FIX_STATUSES else min_float_lon_cov
     min_alt_cov = min_fix_alt_cov if fix_msg.status.status in RTK_FIX_STATUSES else min_float_alt_cov
 
     multipliers = {
-        FIX_QUALITY_OK: 1,
-        FIX_QUALITY_AVERAGE: average_fix_cov_multiplier,
-        FIX_QUALITY_DEGRADED: degraded_fix_cov_multiplier,
+        NavSatFixQuality.QUALITY_OK: 1,
+        NavSatFixQuality.QUALITY_AVERAGE: average_fix_cov_multiplier,
+        NavSatFixQuality.QUALITY_DEGRADED: degraded_fix_cov_multiplier,
     }
     multiplier = multipliers[fix_quality]
 
@@ -208,13 +212,17 @@ def filter_fix(fix_msg, status_msg):
     cov[8] = multiplier * max(cov[8], min_alt_cov)
     fix_msg.position_covariance = tuple(cov)
 
-    return fix_msg
+    fix_quality_msg.quality = fix_quality
+    fix_quality_msg.state = state
+    fix_quality_msg.covariance_multiplier = multiplier
+
+    return fix_msg, fix_quality_msg
 
 
 last_cb_stamp = rospy.Time.now()
 last_fix_stamp = None
 fix_regained_stamp = None
-state = STATE_NO_FIX
+state = NavSatFixQuality.STATE_NO_FIX
 
 fix_only_sub = rospy.Subscriber("gps/fix", NavSatFix, fix_only_cb, queue_size=10)
 fix_sub = Subscriber("gps/fix", NavSatFix, queue_size=10)

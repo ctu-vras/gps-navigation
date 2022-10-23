@@ -243,7 +243,7 @@ def initial_pose_cb(pose_msg):
         utm_pose = tf_buffer.transform(pose, "utm", rospy.Duration(1))
 
         _, _, utm_zone, _ = utm.from_latlon(last_fix_msg.latitude, last_fix_msg.longitude)
-        lat, lon = utm.to_latlon(utm_pose.pose.pose.position.x, utm_pose.pose.pose.position.y, utm_zone)
+        lat, lon = utm.to_latlon(utm_pose.pose.position.x, utm_pose.pose.position.y, utm_zone)
 
         fix_msg = NavSatFix()
         fix_msg.header.stamp = rospy.Time.now()

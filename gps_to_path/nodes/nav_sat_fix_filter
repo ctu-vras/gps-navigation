@@ -15,7 +15,7 @@ from collections import deque
 from threading import Lock
 import utm
 
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped
 from message_filters import TimeSynchronizer, Subscriber
 import rospy
 from sensor_msgs.msg import NavSatFix, NavSatStatus
@@ -237,9 +237,14 @@ def initial_pose_cb(pose_msg):
         return
 
     try:
+        pose = PoseStamped()
+        pose.header = pose_msg.header
+        pose.pose = pose_msg.pose.pose
+        utm_pose = tf_buffer.transform(pose, "utm", rospy.Duration(1))
+
         _, _, utm_zone, _ = utm.from_latlon(last_fix_msg.latitude, last_fix_msg.longitude)
-        utm_pose = tf_buffer.transform(pose_msg, "utm", rospy.Duration(1))
         lat, lon = utm.to_latlon(utm_pose.pose.pose.position.x, utm_pose.pose.pose.position.y, utm_zone)
+
         fix_msg = NavSatFix()
         fix_msg.header.stamp = rospy.Time.now()
         fix_msg.header.frame_id = last_fix_msg.header.frame_id

@@ -11,14 +11,16 @@ It can either subscribe to :class:`sensor_msgs.msg.NavSatFix` messages alone, or
 :class:`gps_to_path.msg.NavSatDetailedStatus` messages. It automatically tries to subscribe to both, and when it detects
 that the detailed status messages are available, it only uses the algorithm that takes the detailed status into account.
 """
-import math
 from collections import deque
 from threading import Lock
+import utm
 
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from message_filters import TimeSynchronizer, Subscriber
 import rospy
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from gps_to_path.msg import NavSatDetailedStatus, NavSatFixQuality
+from tf2_ros import Buffer, TransformListener
 
 rospy.init_node("nav_sat_fix_filter")
 
@@ -130,7 +132,7 @@ def filter_fix(fix_msg, status_msg):
     :param NavSatDetailedStatus status_msg: 
     """
     global last_cb_stamp
-    global last_fix_stamp
+    global last_fix_msg
     global fix_regained_stamp
     global state
 
@@ -142,19 +144,19 @@ def filter_fix(fix_msg, status_msg):
 
     if last_cb_stamp > rospy.Time.now() + rospy.Duration(3):
         rospy.loginfo("ROS time jumped backwards, resetting.")
-        last_fix_stamp = None
+        last_fix_msg = None
         state = NavSatFixQuality.STATE_NO_FIX
     last_cb_stamp = rospy.Time.now()
 
     if state == NavSatFixQuality.STATE_NO_FIX:
         state = NavSatFixQuality.STATE_HAS_FIX
 
-    if state == NavSatFixQuality.STATE_HAS_FIX and last_fix_stamp is not None \
-            and fix_msg.header.stamp - last_fix_stamp > fix_lost_duration:
+    if state == NavSatFixQuality.STATE_HAS_FIX and last_fix_msg is not None \
+            and fix_msg.header.stamp - last_fix_msg.header.stamp > fix_lost_duration:
         state = NavSatFixQuality.STATE_FIX_RECONVERGING
         fix_regained_stamp = fix_msg.header.stamp
         rospy.loginfo("Fix lost")
-    last_fix_stamp = fix_msg.header.stamp
+    last_fix_msg = fix_msg
 
     if state == NavSatFixQuality.STATE_FIX_RECONVERGING and \
             fix_msg.header.stamp > fix_regained_stamp + fix_reconvergence_duration:
@@ -219,8 +221,57 @@ def filter_fix(fix_msg, status_msg):
     return fix_msg, fix_quality_msg
 
 
+def initial_pose_cb(pose_msg):
+    """Callback for rviz marker that sets the robot pose.
+
+    :param PoseWithCovarianceStamped pose_msg: 
+    """
+    global last_cb_stamp
+    global fix_regained_stamp
+    global state
+    global last_fix_msg
+
+    if last_fix_msg is None:
+        rospy.logerr("UTM zone is not known. Need to receive at least one bad fix message to proceed.")
+        return
+
+    try:
+        _, _, utm_zone, _ = utm.from_latlon(last_fix_msg.latitude, last_fix_msg.longitude)
+        utm_pose = tf_buffer.transform(pose_msg, "utm", rospy.Duration(1))
+        lat, lon = utm.to_latlon(utm_pose.pose.pose.position.x, utm_pose.pose.pose.position.y, utm_zone)
+        fix_msg = NavSatFix()
+        fix_msg.header.stamp = rospy.Time.now()
+        fix_msg.header.frame_id = last_fix_msg.header.frame_id
+        fix_msg.status.status = NavSatStatus.STATUS_GBAS_FIX
+        fix_msg.status.service = NavSatStatus.SERVICE_GPS
+        fix_msg.latitude = lat
+        fix_msg.longitude = lon
+        fix_msg.altitude = last_fix_msg.altitude
+        fix_msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
+        fix_msg.position_covariance = [1e-4, 0, 0, 0, 1e-4, 0, 0, 0, 1]
+
+        fix_status_msg = NavSatDetailedStatus()
+        fix_status_msg.header = fix_msg.header
+        fix_status_msg.last_corrections_time = rospy.Time.now()
+        fix_status_msg.integer_ambiguity_ratio = 10
+        fix_status_msg.satellites_used = 100
+        fix_status_msg.gps_time.header = fix_status_msg.header
+        fix_status_msg.gps_time.time_ref = rospy.Time.now()
+        fix_status_msg.gps_time.source = "user"
+
+        state = NavSatFixQuality.STATE_HAS_FIX
+        last_fix_msg = fix_msg
+
+        fix_with_status_cb(fix_msg, fix_status_msg)
+    except Exception as e:
+        rospy.logerr(str(e))
+
+
+tf_buffer = Buffer()
+tf_listener = TransformListener(tf_buffer)
+
 last_cb_stamp = rospy.Time.now()
-last_fix_stamp = None
+last_fix_msg = None
 fix_regained_stamp = None
 state = NavSatFixQuality.STATE_NO_FIX
 
@@ -229,5 +280,6 @@ fix_sub = Subscriber("gps/fix", NavSatFix, queue_size=10)
 fix_status_sub = Subscriber("gps/fix_status", NavSatDetailedStatus, queue_size=10)
 sub = TimeSynchronizer((fix_sub, fix_status_sub), queue_size=10)
 sub.registerCallback(fix_with_status_cb)
+initial_pose_sub = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, initial_pose_cb, queue_size=1)
 
 rospy.spin()

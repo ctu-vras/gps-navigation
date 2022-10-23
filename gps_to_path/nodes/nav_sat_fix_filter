@@ -21,6 +21,7 @@ import rospy
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from gps_to_path.msg import NavSatDetailedStatus, NavSatFixQuality
 from tf2_ros import Buffer, TransformListener
+import tf2_geometry_msgs
 
 rospy.init_node("nav_sat_fix_filter")
 

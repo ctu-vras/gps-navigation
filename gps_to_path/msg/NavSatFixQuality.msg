@@ -11,4 +11,6 @@ uint8 QUALITY_DEGRADED = 2
 uint8 QUALITY_BAD = 3
 uint8 quality
 
+string[] comments
+
 float64 covariance_multiplier

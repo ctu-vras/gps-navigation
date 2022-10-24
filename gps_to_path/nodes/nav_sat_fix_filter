@@ -11,11 +11,12 @@ It can either subscribe to :class:`sensor_msgs.msg.NavSatFix` messages alone, or
 :class:`gps_to_path.msg.NavSatDetailedStatus` messages. It automatically tries to subscribe to both, and when it detects
 that the detailed status messages are available, it only uses the algorithm that takes the detailed status into account.
 """
-
+import math
 from collections import deque
 import numpy as np
 from threading import Lock
 import utm
+from geometry_msgs.msg import PoseStamped
 
 from gps_to_path.msg import NavSatDetailedStatus, NavSatFixQuality
 from message_filters import TimeSynchronizer, Subscriber
@@ -36,6 +37,19 @@ fix_quality_names = {
 }
 
 RTK_FIX_STATUSES = (NavSatStatus.STATUS_GBAS_FIX, NavSatStatus.STATUS_SBAS_FIX)
+
+
+class UtmFix(object):
+    def __init__(self, easting, northing, stamp):
+        """GPS fix converted to UTM frame.
+
+        :param float easting:
+        :param float northing:
+        :param rospy.Time stamp:
+        """
+        self.easting = easting
+        self.northing = northing
+        self.stamp = stamp
 
 
 class NavSatFixFilter(object):
@@ -72,8 +86,8 @@ class NavSatFixFilter(object):
         self.processed_stamps = deque(maxlen=10)
         self.processed_stamps_lock = Lock()
         self.last_cb_stamp = rospy.Time.now()
-        self.last_fix_stamp = None
-        self.last_fix_utm = None
+        self.last_fix = None
+        self.forced_fix = None
         self.fix_regained_stamp = None
         self.fix_jumped_stamp = None
         self.state = NavSatFixQuality.STATE_NO_FIX
@@ -88,6 +102,7 @@ class NavSatFixFilter(object):
         fix_status_sub = Subscriber("gps/fix_status", NavSatDetailedStatus, queue_size=10)
         self.sub = TimeSynchronizer((fix_sub, fix_status_sub), queue_size=10)
         self.sub.registerCallback(self.fix_with_status_cb)
+        self.force_pose_sub = rospy.Subscriber("force_pose_utm", PoseStamped, self.force_pose_cb, queue_size=1)
 
     def fix_only_cb(self, fix_msg):
         """Callback for fix messages without status.
@@ -170,8 +185,7 @@ class NavSatFixFilter(object):
 
         if self.last_cb_stamp > rospy.Time.now() + rospy.Duration(3):
             rospy.loginfo("ROS time jumped backwards, resetting.")
-            self.last_fix_stamp = None
-            self.last_fix_utm = None
+            self.last_fix = None
             self.state = NavSatFixQuality.STATE_NO_FIX
             fix_quality_msg.comments.append("ROS time jumped back.")
         self.last_cb_stamp = rospy.Time.now()
@@ -179,8 +193,8 @@ class NavSatFixFilter(object):
         if self.state == NavSatFixQuality.STATE_NO_FIX:
             self.state = NavSatFixQuality.STATE_HAS_FIX
 
-        if self.state == NavSatFixQuality.STATE_HAS_FIX and self.last_fix_stamp is not None \
-                and fix_msg.header.stamp - self.last_fix_stamp > self.fix_lost_duration:
+        if self.state == NavSatFixQuality.STATE_HAS_FIX and self.last_fix is not None \
+                and fix_msg.header.stamp - self.last_fix.stamp > self.fix_lost_duration:
             self.state = NavSatFixQuality.STATE_FIX_RECONVERGING
             fix_quality_msg.comments.append("Fix lost.")
             self.fix_regained_stamp = fix_msg.header.stamp
@@ -197,21 +211,37 @@ class NavSatFixFilter(object):
             fix_msg.latitude, fix_msg.longitude, self.utm_zone, self.utm_zone_letter)
 
         fix_is_jumping = False
-        if self.last_fix_stamp is not None and self.last_fix_utm is not None:
-            last_x, last_y = self.last_fix_utm
+        if self.last_fix is not None:
+            last_x, last_y = self.last_fix.easting, self.last_fix.northing
             distance = np.linalg.norm([x - last_x, y - last_y])
-            dt = (fix_msg.header.stamp - self.last_fix_stamp).to_sec()
+            dt = (fix_msg.header.stamp - self.last_fix.stamp).to_sec()
             velocity = distance / dt if dt > 1e-9 else 0.0
             if velocity > self.nonsense_velocity:
                 self.state = NavSatFixQuality.STATE_FIX_RECONVERGING
                 self.fix_regained_stamp = fix_msg.header.stamp
+                fix_is_jumping = True
                 fix_quality_msg.comments.append("Nonsensical large jump in distance detected.")
             elif velocity > self.max_velocity:
                 fix_is_jumping = True
                 self.fix_jumped_stamp = fix_msg.header.stamp
 
-        self.last_fix_stamp = fix_msg.header.stamp
-        self.last_fix_utm = (x, y)
+        if self.forced_fix is not None and not fix_is_jumping:
+            forced_x, forced_y = self.forced_fix.easting, self.forced_fix.northing
+            distance = np.linalg.norm([x - forced_x, y - forced_y])
+            dt = (fix_msg.header.stamp - self.forced_fix.stamp).to_sec()
+            dt = max(dt, 1.0)
+            base_distance = math.sqrt(self.max_cov)
+            jump_distance = base_distance + dt * self.max_velocity
+            nonsense_distance = base_distance + dt * self.nonsense_velocity
+            if distance > nonsense_distance:
+                self.state = NavSatFixQuality.STATE_NO_FIX
+                fix_quality_msg.comments.append("Nonsensical distance from manually specified coordinates.")
+            elif distance > jump_distance:
+                self.state = NavSatFixQuality.STATE_FIX_RECONVERGING
+                self.fix_regained_stamp = fix_msg.header.stamp
+                fix_quality_msg.comments.append("Large distance from manually specified coordinates.")
+
+        self.last_fix = UtmFix(x, y, fix_msg.header.stamp)
 
         if self.state != NavSatFixQuality.STATE_HAS_FIX:
             fix_quality_msg.state = self.state
@@ -281,8 +311,23 @@ class NavSatFixFilter(object):
 
         return fix_msg, fix_quality_msg
 
+    def force_pose_cb(self, pose_msg):
+        """Callback for rviz marker that sets the robot pose.
+
+        :param PoseStamped pose_msg: 
+        """
+        if pose_msg.header.frame_id != "utm":
+            rospy.logerr("Topic %s needs to contain messages in utm frame, but a message in frame %s was received!" % (
+                self.force_pose_sub.resolved_name, pose_msg.header.frame_id))
+            return
+        self.forced_fix = UtmFix(pose_msg.pose.position.x, pose_msg.pose.position.y, pose_msg.header.stamp)
+
+    @staticmethod
+    def run():
+        rospy.spin()
+
 
 if __name__ == '__main__':
     rospy.init_node("nav_sat_fix_filter")
-    filter = NavSatFixFilter()
-    rospy.spin()
+    node = NavSatFixFilter()
+    node.run()

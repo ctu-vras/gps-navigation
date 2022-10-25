@@ -33,8 +33,8 @@ class WaypointsToPath(object):
                 tf = numpify(tf.transform)
                 z = tf[2, 3]
             except TransformException as ex:
-                rospy.logerr('Could not transform from %s to %s at time %.3f.',
-                             self.z_frame, self.target_frame, msg.header.stamp.to_sec())
+                rospy.logerr('Could not transform from %s to %s at time %.3f: %s',
+                             self.z_frame, self.target_frame, msg.header.stamp.to_sec(), str(ex))
                 return
         elif self.constant_z is not None:
             z = self.constant_z
@@ -47,8 +47,8 @@ class WaypointsToPath(object):
                                               rospy.Duration.from_sec(self.timeout))
                 tf = numpify(tf.transform)
             except TransformException as ex:
-                rospy.logerr('Could not transform from %s to %s at time %.3f.',
-                             msg.header.frame_id, self.target_frame, msg.header.stamp.to_sec())
+                rospy.logerr('Could not transform from %s to %s at time %.3f: %s',
+                             msg.header.frame_id, self.target_frame, msg.header.stamp.to_sec(), str(ex))
                 return
 
         path_msg = Path()

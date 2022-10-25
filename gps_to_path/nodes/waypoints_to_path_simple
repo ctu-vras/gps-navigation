@@ -18,7 +18,7 @@ class WaypointsToPath(object):
         self.z_frame = rospy.get_param('~z_frame', 'base_link')
         self.timeout = rospy.get_param('~timeout', 1.0)
 
-        self.path_pub = rospy.Publisher('path', Path, queue_size=2)
+        self.path_pub = rospy.Publisher('path', Path, queue_size=2, latch=True)
         self.waypoints_sub = rospy.Subscriber('waypoints', Waypoints, self.convert, queue_size=2)
 
     def convert(self, msg):

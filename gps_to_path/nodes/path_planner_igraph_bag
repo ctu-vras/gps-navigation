@@ -1040,8 +1040,8 @@ class PathPlanner():
                     rospy.logwarn("Saving finished.")
 
                 self.sub_graphs = self.osm_planner.sub_graphs
-                
-                if self.osm_planner.robot_position_first_point:
+
+                if hasattr(self.osm_planner, 'robot_position_first_point') and self.osm_planner.robot_position_first_point:
                     self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.
 
                 first_waypoint = geometry.Point(np.ravel(self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['start_index_graph']]))

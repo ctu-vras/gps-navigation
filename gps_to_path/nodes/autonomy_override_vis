@@ -55,7 +55,7 @@ class AutonomyOverrideVisualization(cras.Node):
         self.point.header.frame_id = self.base_link_frame_id
         self.point.header.stamp = rospy.Time(0)
 
-        self.pub = rospy.Publisher('autonomy_override_vis', PointCloud2, queue_size=1, latch=True)
+        self.pub = rospy.Publisher('autonomy_override_pcl', PointCloud2, queue_size=1, latch=True)
 
         self.sub1 = rospy.Subscriber('local_joy/cmd_vel', Twist, self.cb)
         self.sub2 = rospy.Subscriber('joy_local/cmd_vel', Twist, self.cb)

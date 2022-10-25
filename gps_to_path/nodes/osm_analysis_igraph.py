@@ -1,6 +1,10 @@
 from __future__ import division
 
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 from math import floor
 from multiprocessing.pool import ThreadPool
 

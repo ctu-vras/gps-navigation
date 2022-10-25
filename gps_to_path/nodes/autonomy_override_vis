@@ -90,7 +90,7 @@ class AutonomyOverrideVisualization(cras.Node):
             return
 
         is_zero = msg.linear.x == 0 and msg.linear.y == 0 and msg.angular.z == 0
-        point = np.zeros(0, dtype=pcl_dtype)
+        point = np.zeros(1, dtype=pcl_dtype)
         point['x'] = fixed_point.point.x
         point['y'] = fixed_point.point.y
         point['z'] = fixed_point.point.z

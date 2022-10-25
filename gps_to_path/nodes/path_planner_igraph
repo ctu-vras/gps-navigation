@@ -413,7 +413,7 @@ class PathPlanner():
                 r = 255
                 g = 0
 
-            current_waypoint_data = np.zeros(0, dtype=[
+            current_waypoint_data = np.zeros(1, dtype=[
                 ('x', np.float32),
                 ('y', np.float32),
                 ('z', np.float32),

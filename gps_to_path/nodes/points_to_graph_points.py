@@ -34,7 +34,7 @@ def increase_line(line,dist_line,vec,n,density):
     after = line[-1] * np.ones((n,2)) + increase_vec
 
     line = np.concatenate((before,line,after),axis=0)
-    dist_line = np.concatenate((np.flip(arange_increase_vec),dist_line,arange_increase_vec),axis=0)
+    dist_line = np.concatenate((np.flip(arange_increase_vec, axis=0),dist_line,arange_increase_vec),axis=0)
     return line,dist_line
 
 def get_equidistant_points(p1, p2, n):

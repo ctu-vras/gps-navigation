@@ -7,7 +7,7 @@
     <arg name="repeat" default="false" />
     <arg name="flip" default="false" />
     <arg name="trav_obstacle_field" default="cost" />
-    <arg name="trav_topic" default="geometric_traversability_raw" />
+    <arg name="trav_topic" default="traversability" />
     <arg name="max_height" default="1.0"/>
     <arg name="min_height" default="-1."/>
     <arg name="run_gps_drivers" default="false" />
@@ -75,7 +75,7 @@
 <!-- TRAVERSABILITY PROCESSING -->
     <!-- <node pkg="gps_to_path" type="trav_to_obstacles_bag" name="trav_to_obstacles_bag" output="screen">
 
-        <remap from="cloud_segmentation/lidar_cloud" to="geometric_traversability_raw" />
+        <remap from="cloud_segmentation/lidar_cloud" to="$(arg trav_topic)" />
 
         <param name="max_height" type="double" value="$(arg max_height)"/>
         <param name="min_height" type="double" value="$(arg min_height)"/>

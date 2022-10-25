@@ -1,95 +1,142 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1" creator="gpx.py -- https://github.com/tkrajina/gpxpy">
-  <wpt lat="50.09769517304698" lon="14.136416942243814">
-  </wpt>
-  <wpt lat="50.09768601881867" lon="14.13641443845883">
-  </wpt>
-  <wpt lat="50.09752194113334" lon="14.136352700354516">
-  </wpt>
-  <wpt lat="50.097290187256704" lon="14.136266745783336">
-  </wpt>
-  <wpt lat="50.09706570135986" lon="14.136186816277725">
-  </wpt>
-  <wpt lat="50.09682409501472" lon="14.136098372031926">
-  </wpt>
-  <wpt lat="50.09629600202592" lon="14.13590030230191">
-  </wpt>
-  <wpt lat="50.096011396614266" lon="14.135791392719609">
-  </wpt>
-  <wpt lat="50.09573180750672" lon="14.135689709519907">
-  </wpt>
-  <wpt lat="50.09548702608489" lon="14.135596322106505">
-  </wpt>
-  <wpt lat="50.095455653314076" lon="14.13558586030229">
-  </wpt>
-  <wpt lat="50.09514416043611" lon="14.135469882085706">
-  </wpt>
-  <wpt lat="50.09486779017257" lon="14.135365659402702">
-  </wpt>
-  <wpt lat="50.09458620513242" lon="14.135263008466772">
-  </wpt>
-  <wpt lat="50.09431205775027" lon="14.13516126347678">
-  </wpt>
-  <wpt lat="50.094021761511726" lon="14.135059684159668">
-  </wpt>
-  <wpt lat="50.093737826232775" lon="14.134954165999364">
-  </wpt>
-  <wpt lat="50.09344709303302" lon="14.134842804357085">
-  </wpt>
-  <wpt lat="50.09332709846769" lon="14.13479650523978">
-  </wpt>
-  <wpt lat="50.0932921948425" lon="14.134781174917363">
-  </wpt>
-  <wpt lat="50.093261419362086" lon="14.134766503345476">
-  </wpt>
-  <wpt lat="50.093260171663985" lon="14.134763870021564">
-  </wpt>
-  <wpt lat="50.092635153134786" lon="14.134524492614549">
-  </wpt>
-  <wpt lat="50.09255909779507" lon="14.134497917380141">
-  </wpt>
-  <wpt lat="50.09250597015186" lon="14.134479806945054">
-  </wpt>
-  <wpt lat="50.092436275783044" lon="14.134452383072553">
-  </wpt>
-  <wpt lat="50.092319889741525" lon="14.13440752226996">
-  </wpt>
-  <wpt lat="50.09195693945536" lon="14.134272460470537">
-  </wpt>
-  <wpt lat="50.091827465406936" lon="14.134224480728344">
-  </wpt>
-  <wpt lat="50.09162802768438" lon="14.134156194993734">
-  </wpt>
-  <wpt lat="50.09126611396374" lon="14.134014373737724">
-  </wpt>
-  <wpt lat="50.091191208081135" lon="14.133987660097027">
-  </wpt>
-  <wpt lat="50.091035692208685" lon="14.133931126378712">
-  </wpt>
-  <wpt lat="50.09099567097378" lon="14.133925815511228">
-  </wpt>
-  <wpt lat="50.090831360682756" lon="14.133862155147726">
-  </wpt>
-  <wpt lat="50.09065934811694" lon="14.13379907451973">
-  </wpt>
-  <wpt lat="50.090540968111206" lon="14.13375256655863">
-  </wpt>
-  <wpt lat="50.09029380724387" lon="14.133659016413521">
-  </wpt>
-  <wpt lat="50.09010237688174" lon="14.1335821421652">
-  </wpt>
-  <wpt lat="50.09007606238883" lon="14.13357438098569">
-  </wpt>
-  <wpt lat="50.09007554503453" lon="14.13357418427571">
-  </wpt>
-  <wpt lat="50.090003849452614" lon="14.133546229384008">
-  </wpt>
-  <wpt lat="50.090004845455105" lon="14.133541211332611">
-  </wpt>
-  <wpt lat="50.09001104997562" lon="14.133510022389093">
-  </wpt>
-  <wpt lat="50.09003825437269" lon="14.133266772061786">
-  </wpt>
-  <wpt lat="50.090039043639905" lon="14.133259583492396">
-  </wpt>
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="https://mapy.cz/">
+	<wpt lat="50.097695" lon="14.136417">
+		<name>Point 1</name>
+	</wpt>
+	<wpt lat="50.097686" lon="14.136414">
+		<name>Point 2</name>
+	</wpt>
+	<wpt lat="50.097522" lon="14.136353">
+		<name>Point 3</name>
+	</wpt>
+	<wpt lat="50.097290" lon="14.136267">
+		<name>Point 4</name>
+	</wpt>
+	<wpt lat="50.097066" lon="14.136187">
+		<name>Point 5</name>
+	</wpt>
+	<wpt lat="50.096824" lon="14.136098">
+		<name>Point 6</name>
+	</wpt>
+	<wpt lat="50.096296" lon="14.135900">
+		<name>Point 7</name>
+	</wpt>
+	<wpt lat="50.096011" lon="14.135791">
+		<name>Point 8</name>
+	</wpt>
+	<wpt lat="50.095732" lon="14.135690">
+		<name>Point 9</name>
+	</wpt>
+	<wpt lat="50.095487" lon="14.135596">
+		<name>Point 10</name>
+	</wpt>
+	<wpt lat="50.095456" lon="14.135586">
+		<name>Point 11</name>
+	</wpt>
+	<wpt lat="50.095144" lon="14.135470">
+		<name>Point 12</name>
+	</wpt>
+	<wpt lat="50.094868" lon="14.135366">
+		<name>Point 13</name>
+	</wpt>
+	<wpt lat="50.094586" lon="14.135263">
+		<name>Point 14</name>
+	</wpt>
+	<wpt lat="50.094312" lon="14.135161">
+		<name>Point 15</name>
+	</wpt>
+	<wpt lat="50.094022" lon="14.135060">
+		<name>Point 16</name>
+	</wpt>
+	<wpt lat="50.093738" lon="14.134954">
+		<name>Point 17</name>
+	</wpt>
+	<wpt lat="50.093447" lon="14.134843">
+		<name>Point 18</name>
+	</wpt>
+	<wpt lat="50.093327" lon="14.134797">
+		<name>Point 19</name>
+	</wpt>
+	<wpt lat="50.093292" lon="14.134781">
+		<name>Point 20</name>
+	</wpt>
+	<wpt lat="50.093261" lon="14.134767">
+		<name>Point 21</name>
+	</wpt>
+	<wpt lat="50.093260" lon="14.134764">
+		<name>Point 22</name>
+	</wpt>
+	<wpt lat="50.092635" lon="14.134524">
+		<name>Point 23</name>
+	</wpt>
+	<wpt lat="50.092559" lon="14.134498">
+		<name>Point 24</name>
+	</wpt>
+	<wpt lat="50.092506" lon="14.134480">
+		<name>Point 25</name>
+	</wpt>
+	<wpt lat="50.092436" lon="14.134452">
+		<name>Point 26</name>
+	</wpt>
+	<wpt lat="50.092320" lon="14.134408">
+		<name>Point 27</name>
+	</wpt>
+	<wpt lat="50.091957" lon="14.134272">
+		<name>Point 28</name>
+	</wpt>
+	<wpt lat="50.091827" lon="14.134224">
+		<name>Point 29</name>
+	</wpt>
+	<wpt lat="50.091628" lon="14.134156">
+		<name>Point 30</name>
+	</wpt>
+	<wpt lat="50.091266" lon="14.134014">
+		<name>Point 31</name>
+	</wpt>
+	<wpt lat="50.091191" lon="14.133988">
+		<name>Point 32</name>
+	</wpt>
+	<wpt lat="50.091036" lon="14.133931">
+		<name>Point 33</name>
+	</wpt>
+	<wpt lat="50.090996" lon="14.133926">
+		<name>Point 34</name>
+	</wpt>
+	<wpt lat="50.090831" lon="14.133862">
+		<name>Point 35</name>
+	</wpt>
+	<wpt lat="50.090659" lon="14.133799">
+		<name>Point 36</name>
+	</wpt>
+	<wpt lat="50.090541" lon="14.133753">
+		<name>Point 37</name>
+	</wpt>
+	<wpt lat="50.090294" lon="14.133659">
+		<name>Point 38</name>
+	</wpt>
+	<wpt lat="50.090102" lon="14.133582">
+		<name>Point 39</name>
+	</wpt>
+	<wpt lat="50.090076" lon="14.133574">
+		<name>Point 40</name>
+	</wpt>
+	<wpt lat="50.090076" lon="14.133574">
+		<name>Point 41</name>
+	</wpt>
+	<wpt lat="50.090004" lon="14.133546">
+		<name>Point 42</name>
+	</wpt>
+	<wpt lat="50.090005" lon="14.133541">
+		<name>Point 43</name>
+	</wpt>
+	<wpt lat="50.090011" lon="14.133510">
+		<name>Point 44</name>
+	</wpt>
+	<wpt lat="50.090038" lon="14.133267">
+		<name>Point 45</name>
+	</wpt>
+	<wpt lat="50.090039" lon="14.133260">
+		<name>Point 46</name>
+	</wpt>
 </gpx>
+

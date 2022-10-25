@@ -997,10 +997,10 @@ class PathPlanner():
                     self.waypoints_msg = self.generate_waypoints_msg(self.waypoints)
                     self.pub_path_waypoints.publish(self.waypoints_msg)
                 
-                # Pulbish original and processed (OSM, max_dist...) waypoints. 
-                """ if not self.static_waypoints_published:
+                # Publish original and processed (OSM, max_dist...) waypoints. 
+                if not self.static_waypoints_published:
                     self.publish_static_waypoints()
-                    self.static_waypoints_published = True """
+                    self.static_waypoints_published = True
 
                 rate.sleep()
                 

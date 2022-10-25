@@ -1,26 +1,41 @@
 #!/usr/bin/env python
+import os.path
+import sys
 
 import osm_analysis_igraph
 import rospy
 import numpy as np
 import pickle
 import shapely.geometry as geometry
+import rospkg
 
-rospy.init_node('osm_only_node')
+rospy.init_node('osm_pickler', anonymous=True)
 
-gpx_pre = "/home/robot/0923/src/gps-navigation/gps_to_path/data/"
-gpx_file_names = ["CH-forest-north_short_circle_debug.gpx"]#"unhost_final_demo_spot_east_trimmed.gpx"]
+rospack = rospkg.RosPack()
+gpx_pre = rospack.get_path("gps_to_path") + "/data"
+
+if len(sys.argv) > 1:
+    gpx_file_names = sys.argv[1:]
+else:
+    gpx_file_names = ["CH-forest-north_short_circle_debug.gpx"]#"unhost_final_demo_spot_east_trimmed.gpx"]
 
 for fn in gpx_file_names:
-    fn = gpx_pre + fn
+    fn = os.path.join(gpx_pre, fn)
     osm_planner = osm_analysis_igraph.PathAnalysis(fn,
                                                     True,
-                                                    np.array([[459595,5553117]]),
+                                                    # np.array([[459595,5553117]]),
                                                     #np.array([[438006,5549044]]),
+                                                    None,
                                                     True,
                                                     False,
                                                     False)
     osm_planner.run_ros()
+
+    # these cannot be pickled
+    osm_planner.api = None
+    osm_planner.osm_rels_data = None  # cannot be pickled
+    osm_planner.roads = osm_planner.ways = osm_planner.barriers_list = osm_planner.footways = None
+    osm_planner.osm_ways_data = osm_planner.roads_list = osm_planner.barriers = osm_planner.footways_list = None
 
     with open(fn[:-4]+'.osm_planner', 'wb') as handle:
         pickle.dump(osm_planner, handle, protocol=pickle.HIGHEST_PROTOCOL)

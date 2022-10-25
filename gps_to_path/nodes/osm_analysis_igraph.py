@@ -1,5 +1,6 @@
 from __future__ import division
 
+import pickle
 from math import floor
 from multiprocessing.pool import ThreadPool
 
@@ -177,6 +178,7 @@ class PathAnalysis:
         #self.waypoints = np.genfromtxt(in_file, delimiter=',') # This works for .csv files...
 
         # Gpx file to numpy array.
+        self.coords_file = coords_file
         gpx_f = open(coords_file, 'r')
         gpx_object = gpxpy.parse(gpx_f)
         self.waypoints = np.array([[point.latitude,point.longitude] for point in gpx_object.waypoints])
@@ -1360,7 +1362,7 @@ class PathAnalysis:
                 way_query = self.get_way_query()
                 osm_ways_data = self.api.query(way_query)
                 self.way_query = way_query
-                self.osm_ways_data = osm_ways_data
+                self.osm_ways_data = make_overpy_result_picklable(osm_ways_data)
                 break
             except Exception as e:
                 rospy.loginfo(e)
@@ -1375,7 +1377,7 @@ class PathAnalysis:
                 rel_query = self.get_rel_query()
                 osm_rels_data = self.api.query(rel_query)
                 self.rel_query = rel_query
-                self.osm_rels_data = osm_rels_data
+                self.osm_rels_data = make_overpy_result_picklable(osm_rels_data)
                 break
             except Exception as e:
                 rospy.loginfo(e)
@@ -1391,7 +1393,7 @@ class PathAnalysis:
                     node_query = self.get_node_query()  # Query sometimes times out...
                     osm_nodes_data = self.api.query(node_query)
                     self.node_query = node_query
-                    self.osm_nodes_data = osm_nodes_data
+                    self.osm_nodes_data = make_overpy_result_picklable(osm_nodes_data)
                     break
                 except Exception as e:
                     rospy.loginfo(e)
@@ -1461,7 +1463,33 @@ class PathAnalysis:
             cost *= ROAD_CROSSINGS_RANKS
             ranked_segments_2[(ROAD_CROSSINGS_RANKS-1) if cost >= (ROAD_CROSSINGS_RANKS-1) else int(floor(cost))].append(segment[0].buffer(7/2))
         self.road_polygons = ranked_segments_2
-        
-        
+
+    def save_to_pickle(self, filename=None):
+        fn = self.coords_file if filename is None else filename
+        with open(fn[:-4]+'.osm_planner', 'wb') as handle:
+            pickle.dump(self, handle, protocol=2)
+
 # Useful links:
 # https://gis.stackexchange.com/questions/259422/how-to-get-a-multipolygon-object-from-overpass-ql
+
+
+# fix for pickling overpy.Result on Melodic
+
+
+def make_overpy_picklable(data):
+    if hasattr(data, '_attribute_modifiers'):
+        data._attribute_modifiers = None
+    return data
+
+
+def make_overpy_result_picklable(sample):
+    sample = make_overpy_picklable(sample)
+    for i in range(len(sample.nodes)):
+        sample.nodes[i] = make_overpy_picklable(sample.nodes[i])
+    for i in range(len(sample.ways)):
+        sample.ways[i] = make_overpy_picklable(sample.ways[i])
+    for i in range(len(sample.areas)):
+        sample.areas[i] = make_overpy_picklable(sample.areas[i])
+    for i in range(len(sample.relations)):
+        sample.relations[i] = make_overpy_picklable(sample.relations[i])
+    return sample

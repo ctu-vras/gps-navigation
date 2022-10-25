@@ -7,6 +7,7 @@ import os
 import rospy
 import ros_numpy
 import time
+from ros_numpy.point_cloud2 import merge_rgb_fields
 from threading import Lock
 from sensor_msgs.msg import NavSatFix,PointCloud2
 from geometry_msgs.msg import Point
@@ -426,7 +427,7 @@ class PathPlanner():
             current_waypoint_data['r'] = r
             current_waypoint_data['g'] = g
 
-            marker = ros_numpy.msgify(PointCloud2, current_waypoint_data)
+            marker = ros_numpy.msgify(PointCloud2, merge_rgb_fields(current_waypoint_data))
             marker.header.stamp = rospy.Time.now()
             marker.header.frame_id = "utm"
 

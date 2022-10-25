@@ -30,6 +30,7 @@ import rospy
 
 from geometry_msgs.msg import PointStamped, Twist
 from ros_numpy import msgify
+from ros_numpy.point_cloud2 import merge_rgb_fields
 import tf2_geometry_msgs
 from tf2_ros import Buffer, TransformException, TransformListener
 from sensor_msgs.msg import PointCloud2
@@ -101,7 +102,7 @@ class AutonomyOverrideVisualization(cras.Node):
         self.pub.publish(self.create_pcl_msg())
 
     def create_pcl_msg(self):
-        msg = msgify(PointCloud2, self.point_data)
+        msg = msgify(PointCloud2, merge_rgb_fields(self.point_data))
         msg.header.stamp = rospy.Time.now()
         msg.header.frame_id = self.fixed_frame_id
         return msg

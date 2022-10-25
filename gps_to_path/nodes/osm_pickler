@@ -1,29 +1,34 @@
 #!/usr/bin/env python
+import os.path
+import sys
 
 import osm_analysis_igraph
 import rospy
-import numpy as np
-import pickle
-import shapely.geometry as geometry
+import rospkg
 
-rospy.init_node('osm_only_node')
+rospy.init_node('osm_pickler', anonymous=True)
 
-gpx_pre = "/home/robot/0923/src/gps-navigation/gps_to_path/data/"
-gpx_file_names = ["CH-forest-north_short_circle_debug.gpx"]#"unhost_final_demo_spot_east_trimmed.gpx"]
+rospack = rospkg.RosPack()
+gpx_pre = rospack.get_path("gps_to_path") + "/data"
+
+if len(sys.argv) > 1:
+    gpx_file_names = sys.argv[1:]
+else:
+    gpx_file_names = ["CH-forest-north_short_circle_debug.gpx"]#"unhost_final_demo_spot_east_trimmed.gpx"]
+
+robot_pose = None
+#robot_pose = np.array([[459595,5553117]])
 
 for fn in gpx_file_names:
-    fn = gpx_pre + fn
+    fn = os.path.join(gpx_pre, fn)
     osm_planner = osm_analysis_igraph.PathAnalysis(fn,
                                                     True,
-                                                    np.array([[459595,5553117]]),
-                                                    #np.array([[438006,5549044]]),
+                                                    robot_pose,
                                                     True,
                                                     False,
                                                     False)
     osm_planner.run_ros()
-
-    with open(fn[:-4]+'.osm_planner', 'wb') as handle:
-        pickle.dump(osm_planner, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    osm_planner.save_to_pickle()
 
 """ with open('/home/robot/0923/src/gps-navigation/gps_to_path/data/unhost_final_demo_spot_east', 'rb') as handle:
     b = pickle.load(handle)

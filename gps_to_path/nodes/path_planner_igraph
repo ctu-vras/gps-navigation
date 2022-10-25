@@ -999,8 +999,8 @@ class PathPlanner():
                         self.osm_planner = pickle.load(handle)
                     rospy.loginfo("OSM data loaded.")
 
-                except:
-                    rospy.logwarn("OSM pickle {} not found.".format(osm_fn))
+                except Exception as e:
+                    rospy.logwarn("OSM pickle {} not loaded (error is {}).".format(osm_fn, str(e)))
                     rospy.logwarn("Running OSM analysis instead.")
                     self.osm_planner = osm_analysis_igraph.PathAnalysis(self.gpx_assignment,
                                                             True,
@@ -1009,6 +1009,7 @@ class PathPlanner():
                                                             self.osm_use_solitary_nodes,
                                                             self.flip)
                     self.osm_planner.run_ros()
+                    self.osm_planner.save_to_pickle()
 
                 self.sub_graphs = self.osm_planner.sub_graphs
                 self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.

@@ -28,7 +28,7 @@ class WaypointsToPath(object):
         z = None
         if self.target_frame and self.z_frame:
             try:
-                tf = self.tf.lookup_transform(self.target_frame, self.z_frame, msg.header.stamp,
+                tf = self.tf.lookup_transform(self.target_frame, self.z_frame, rospy.Time(0),
                                               rospy.Duration.from_sec(self.timeout))
                 tf = numpify(tf.transform)
                 z = tf[2, 3]

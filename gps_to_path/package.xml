@@ -38,6 +38,7 @@
   <exec_depend condition="$ROS_DISTRO != noetic">python-numpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-OSMPythonTools</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-igraph</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-tqdm</exec_depend>
 
   <exec_depend condition="$ROS_DISTRO == noetic">python3-geopy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-gpxpy</exec_depend>
@@ -47,4 +48,5 @@
   <exec_depend condition="$ROS_DISTRO == noetic">python3-numpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-OSMPythonTools</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-igraph</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-tqdm</exec_depend>
 </package>

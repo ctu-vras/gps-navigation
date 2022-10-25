@@ -63,7 +63,7 @@
         <param name="z_offset" value="$(arg utm_z_offset)" />
     </node>
 
-    <node name="costmap_slow" pkg="topic_tools" type="throttle" args="bytes graph_pcd 250000 1 graph_pcd_slow" respawn="true" />
+    <node name="costmap_slow" pkg="topic_tools" type="throttle" args="bytes graph_pcd 2500000 10 graph_pcd_slow" respawn="true" />
     <node name="azimuth_slow" pkg="topic_tools" type="throttle" args="messages visualize_azimuth/azimuth_vis 2 visualize_azimuth/azimuth_vis_slow" respawn="true" />
     <node name="path_utm_slow" pkg="topic_tools" type="throttle" args="messages path_utm 2 path_utm_slow" respawn="true" />
 

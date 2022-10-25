@@ -300,10 +300,10 @@ class PathPlanner():
     
             goal_point = self.get_current_goal_point()
             
-            if sub_graph_ind < len(self.sub_graphs) - 1:
+            """ if sub_graph_ind < len(self.sub_graphs) - 1:
                 next_goal_point = self.sub_graphs[sub_graph_ind + 1]['graph_points'][self.sub_graphs[sub_graph_ind + 1]['goal_index_graph']]
             else:
-                next_goal_point = None
+                next_goal_point = None """
     
             if self.reached_goal_point(self.current_robot_position, goal_point):
                 if self.near_goal_point_time <= 0:
@@ -314,13 +314,13 @@ class PathPlanner():
                     call_next_waypoint = True
                     self.near_goal_point_time = -1.  
             # Switch to next goal_point if nearby it.
-            elif next_goal_point is not None and self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
+            """ elif next_goal_point is not None and self.next_waypoint_proximity_switch and self.reached_goal_point(self.current_robot_position, next_goal_point):
                 if self.near_next_waypoint_time <= 0:
                     self.near_next_waypoint_time = rospy.Time.now().to_sec()
     
                 if rospy.Time.now().to_sec() - self.near_next_waypoint_time >= self.min_time_near_goal:
                     call_next_waypoint = True
-                    self.near_next_waypoint_time = -1.      
+                    self.near_next_waypoint_time = -1.     """  
     
             if (rospy.Time.now() - self.subgraph_start_time).to_sec() > self.max_subgraph_time:
                 rospy.loginfo("Subgraph timed out after {}. Goal point {}/{} not reached. Moving onto the next one".format(
@@ -1010,8 +1010,15 @@ class PathPlanner():
                                                             self.flip)
                     self.osm_planner.run_ros()
 
-
                 self.sub_graphs = self.osm_planner.sub_graphs
+                self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.
+
+                first_waypoint = geometry.Point(np.ravel(self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]))
+                current_position_point = geometry.Point(np.ravel(self.current_robot_position))
+
+                current_pos_to_start_point_graph = self.osm_planner.generate_graph(current_position_point, first_waypoint)
+
+                self.sub_graphs.insert(0, current_pos_to_start_point_graph)
                     
                 if self.repeat:
                     self.all_sub_graphs = copy.copy(self.sub_graphs)

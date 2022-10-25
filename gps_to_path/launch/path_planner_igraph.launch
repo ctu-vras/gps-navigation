@@ -50,6 +50,7 @@
         <param name="trav_topic" type="string" value="$(arg trav_topic)"/>
         <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
         <param name="max_relative_path_cost_change" type="double" value="5."/>	
+        <param name="heading_diff_cost" type="double" value="10."/>
     </node>
 
 <!-- PATH -->
@@ -96,8 +97,15 @@
     <node name="waypoint_joy_tradr" pkg="topic_tools" type="relay" args="secondary_joy/joy waypoint_control/joy" />
 
 <!-- OSM PCD VISUALIZATION -->
-    <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
+    <!-- <node pkg="gps_to_path" type="osm_to_pcd_for_path_planner" name="osm_to_pcd_for_path_planner" output="screen">
         <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+    </node> -->
+
+    <node pkg="gps_to_path" type="osm_visualizer" name="osm_visualizer" output="screen">
+    	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
+    	<param name="do_transform_to_odom" type="bool" value="true"/>
+    	<param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+    	<param name="offset" type="string" value="0,0"/>
     </node>
 
 </launch>    

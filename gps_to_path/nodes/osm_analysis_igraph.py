@@ -170,6 +170,7 @@ RESERVE = 50 # meters
 class PathAnalysis:
     def __init__(self, coords_file, road_crossing, current_robot_position=None, use_osm=True,use_solitary_nodes=True, flip=False):
         
+        self.robot_position_first_point = False
         self.api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
         self.road_crossing = road_crossing
@@ -192,6 +193,7 @@ class PathAnalysis:
             self.waypoints = np.flip(self.waypoints, 0)
 
         if current_robot_position is not None:
+            self.robot_position_first_point = True
             self.waypoints = np.concatenate([current_robot_position,self.waypoints])
         
         self.max_x = np.max(self.waypoints[:,0]) + RESERVE
@@ -199,10 +201,11 @@ class PathAnalysis:
         self.max_y = np.max(self.waypoints[:,1]) + RESERVE
         self.min_y = np.min(self.waypoints[:,1]) - RESERVE
 
-        self.max_lat = utm.to_latlon(self.max_x, self.max_y, self.zone_number, self.zone_letter)[0]
-        self.max_long = utm.to_latlon(self.max_x, self.max_y, self.zone_number, self.zone_letter)[1]
-        self.min_lat = utm.to_latlon(self.min_x, self.min_y, self.zone_number, self.zone_letter)[0]
-        self.min_long = utm.to_latlon(self.min_x, self.min_y, self.zone_number, self.zone_letter)[1]
+
+        self.max_lat = utm.to_latlon(self.max_x + OSM_RECTANGLE_MARGIN, self.max_y + OSM_RECTANGLE_MARGIN, self.zone_number, self.zone_letter)[0]
+        self.max_long = utm.to_latlon(self.max_x + OSM_RECTANGLE_MARGIN, self.max_y + OSM_RECTANGLE_MARGIN, self.zone_number, self.zone_letter)[1]
+        self.min_lat = utm.to_latlon(self.min_x - OSM_RECTANGLE_MARGIN, self.min_y - OSM_RECTANGLE_MARGIN, self.zone_number, self.zone_letter)[0]
+        self.min_long = utm.to_latlon(self.min_x - OSM_RECTANGLE_MARGIN, self.min_y - OSM_RECTANGLE_MARGIN, self.zone_number, self.zone_letter)[1]
 
         self.points = list(map(geometry.Point, zip(self.waypoints[:,0], self.waypoints[:,1])))
 

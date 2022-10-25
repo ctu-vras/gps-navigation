@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import osm_analysis_igraph
+import os
+from tqdm import tqdm
+
 import rospy
 import numpy as np
 import pickle
@@ -19,13 +22,68 @@ import tf2_ros
 #BASE_POINT = np.array([[438006,5549044]])  # UNHOST
 #BASE_POINT = np.array([[459562,5553151]])   # CIMICKY HAJ
 
+
+
+class TQDMBytesReader(object):
+
+    def __init__(self, fd, **kwargs):
+        self.fd = fd
+        kw = {
+            'smoothing': 0.0,
+            'delay': 2.0,
+            'mininterval': 1.0,
+        }
+        kw.update(kwargs)
+        self.tqdm = tqdm(**kw)
+
+    def read(self, size=-1):
+        bytes = self.fd.read(size)
+        self.tqdm.update(len(bytes))
+        return bytes
+
+    def readline(self):
+        bytes = self.fd.readline()
+        self.tqdm.update(len(bytes))
+        return bytes
+
+    def readinto(self, b):
+        num_bytes = self.fd.readinto(b)
+        self.tqdm.update(len(num_bytes))
+        return num_bytes
+
+    def __enter__(self):
+        self.tqdm.__enter__()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        return self.tqdm.__exit__(*args, **kwargs)
+
+
 class OsmVisualizer():
     def __init__(self, fn, offset, do_transform_to_odom, odom_frame):
         self.do_transform_to_odom = do_transform_to_odom
         self.odom_frame = odom_frame
         self.offset = offset
-        with open(fn, 'rb') as handle:
-            self.osm_planner = pickle.load(handle)
+
+        self.osm_planner = None
+
+        """ with open(fn, 'rb') as handle:
+            self.osm_planner = pickle.load(handle) """
+        rate = rospy.Rate(10)
+
+        while self.osm_planner is None: 
+
+            try:
+                rospy.loginfo("OSM VISUALIZER: Loading OSM data from pickle {}.".format(fn))
+                with open(fn, 'rb') as handle:
+                    total = os.path.getsize(fn)
+                    with TQDMBytesReader(handle, total=total) as handle_with_progress:
+                        self.osm_planner = pickle.load(handle_with_progress)
+                rospy.loginfo("OSM VISUALIZER: OSM data loaded.")
+
+            except Exception as e:
+                rospy.loginfo("OSM VISUALIZER: OSM pickle not loaded, waiting for it to be created.")
+                rate.sleep()
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
@@ -71,18 +129,18 @@ class OsmVisualizer():
         return np.array(squarish)
 
     def publish_osm_objects_pcd(self):
-            self.roads    =  np.array(list(self.osm_planner.roads))
-            self.footways =  np.array(list(self.osm_planner.footways))
-            self.untraversables =  np.array(list(self.osm_planner.barriers))
-            self.all_goal_points = copy.copy(self.osm_planner.all_goal_points)
-            self.all_goal_points = self.squarify(self.all_goal_points)
+        self.roads    =  np.array(list(self.osm_planner.roads))
+        self.footways =  np.array(list(self.osm_planner.footways))
+        self.untraversables =  np.array(list(self.osm_planner.barriers))
+        self.all_goal_points = copy.copy(self.osm_planner.all_goal_points)
+        self.all_goal_points = self.squarify(self.all_goal_points)
 
-            self.osm_points = self.get_osm_points()
-            self.pcd_msg = PointCloud2()
-            self.set_pcd_msg()
-            self.pub_pcd = rospy.Publisher('osm_pcd_utm', PointCloud2, queue_size=10, latch=True)
-            self.pub_pcd.publish(self.osm_pcd_msg)
-            rospy.loginfo("Publishing OSM data visualisation (osm_pcd_utm topic).")
+        self.osm_points = self.get_osm_points()
+        self.pcd_msg = PointCloud2()
+        self.set_pcd_msg()
+        self.pub_pcd = rospy.Publisher('osm_pcd_utm', PointCloud2, queue_size=10, latch=True)
+        self.pub_pcd.publish(self.osm_pcd_msg)
+        rospy.loginfo("Publishing OSM data visualisation (osm_pcd_utm topic).")
 
     def set_pcd_msg(self):
         self.pcd_data = np.zeros(0, dtype=[
@@ -238,6 +296,16 @@ class OsmVisualizer():
                 self.generate_osm_path()
                 self.publish_osm_path()
                 self.publish_osm_objects_pcd()
+
+                self.osm_planner = None     # Free up memory.
+                self.osm_pcd_msg = None
+                self.osm_points = None
+                self.pcd_data = None
+                self.pcd_msg = None
+                self.roads = None
+                self.footways = None
+                self.untraversables = None
+                self.all_goal_points = None
 
                 while not rospy.is_shutdown():
                     rate.sleep()

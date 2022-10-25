@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 from __future__ import division
+
+import os
+
 import rospy
 import ros_numpy
 import time
@@ -13,7 +16,12 @@ import std_msgs.msg
 from geodesy import utm
 import numpy as np
 
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
+from tqdm import tqdm
 
 from visualization_msgs.msg import Marker
 
@@ -123,6 +131,8 @@ class PathPlanner():
         self.current_sub_graph_changed = True
         
         self.graph_mutex = Lock()
+
+        self.current_path_length = 30
 
         self.sub_fix = rospy.Subscriber(
             "fix", NavSatFix, self.update_fix, queue_size=10)
@@ -288,10 +298,21 @@ class PathPlanner():
         goal_point = self.current_sub_graph['graph_points'][goal_point_index]
         return goal_point
 
+    def get_current_path_length(self):
+        goal_i = self.current_sub_graph['goal_index_graph']
+        start_i = self.current_sub_graph['start_index_graph']
+
+        goal_point = self.current_sub_graph['graph_points'][goal_i]
+        start_point = self.current_sub_graph['graph_points'][start_i]
+
+        length = dist(goal_point,start_point)
+        return length
+
     def get_current_sub_graph(self):
         # Obtain graph which start point is the last goal point you visited.
         call_next_waypoint = False
         sub_graph_ind = self.current_sub_graph_ind + self.waypoint_offset
+
         with self.graph_mutex:
             if self.current_sub_graph is None:
                 self.current_sub_graph = self.sub_graphs[sub_graph_ind]
@@ -299,6 +320,8 @@ class PathPlanner():
                 self.current_sub_graph_changed = True
     
             goal_point = self.get_current_goal_point()
+
+            self.current_path_length = self.get_current_path_length()
             
             """ if sub_graph_ind < len(self.sub_graphs) - 1:
                 next_goal_point = self.sub_graphs[sub_graph_ind + 1]['graph_points'][self.sub_graphs[sub_graph_ind + 1]['goal_index_graph']]
@@ -322,13 +345,14 @@ class PathPlanner():
                     call_next_waypoint = True
                     self.near_next_waypoint_time = -1.     """  
     
-            if (rospy.Time.now() - self.subgraph_start_time).to_sec() > self.max_subgraph_time:
+            if (rospy.Time.now() - self.subgraph_start_time).to_sec() > self.max_subgraph_time * self.current_path_length:
                 rospy.loginfo("Subgraph timed out after {}. Goal point {}/{} not reached. Moving onto the next one".format(
                     round((rospy.Time.now() - self.subgraph_start_time).to_sec(),2),
-                    self.num_sub_graphs-len(self.sub_graphs),
+                    sub_graph_ind,
                     self.num_sub_graphs))
     
                 call_next_waypoint = True
+                self.near_goal_point_time = -1.
 
         if call_next_waypoint:
             self.next_waypoint()
@@ -394,7 +418,7 @@ class PathPlanner():
                 marker.color.g = 1
             else:
                 marker.type = Marker.CUBE
-                sub_graph = self.sub_graphs[sub_graph_ind]
+                sub_graph = self.sub_graphs[sub_graph_ind + 1]
                 current_waypoint = np.ravel(sub_graph['graph_points'][sub_graph['goal_index_graph']])
                 marker.pose.position.x, marker.pose.position.y = current_waypoint
                 marker.color.r = 1
@@ -936,7 +960,7 @@ class PathPlanner():
 
         self.is_on_road_pub.publish(is_on_road_msg)      
 
-    """ def publish_static_waypoints(self):
+    def publish_static_waypoints(self):
         processed_waypoints_msg = Waypoints()
         original_waypoints_msg = Waypoints()
 
@@ -944,7 +968,7 @@ class PathPlanner():
         original_waypoints_msg = self.generate_waypoints_msg(self.osm_planner.waypoints[1:,:]) # First point is starting robot position - throw away.
 
         self.pub_processed_waypoints.publish(processed_waypoints_msg)
-        self.pub_original_waypoints.publish(original_waypoints_msg) """
+        self.pub_original_waypoints.publish(original_waypoints_msg)
         
     def run(self):
         rate = rospy.Rate(100)
@@ -996,11 +1020,13 @@ class PathPlanner():
                 try:
                     rospy.loginfo("Loading OSM data from pickle {}.".format(osm_fn))
                     with open(osm_fn, 'rb') as handle:
-                        self.osm_planner = pickle.load(handle)
+                        total = os.path.getsize(osm_fn)
+                        with TQDMBytesReader(handle, total=total) as handle_with_progress:
+                            self.osm_planner = pickle.load(handle_with_progress)
                     rospy.loginfo("OSM data loaded.")
 
-                except:
-                    rospy.logwarn("OSM pickle {} not found.".format(osm_fn))
+                except Exception as e:
+                    rospy.logwarn("OSM pickle {} not loaded (error is {}).".format(osm_fn, str(e)))
                     rospy.logwarn("Running OSM analysis instead.")
                     self.osm_planner = osm_analysis_igraph.PathAnalysis(self.gpx_assignment,
                                                             True,
@@ -1009,11 +1035,16 @@ class PathPlanner():
                                                             self.osm_use_solitary_nodes,
                                                             self.flip)
                     self.osm_planner.run_ros()
+                    rospy.logwarn("Saving the analysis to pickle.")
+                    self.osm_planner.save_to_pickle()
+                    rospy.logwarn("Saving finished.")
 
                 self.sub_graphs = self.osm_planner.sub_graphs
-                self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.
+                
+                if self.osm_planner.robot_position_first_point:
+                    self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.
 
-                first_waypoint = geometry.Point(np.ravel(self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['goal_index_graph']]))
+                first_waypoint = geometry.Point(np.ravel(self.sub_graphs[0]['graph_points'][self.sub_graphs[0]['start_index_graph']]))
                 current_position_point = geometry.Point(np.ravel(self.current_robot_position))
 
                 current_pos_to_start_point_graph = self.osm_planner.generate_graph(current_position_point, first_waypoint)
@@ -1116,6 +1147,41 @@ def main():
                         heading_diff_cost)
 
     node.run()
+
+
+class TQDMBytesReader(object):
+
+    def __init__(self, fd, **kwargs):
+        self.fd = fd
+        kw = {
+            'smoothing': 0.0,
+            'delay': 2.0,
+            'mininterval': 1.0,
+        }
+        kw.update(kwargs)
+        self.tqdm = tqdm(**kw)
+
+    def read(self, size=-1):
+        bytes = self.fd.read(size)
+        self.tqdm.update(len(bytes))
+        return bytes
+
+    def readline(self):
+        bytes = self.fd.readline()
+        self.tqdm.update(len(bytes))
+        return bytes
+
+    def readinto(self, b):
+        num_bytes = self.fd.readinto(b)
+        self.tqdm.update(len(num_bytes))
+        return num_bytes
+
+    def __enter__(self):
+        self.tqdm.__enter__()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        return self.tqdm.__exit__(*args, **kwargs)
 
 
 if __name__ == '__main__':

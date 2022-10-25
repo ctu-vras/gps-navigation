@@ -30,7 +30,7 @@
         <param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
         <param name="max_goal_untrav_cost" type="double" value="100."/>
         <!--param name="max_path_cost" type="double" value="1000." /-->
-        <param name="max_subgraph_time" type="double" value="1200." />
+        <param name="max_subgraph_time" type="double" value="30." />    <!-- in seconds per meter of path length -->
         <param name="use_osm" type="bool" value="$(arg use_osm)"/>
 	    <param name="osm_use_solitary_nodes" type="bool" value="false"/>
         <param name="repeat" type="bool" value="$(arg repeat)"/>

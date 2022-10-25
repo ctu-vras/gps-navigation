@@ -1,4 +1,6 @@
-INIT_WIDTH = 50          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+INIT_WIDTH = 70          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+
+OSM_RECTANGLE_MARGIN = 100 # METERS. nafouknuti obdelniku stahovanych dat
 
 DENSITY = 0.5             # In meters. How dense is the graph (distance between neighboring nodes).
 DIST_COST_MULTIPLIER = 6

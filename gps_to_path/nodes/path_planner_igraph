@@ -404,21 +404,27 @@ class PathPlanner():
 
             if self.finished:
                 current_waypoint = np.ravel(self.current_robot_position)
-                current_waypoint_data = {
-                    'x': [current_waypoint[0]],
-                    'y': [current_waypoint[1]],
-                    'z': self.current_robot_altitude,
-                    'r': 0, 'g': 1, 'b': 0,
-                }
+                r = 0
+                g = 255
             else:
                 sub_graph = self.sub_graphs[sub_graph_ind + 1]
                 current_waypoint = np.ravel(sub_graph['graph_points'][sub_graph['goal_index_graph']])
-                current_waypoint_data = {
-                    'x': [current_waypoint[0]],
-                    'y': [current_waypoint[1]],
-                    'z': self.current_robot_altitude,
-                    'r': 1, 'g': 0, 'b': 0,
-                }
+                r = 255
+                g = 0
+
+            current_waypoint_data = np.zeros(0, dtype=[
+                ('x', np.float32),
+                ('y', np.float32),
+                ('z', np.float32),
+                ('r', np.uint8),
+                ('g', np.uint8),
+                ('b', np.uint8),
+            ])
+            current_waypoint_data['x'] = [current_waypoint[0]]
+            current_waypoint_data['y'] = [current_waypoint[1]]
+            current_waypoint_data['z'] = self.current_robot_altitude
+            current_waypoint_data['r'] = r
+            current_waypoint_data['g'] = g
 
             marker = ros_numpy.msgify(PointCloud2, current_waypoint_data)
             marker.header.stamp = rospy.Time.now()

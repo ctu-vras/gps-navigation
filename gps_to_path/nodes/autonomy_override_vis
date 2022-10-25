@@ -25,6 +25,7 @@ Parameters:
 - `~marker_alpha` (float, defaults to 0.8, range [0.0-1.0]): Transparency of the markers.
 """
 
+import numpy as np
 import rospy
 
 from geometry_msgs.msg import PointStamped, Twist
@@ -34,6 +35,16 @@ from tf2_ros import Buffer, TransformException, TransformListener
 from sensor_msgs.msg import PointCloud2
 
 import cras
+
+
+pcl_dtype = [
+    ('x', np.float32),
+    ('y', np.float32),
+    ('z', np.float32),
+    ('r', np.uint8),
+    ('g', np.uint8),
+    ('b', np.uint8),
+]
 
 
 class AutonomyOverrideVisualization(cras.Node):
@@ -46,7 +57,7 @@ class AutonomyOverrideVisualization(cras.Node):
         self.base_link_frame_id = cras.get_param("~base_link_frame_id", "base_link")
         self.fixed_frame_id = cras.get_param("~fixed_frame_id", "utm_local")
 
-        self.point_data = {'x': [], 'y': [], 'z': [], 'r': [], 'g': [], 'b': []}
+        self.point_data = np.zeros(0, dtype=pcl_dtype)
 
         self.tf = Buffer()
         self.tf_listener = TransformListener(self.tf)
@@ -78,12 +89,14 @@ class AutonomyOverrideVisualization(cras.Node):
             return
 
         is_zero = msg.linear.x == 0 and msg.linear.y == 0 and msg.angular.z == 0
-        self.point_data['x'].append(fixed_point.point.x)
-        self.point_data['y'].append(fixed_point.point.y)
-        self.point_data['z'].append(fixed_point.point.z)
-        self.point_data['r'].append(1.0 if is_zero else 0.0)
-        self.point_data['g'].append(0.0 if is_zero else 1.0)
-        self.point_data['b'].append(0.0)
+        point = np.zeros(0, dtype=pcl_dtype)
+        point['x'] = fixed_point.point.x
+        point['y'] = fixed_point.point.y
+        point['z'] = fixed_point.point.z
+        point['r'] = 255 if is_zero else 0
+        point['g'] = 0 if is_zero else 255
+        point['b'] = 0
+        self.point_data = np.concatenate([self.point_data, point])
 
         self.pub.publish(self.create_pcl_msg())
 
@@ -94,8 +107,7 @@ class AutonomyOverrideVisualization(cras.Node):
         return msg
 
     def reset(self):
-        for k in self.point_data:
-            del self.point_data[k][:]
+        self.point_data = np.zeros(0, dtype=pcl_dtype)
         self.pub.publish(self.create_pcl_msg())
         self.last_override_stamp = None
         super(AutonomyOverrideVisualization, self).reset()

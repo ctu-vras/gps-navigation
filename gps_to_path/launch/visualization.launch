@@ -63,4 +63,20 @@
         <param name="z_offset" value="$(arg utm_z_offset)" />
     </node>
 
+    <node name="costmap_slow" pkg="topic_tools" type="throttle" args="messages graph_pcd 0.5 graph_pcd_slow" respawn="true" />
+
+    <node name="processed_waypoints_path" pkg="gps_to_path" type="waypoints_to_path_simple">
+        <param name="target_frame" value="utm" />
+        <param name="z_frame" value="base_link" />
+        <remap from="waypoints" to="processed_waypoints" />
+        <remap from="path" to="processed_waypoints_path" />
+    </node>
+
+    <node name="original_waypoints_path" pkg="gps_to_path" type="waypoints_to_path_simple">
+        <param name="target_frame" value="utm" />
+        <param name="z_frame" value="base_link" />
+        <remap from="waypoints" to="original_waypoints" />
+        <remap from="path" to="original_waypoints_path" />
+    </node>
+
 </launch>    

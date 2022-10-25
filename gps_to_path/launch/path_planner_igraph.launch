@@ -73,8 +73,6 @@
         <remap from="path" to="path_utm"/>
     </node>
     
-    <node name="costmap_slow" pkg="topic_tools" type="throttle" args="messages graph_pcd 1 graph_pcd_slow" respawn="true" />
-
 <!-- TRAVERSABILITY PROCESSING -->
     <!-- <node pkg="gps_to_path" type="trav_to_obstacles_bag" name="trav_to_obstacles_bag" output="screen">
 

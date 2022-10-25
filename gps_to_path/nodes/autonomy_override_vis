@@ -27,8 +27,11 @@ Parameters:
 
 import rospy
 
-from geometry_msgs.msg import Twist
-from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import PointStamped, Twist
+from ros_numpy import msgify
+import tf2_geometry_msgs
+from tf2_ros import Buffer, TransformException, TransformListener
+from sensor_msgs.msg import PointCloud2
 
 import cras
 
@@ -37,15 +40,22 @@ class AutonomyOverrideVisualization(cras.Node):
     def __init__(self):
         super(AutonomyOverrideVisualization, self).__init__()
 
-        self.array = MarkerArray()
         self.last_override_stamp = None
 
         self.time_threshold = cras.get_param("~time_threshold", rospy.Duration(5))
-        self.marker_frame_id = cras.get_param("~marker_frame_id", "base_link")
-        self.marker_size = cras.get_param("~marker_size", 1.0, "m")
-        self.marker_alpha = cras.get_param("~marker_alpha", 0.8)
+        self.base_link_frame_id = cras.get_param("~base_link_frame_id", "base_link")
+        self.fixed_frame_id = cras.get_param("~fixed_frame_id", "utm_local")
 
-        self.pub = rospy.Publisher('autonomy_override_vis', MarkerArray, queue_size=10, latch=True)
+        self.point_data = {'x': [], 'y': [], 'z': [], 'r': [], 'g': [], 'b': []}
+
+        self.tf = Buffer()
+        self.tf_listener = TransformListener(self.tf)
+
+        self.point = PointStamped()
+        self.point.header.frame_id = self.base_link_frame_id
+        self.point.header.stamp = rospy.Time(0)
+
+        self.pub = rospy.Publisher('autonomy_override_vis', PointCloud2, queue_size=1, latch=True)
 
         self.sub1 = rospy.Subscriber('local_joy/cmd_vel', Twist, self.cb)
         self.sub2 = rospy.Subscriber('joy_local/cmd_vel', Twist, self.cb)
@@ -61,30 +71,32 @@ class AutonomyOverrideVisualization(cras.Node):
             return
         self.last_override_stamp = rospy.Time.now()
 
+        try:
+            fixed_point = self.tf.transform(self.point, self.fixed_frame_id, timeout=rospy.Duration(0.1))
+        except TransformException as e:
+            rospy.logerr_throttle_identical(10.0, "Cannot get current robot position: " + str(e))
+            return
+
         is_zero = msg.linear.x == 0 and msg.linear.y == 0 and msg.angular.z == 0
-        marker = Marker()
-        marker.header.stamp = rospy.Time.now()
-        marker.header.frame_id = self.marker_frame_id
-        topic = msg._connection_header["topic"]
-        marker.id = len(self.array.markers)
-        marker.pose.orientation.w = 1
-        marker.action = Marker.ADD
-        marker.color.a = self.marker_alpha
-        if is_zero:
-            marker.color.r = 1
-        else:
-            marker.color.g = 1
-        marker.ns = topic
-        marker.scale.x = marker.scale.y = marker.scale.z = self.marker_size
-        marker.type = Marker.SPHERE
+        self.point_data['x'].append(fixed_point.point.x)
+        self.point_data['y'].append(fixed_point.point.y)
+        self.point_data['z'].append(fixed_point.point.z)
+        self.point_data['r'].append(1.0 if is_zero else 0.0)
+        self.point_data['g'].append(0.0 if is_zero else 1.0)
+        self.point_data['b'].append(0.0)
 
-        self.array.markers.append(marker)
+        self.pub.publish(self.create_pcl_msg())
 
-        self.pub.publish(self.array)
+    def create_pcl_msg(self):
+        msg = msgify(PointCloud2, self.point_data)
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = self.fixed_frame_id
+        return msg
 
     def reset(self):
-        del self.array.markers[:]
-        self.pub.publish(self.array)
+        for k in self.point_data:
+            del self.point_data[k][:]
+        self.pub.publish(self.create_pcl_msg())
         self.last_override_stamp = None
         super(AutonomyOverrideVisualization, self).reset()
 

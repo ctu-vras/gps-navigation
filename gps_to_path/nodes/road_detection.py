@@ -4,6 +4,13 @@ import shapely.geometry as geom
 from matplotlib import pyplot as plt
 from matplotlib import patches as ptch
 from math import ceil
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iter, desc=None, *args, **kwargs):
+        if desc is not None:
+            print(desc)
+        return iter
 
 highway_tags = ["primary", "secondary", "tertiary", "unclassified", "residential", "primary_link", "secondary_link", \
                 "tertiary_link", "service", "track", "cycleway", "busway", "road", "living_street"]
@@ -114,7 +121,7 @@ def find_intersections(road_network):
     '''
     intersections = []
     roads = list(road_network.geoms)
-    for i in range(len(roads)):
+    for i in tqdm(range(len(roads)), desc="Intersections"):
         for j in range(i+1, len(roads)):
             inter = roads[i].intersection(roads[j])
             if inter and inter not in intersections:  # intersection exist and we have not found it yet
@@ -144,7 +151,7 @@ def find_junctions(intersections, road_network):
     '''
     junctions = []
     counts = dict()
-    for road in list(road_network.geoms):
+    for road in tqdm(list(road_network.geoms), desc="Junctions"):
         
         for point in intersections:
             if point.distance(road) != 0:
@@ -186,7 +193,7 @@ def combine_road(junctions, intersections, road_network):
     for point in intersections:
         if point not in junctions:
             combining_points.append(point)
-    for point in combining_points:
+    for point in tqdm(combining_points, desc="Combining points"):
         first_road = []
         for road in new_road_network:
             if list(point.coords)[0] in list(road.coords) and not first_road:
@@ -203,7 +210,7 @@ def combine_road(junctions, intersections, road_network):
 
     # Set minimal distance between nodes for better curve detection
     new_new_road_network = []
-    for road in new_road_network:
+    for road in tqdm(new_road_network, desc="Combine roads"):
         new_road = []
         coords = list(road.coords)
         for i in range(len(coords)-1):

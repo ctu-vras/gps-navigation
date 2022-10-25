@@ -25,6 +25,14 @@ from points_to_graph_points import points_to_graph_points, points_arr_to_point_l
 from scipy.spatial import ckdtree
 from scipy.spatial import KDTree
 
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iter, desc=None, *args, **kwargs):
+        if desc is not None:
+            rospy.loginfo(desc)
+        return iter
+
 import igraph
 
 import gpxpy
@@ -261,7 +269,7 @@ class PathAnalysis:
     def parse_ways(self):
         """ 1. Fill self.ways, a dictionary of id:way pairs, from all the ways from the query."""
 
-        for way in self.osm_ways_data.ways:
+        for way in tqdm(self.osm_ways_data.ways, desc="Parse ways"):
             way_to_store = Way()
             coords = []
             is_area = False
@@ -351,7 +359,7 @@ class PathAnalysis:
             Use relations to alter ways - combine neighbor ways, add tags...
         """
 
-        for rel in self.osm_rels_data.relations:
+        for rel in tqdm(self.osm_rels_data.relations, desc="Parse rels"):
             if len(rel.members) <= MAX_REL_MEMBERS:   # A lot of members is very likely some relation we are not interested in.
                 inner_ids = []
                 outer_ids = []
@@ -398,7 +406,7 @@ class PathAnalysis:
     def parse_nodes(self):
         """ Convert solitary nodes (not part of a way) to barrier areas. """
 
-        for node in self.osm_nodes_data.nodes:
+        for node in tqdm(self.osm_nodes_data.nodes, desc="Parse nodes"):
             if not node.id in self.way_node_ids:
                 # Check if node is a obstacle.
                 if any(key in self.OBSTACLE_TAGS and (node.tags[key] in self.OBSTACLE_TAGS[key] or ('*' in self.OBSTACLE_TAGS[key] and not node.tags[key]  in self.NOT_OBSTACLE_TAGS.get(key,[]))) for key in node.tags):
@@ -432,7 +440,7 @@ class PathAnalysis:
     def separate_ways(self):
         """ Separate ways (dict) into roads, footways and barriers (lists). """
 
-        for way in self.ways.values():
+        for way in tqdm(self.ways.values(), desc="Separate ways"):
             if way.is_road():
                 way = self.line_to_polygon(way,width=7)
                 self.roads.add(way)

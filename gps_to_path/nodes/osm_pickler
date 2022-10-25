@@ -28,6 +28,7 @@ for fn in gpx_file_names:
                                                     False,
                                                     False)
     osm_planner.run_ros()
+    print("Saving the graph to pickle.")
     osm_planner.save_to_pickle()
 
 """ with open('/home/robot/0923/src/gps-navigation/gps_to_path/data/unhost_final_demo_spot_east', 'rb') as handle:

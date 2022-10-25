@@ -30,7 +30,6 @@ class TQDMBytesReader(object):
         self.fd = fd
         kw = {
             'smoothing': 0.0,
-            'delay': 2.0,
             'mininterval': 1.0,
         }
         kw.update(kwargs)

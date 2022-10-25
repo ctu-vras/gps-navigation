@@ -719,16 +719,16 @@ class PathPlanner():
             return np.eye(3)
 
     def publish_graph_pcd(self,points,points_cost,mean_trav_cost_mask,absence_cost_mask,trav_and_absence_mask,heading_diff_cost_mask):
+
+        heading_diff_cost_mask_temp = heading_diff_cost_mask * self.heading_diff_cost
+        mean_trav_cost_mask_temp = mean_trav_cost_mask * self.untrav_cost
+
         if self.use_osm and len(points_cost) >= 5: # it should have 5 items
             dist_cost = points_cost[1].reshape(-1)
             road_cost = points_cost[2].reshape(-1)
             no_footway_cost = points_cost[3].reshape(-1)
             barrier_cost = points_cost[4].reshape(-1)
             osm_costs_added = points_cost[0].reshape(-1)
-
-            heading_diff_cost_mask_temp = heading_diff_cost_mask * self.heading_diff_cost
-            mean_trav_cost_mask_temp = mean_trav_cost_mask * self.untrav_cost
-
             total_cost = osm_costs_added + mean_trav_cost_mask_temp + absence_cost_mask + heading_diff_cost_mask_temp 
             costs = [total_cost,dist_cost,road_cost,no_footway_cost,barrier_cost,mean_trav_cost_mask_temp, absence_cost_mask, trav_and_absence_mask, heading_diff_cost_mask_temp]
         else:

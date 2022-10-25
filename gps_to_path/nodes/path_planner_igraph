@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 from __future__ import division
+
+import os
+
 import rospy
 import ros_numpy
 import time
@@ -13,7 +16,12 @@ import std_msgs.msg
 from geodesy import utm
 import numpy as np
 
-import pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
+from tqdm import tqdm
 
 from visualization_msgs.msg import Marker
 
@@ -996,7 +1004,9 @@ class PathPlanner():
                 try:
                     rospy.loginfo("Loading OSM data from pickle {}.".format(osm_fn))
                     with open(osm_fn, 'rb') as handle:
-                        self.osm_planner = pickle.load(handle)
+                        total = os.path.getsize(osm_fn)
+                        with TQDMBytesReader(handle, total=total) as handle_with_progress:
+                            self.osm_planner = pickle.load(handle_with_progress)
                     rospy.loginfo("OSM data loaded.")
 
                 except Exception as e:
@@ -1009,7 +1019,9 @@ class PathPlanner():
                                                             self.osm_use_solitary_nodes,
                                                             self.flip)
                     self.osm_planner.run_ros()
+                    rospy.logwarn("Saving the analysis to pickle.")
                     self.osm_planner.save_to_pickle()
+                    rospy.logwarn("Saving finished.")
 
                 self.sub_graphs = self.osm_planner.sub_graphs
                 self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.
@@ -1117,6 +1129,41 @@ def main():
                         heading_diff_cost)
 
     node.run()
+
+
+class TQDMBytesReader(object):
+
+    def __init__(self, fd, **kwargs):
+        self.fd = fd
+        kw = {
+            'smoothing': 0.0,
+            'delay': 2.0,
+            'mininterval': 1.0,
+        }
+        kw.update(kwargs)
+        self.tqdm = tqdm(**kw)
+
+    def read(self, size=-1):
+        bytes = self.fd.read(size)
+        self.tqdm.update(len(bytes))
+        return bytes
+
+    def readline(self):
+        bytes = self.fd.readline()
+        self.tqdm.update(len(bytes))
+        return bytes
+
+    def readinto(self, b):
+        num_bytes = self.fd.readinto(b)
+        self.tqdm.update(len(num_bytes))
+        return num_bytes
+
+    def __enter__(self):
+        self.tqdm.__enter__()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        return self.tqdm.__exit__(*args, **kwargs)
 
 
 if __name__ == '__main__':

@@ -71,8 +71,14 @@ https://docs.google.com/document/d/1KzqRMCqWA9Lp7udVuo1rrv_zFBvToaIX2LB-wEFRZC4/
     Run service which supplies the GPS sensor with NTRIP corrections thus improving quality of the produced fix. <br />
        - Recommended value: true
     - **flip**  <br />
-    Reverse order of waypoints. <br />
+    Reverse order of waypoints. IF TRUE YOU ALSO HAVE TO DELETE THE PICKLED .osm_planner FILE BEFORE RUNNING! <br />
        - Value: true or false.
+    - **default_trav_cost**  <br />
+    Reverse order of waypoints. IF TRUE YOU ALSO HAVE TO DELETE THE PICKLED .osm_planner FILE BEFORE RUNNING! <br />
+       - Recommended value: Half of max_traversable_cost/100 or 0 if it is buggy.
+    - **untrav_points_buffer**  <br />
+    If a point's trav cost is over max_traversable_cost threshold and is bumped up to infinity, also bump all neighboring points. <br />
+       - Value: true or false. Definitely false if the trav reports some point like the robot's antenna as untraversable...
     - **max_height**, **min_height**  <br />
     In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too low or too high from the robot, related to base_link).
        - Recommended values:

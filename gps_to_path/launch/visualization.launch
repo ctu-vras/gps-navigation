@@ -83,4 +83,20 @@
         <remap from="path" to="original_waypoints_path" />
     </node>
 
+    <!-- Support for remaining battery visualization. -->
+    <node name="$(anon tradr_battery_viz)" pkg="topic_tools" type="relay_field"
+          args="/battery_status tradr_battery_voltage std_msgs/Float32 &quot;{data: m.voltage - 40}&quot; --wait-for-start" respawn="true" />
+
+    <node name="$(anon spot_payload_battery_viz)" pkg="topic_tools" type="relay_field"
+          args="/sysvoltage spot_payload_voltage std_msgs/Float32 &quot;{data: m.data - 14}&quot; --wait-for-start" respawn="true" />
+
+    <node name="$(anon spot_battery_viz)" pkg="topic_tools" type="transform"
+          args="/spot/status/battery_states spot_battery_percentage std_msgs/Float32 &quot;m.battery_states[0].charge_percentage&quot; --wait-for-start" respawn="true" />
+
+    <node name="$(anon husky_battery_viz)" pkg="topic_tools" type="relay_field"
+          args="/status husky_battery_voltage std_msgs/Float32 &quot;{data: m.battery_voltage - 19}&quot; --wait-for-start" respawn="true" />
+
+    <node name="$(anon robotsound_viz)" pkg="topic_tools" type="relay_field"
+          args="/robotsound robotsound_viz std_msgs/String &quot;{data: m.arg}&quot; --wait-for-start" respawn="true" />
+
 </launch>    

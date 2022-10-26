@@ -34,8 +34,8 @@ The planner only replans when the current path's cost becomes larger than max_re
 <br />
 
 ### Use follower.launch like this:<br /><br />
-**roslaunch gps_to_path follower.launch robot:=(ctu-robot/spot)**
- - Don't forget the argument if robot is not ctu-robot!
+**roslaunch gps_to_path follower.launch robot:=ctu-robot/husky-robot/spot-3**
+ - Don't forget the argument!
 <br />
 
 ### Checklist:

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <launch>
-    <arg name="robot" default="ctu-robot"/>
+    <arg name="robot" doc="Robot name from {ctu-robot, husky-robot, spot-3}"/><group if="$(eval {'ctu-robot': 0, 'husky-robot': 0, 'spot-3': 0}[robot])"/>
     <arg name="cmd_vel" default="$(anon priority_wrapper)/nav/cmd_vel" doc="Topic to which to publish velocity commands." if="$(eval robot == 'ctu-robot')"/>
     <arg name="cmd_vel" default="/nav/cmd_vel_slow" doc="Topic to which to publish velocity commands." if="$(eval robot == 'spot-3')"/>
     <arg name="cmd_vel" default="/nav/cmd_vel" doc="Topic to which to publish velocity commands." unless="$(eval robot == 'ctu-robot' or robot == 'spot-3')"/>

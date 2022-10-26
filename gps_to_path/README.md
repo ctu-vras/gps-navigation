@@ -3,6 +3,102 @@ https://docs.google.com/document/d/1KzqRMCqWA9Lp7udVuo1rrv_zFBvToaIX2LB-wEFRZC4/
 
 # TL;DR Most important stuff is here.
 
+### 27/10/2022 experiment
+#### Launch file
+ - roslaunch gps_to_path path_planner_igraph.launch
+ - Nodes:
+    -  path_planner_igraph - Graph search based planner. Combines information from lidar traversability and OSM data. Main output is waypoints for the robot to follow.
+    -  path_waypoints_to_path - Subscribes to waypoints and publishes path, which is used by the path_follower.
+    -  path_waypoints_to_path_utm - Same as above but instead of odom frame (gps_odom) the path is published in utm frame (utm).
+    -  waypoint_joy - Gamepad control of waypoints.
+    -  osm_visualizer - Visualizes OSM data in rviz as point cloud.
+ - Arguments & Parameters:
+    - **gpx_assignment** <br />
+    Name of the file with the coordinates we want the robot to drive through. The file is of the gpx format. Usually these files are located in the gps_to_path/data folder. <br />
+       - Value: string path to file
+       - Example: "$(find gps_to_path)/data/unhost_final_demo_husky_east_trimmed.gpx"
+    - **goal_reached_distance** <br />
+    In meters. Maximum distance between robot and goal point for the goal point to be considered reached. <br />
+       - Recommended value: 2.
+    - **publish_pcd**  <br />
+    Currently not used. ~~Allows visualisation of OSM data in rviz.~~ <br />
+    - **trav_max_dist**  <br />
+    In meters. Maximum distance at which points from traversability point cloud are used. Points further than this distance are ignored. This parameter is not used to filter the traversability point cloud per se, but rather to speed up the planning.<br />
+    - **points_absence_radius**  <br />
+    In meters. Distance from robot in which graph vertices are penalized if there are no traversability points nearby them. This is supposed to stop the robot from going to nearby unexplored places (e.g. holes in ground).<br />
+       - Recommended value: 2.
+    - **trav_radius**  <br />
+    In meters. Maximum distance from a graph vertex at which untraversable points from point cloud are used to increase the cost of travelling to or from this vertex. <br />
+    - **untrav_cost**  <br />
+    Multiplier of mean of cost field of traversability points. E.g. if a vortex has two trav points near itself with costs 0.5 and 1.3, the mean is 0.9 and the trav cost applied to the graph is 90 for this given vortex. <br />
+       - Recommended value: 100. if using traversability which has cost field in the range [0,2]. Less if you want less strict traversability obeying. Also consider max_traversable_cost.
+    - **absence_cost**  <br />
+    Related to points_absence_radius. If there are no trav points near a near vortex and there have never been any trav points there in the past, then we treat this vortex as a dangerous unexplored place and we penalize it. Should be higher than max_traversable_cost. <br />
+       - Recommended value: Two times untrav_cost.
+    - **max_traversable_cost**  <br />
+    If a vortex has its traversability cost PLUS absence cost larger than this parameter, than it is "forbidden" and its cost is bumped up to infinity. Robot effectively cannot plan through infinity-cost vertices. <br />
+       - Recommended value: Set so that once we reach a trav_mean (mean of cost field of traversability points near a vortex) which we consider untraversable (such that we do not want the robot to go to such a point) then max_traversable_cost = trav_mean x untrav_cost.
+       - Example: Say we want to forbid a vortex if traversability says its cost mean is 1. or higher. Then set this equal to untrav_cost (i.e. :=100).
+    - **long_term_memory_longevity**  <br />
+    Increasing this parameter causes the costs of vertices outside of trav_max_distance from robot to decay slower (at 1 they do not decay at all). More precisely the planner runs at around 10 Hz and each time it multiplies all trav costs by this value (e.g. for 0.997 it reduces the values each second to 97 %). <br />
+       - Recommended value: Perhaps around 0.997. Then 1 s ~ 97 %, then 1 minute ~ 16.5 %, 5 minutes ~ 0.01 %.
+    - **short_term_memory_longevity**  <br />
+    Increasing this parameter causes the costs of vertices inside of trav_max_distance from robot to change slower (i.e. slower reaction to new close untraversable objects). Similar to above, but only applies to vertices which recieved lidar points in the current cycle. The formula is (p x old_cost) + ((1-p) x new_cost) <br />
+       - Recommended value: 0.9. If the robot seems to be reacting slowly to obstacles then perhaps higher.
+    - **trav_inheritance_radius**  <br />
+   In meters. When a waypoint is reached and another one is taken as current goal, the old graph is retired and a new graph is used. These two graphs usually have a major overlap. This parameter sets the maximum distance for a new graph vortex to inherit cost of a nearby old graph vortex. <br />
+       - Recommended value: sqrt(2)/2/(points per meter in graph lattice) (slightly larger than that).
+       - Example: For 0.5 m between points in graph use 0.36.
+    - **max_goal_untrav_cost**  <br />
+    When the trav cost of the graph vortex representing the current goal point exceeds this value (i.e. the goal is untraversable thus unreachable), then the goal is moved one vertex closer along the gas pipeline. <br /> 
+       - Recommended value: equal to max_traversable_cost.
+    - **max_subgraph_time**  <br />
+    In seconds. Multiplier per meter of distance between start and goal waypoints (NOT TAKING INTO ACCOUNT ROBOT POSITION). If goal has not been reached in max_subgraph_time x distance we skip to next waypoint. Starts counting once the planner loads OSM data!<br />
+       - Recommended value: Around 30. sounds reasonable.
+    - **use_osm**  <br />
+    Use data from OSM. Either you have a pickle premade for the given gpx file, or one will be created in initialization phase.<br />
+       - Recommended value: true unless something is buggy, then false can help.
+    - **osm_use_solitary_nodes**  <br />
+    Use solitary OSM nodes, which usually represent objects such as trees, benches, signs, etc. Speeds up initialization of the planner when set to 'false'. <br />
+       - Recommended value: false
+    - **repeat**  <br />
+    After arriving to the last waypoint, start from the beggining. <br />
+       - Value: true or false. true has not been tested much.
+    - **next_waypoint_proximity_switch**  <br />
+    Should not be used. <br />
+       - Recommended value: false but should not matter.
+    - **min_time_near_goal**  <br />
+    Run service which supplies the GPS sensor with NTRIP corrections thus improving quality of the produced fix. <br />
+       - Recommended value: true
+    - **flip**  <br />
+    Reverse order of waypoints. <br />
+       - Value: true or false.
+    - **max_height**, **min_height**  <br />
+    In meters. Parameters used for filtering untraversable points from the traversability point cloud (e.g. points too low or too high from the robot, related to base_link).
+       - Recommended values:
+           - TRADR (min -1., max 1.), SPOT (min -1., max 0.5), HUSKY not sure? same as TRADR or depending on where the base_link frame is... Also the min values could maybe be even lower? <br />
+    - **max_age**  <br />
+    In seconds. Maximum age of traversability point cloud message to be used (in case the traversability pcd msg comes at a higher frequency than we can process it at). <br />
+       - Recommended value: 1.
+    - **trav_obstacle_field**  <br />
+    Name of the field in which the traversability point cloud contains the information whether a point is traversable or not.<br />
+       - Recommended value: cost
+    - **trav_topic**  <br />
+    Name of the frame in which the traversability point cloud is published.<br />
+       - Recommended value: traversability
+    - **odom_frame**  <br />
+    Name of the odometry frame which is used for most transformations.<br />
+       - Recommended value: gps_odom
+    - **max_relative_path_cost_change**  <br />
+    Run service which supplies the GPS sensor with NTRIP corrections thus improving quality of the produced fix. <br />
+       - Recommended value: true
+    - **heading_diff_cost**  <br />
+    Multiplies the absolute value of the angle between the robot's heading and the vortex in radians. Penalizes rotations of the robot. ONLY APPLIES TO VERTICES IN A SMALL RADIUS AROUND ROBOT.<br />
+       - Recommended value: Around 10. seems reasonable but has not been tested properly.
+       - Example: If 10., then the vortex directly behind robot will have penalty ~16 to its cost.
+
+
+
 ### 20/10/2022 experiment
  - graph_pcd - cost layers with osm might not be showing correctly, traversability ones should be fine (except total does not show the infinite costs of untraversable vertices)
  - **balancing the graph costs** - there was not much done in this regard, so you will probably have to adjust some numbers, following are the parts of the total cost and their range and parameter which sets that range:

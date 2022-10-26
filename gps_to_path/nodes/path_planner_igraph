@@ -690,8 +690,11 @@ class PathPlanner():
                     edge = graph_dict['graph'].get_eid(v1,v2)
                     current_path_cost += graph_dict['graph'].es[edge]["total_weight"]
     
-                if (current_path_cost/min([original_path_cost_sum,0.0001]) <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) > 5:
+                if (current_path_cost/min([original_path_cost_sum,0.0001]) <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) < 1:
                     replan = False
+
+                if current_path_cost >= float('inf') or original_path_cost_sum >= float('inf'):
+                    replan = True
                     
                 """ print(">././>?>?>/./>?>/./>?././")
                 print(dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]))

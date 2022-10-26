@@ -30,7 +30,7 @@
         <param name="absence_cost" type="double" value="200."/>
         <param name="max_traversable_cost" type="double" value="70."/>
         <param name="long_term_memory_longevity" type="double" value="0.997" />
-        <param name="short_term_memory_longevity" type="double" value="0.9"/>
+        <param name="short_term_memory_longevity" type="double" value="0.7"/>
         <param name="trav_inheritance_radius" type="double" value="0.36"/>	
         <param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
         <param name="max_goal_untrav_cost" type="double" value="100."/>
@@ -49,7 +49,7 @@
         <param name="trav_obstacle_field" type="string" value="$(arg trav_obstacle_field)"/>
         <param name="trav_topic" type="string" value="$(arg trav_topic)"/>
         <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
-        <param name="max_relative_path_cost_change" type="double" value="5."/>	
+        <param name="max_relative_path_cost_change" type="double" value="500."/>	
         <param name="heading_diff_cost" type="double" value="10."/>
     </node>
 

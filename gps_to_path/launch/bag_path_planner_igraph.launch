@@ -26,7 +26,7 @@
         <param name="max_traversable_cost" type="double" value="100."/>
         <param name="long_term_memory_longevity" type="double" value="0.997" />
         <param name="short_term_memory_longevity" type="double" value="0.9"/>
-        <param name="trav_inheritance_radius" type="double" value="0.71"/>	
+        <param name="trav_inheritance_radius" type="double" value="0.36"/>	
         <param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
         <param name="max_goal_untrav_cost" type="double" value="100."/>
         <!--param name="max_path_cost" type="double" value="1000." /-->
@@ -90,5 +90,9 @@
     	<param name="odom_frame" type="string" value="$(arg odom_frame)"/>
     	<param name="offset" type="string" value="0,0"/>
     </node>
+
+    <!-- <node pkg="gps_to_path" type="waypoints_visualize" name="waypoints_visualize" output="screen">
+    	<param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+    </node> -->
 
 </launch>    

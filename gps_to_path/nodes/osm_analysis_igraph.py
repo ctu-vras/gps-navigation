@@ -845,7 +845,7 @@ class PathAnalysis:
         while True:
             t = time.time()
             # Generate lattice of points.
-            graph_range =  INIT_WIDTH + 2*increase_graph
+            graph_range =  INIT_WIDTH + increase_graph
             graph_points, points_line, dist_from_line = points_to_graph_points(start_point, goal_point, density=density, width=graph_range)
             # From OSM objects get those which are near the points.
             objects_in_area = self.get_reduced_objects(graph_points.bounds[0],
@@ -978,7 +978,7 @@ class PathAnalysis:
                                         weights="weight")[0][0]
             
             if shortest_path_vertices:
-                if (shortest_path_cost < MAX_COST_PER_METER * start_point.distance(goal_point)) or increase_graph > 0:
+                if (shortest_path_cost < MAX_COST_PER_METER * start_point.distance(goal_point)) or graph_range >= MAX_RANGE:# or increase_graph > 0:
 
                     rospy.loginfo("{} s - {} ps. - {}x{} m r.- Found path".format(round(time.time()-t,3), len(graph_points), graph_range, len(points_line.geoms)*density))
                     graph_dict = {'graph':graph,
@@ -997,6 +997,7 @@ class PathAnalysis:
             else:
                 rospy.loginfo("{} s - {} ps. - {}x{} m r.- No possible path yet".format(round(time.time()-t,3), len(graph_points), graph_range, len(points_line.geoms)))
                 if graph_range >= MAX_RANGE:
+                    rospy.logerr("OSM ANALYSIS RETURNING NONE SUBGRAPH. THIS SHOULD NOT HAPPEN.")
                     graph_dict = {'graph':None,
                                     'shortest_path_vertices':None,
                                     'graph_points':None,

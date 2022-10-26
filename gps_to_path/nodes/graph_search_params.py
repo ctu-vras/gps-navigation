@@ -1,4 +1,4 @@
-INIT_WIDTH = 70          # In meters. (NOT ANYMORE ==> Points further than INIT_WIDTH from the desired trajectory are penalized.)
+INIT_WIDTH = 50          # In meters.
 
 OSM_RECTANGLE_MARGIN = 100 # METERS. nafouknuti obdelniku stahovanych dat
 
@@ -7,8 +7,7 @@ DIST_COST_MULTIPLIER = 6
 GOAL_BASE_DIST = 30     # In meters. Desired distance between start and goal points in a sub-graph.
                         # If there is an obstacle in the way, the distance is modified accordingly.
 
-INCREASE = 30           # In meters. How much the range of the graph increases to each side
-                        # with further iterations. (The actual range increases by 2*INCREASE with each iter).
+INCREASE = 25           # In meters. How much the graph rectangle grows.
                         
 MAX_RANGE = 100         # In meters. Maximum range of the area that will be searched.
 
@@ -30,7 +29,7 @@ NO_FOOTWAY_LOSS = 10   # Penalization of an edge at least MAX_DIST_LOSS far and 
                         # (((The graph search will prefer walking along footways ONCE IT IS FAR from the
                         # desired trajectory anyway.)))
 
-BARRIER_LOSS = 500
+BARRIER_LOSS = 10000
                     
 MAX_DETOUR_COUNTER = 3  #  CURRENTLY NOT BEING USED.
 

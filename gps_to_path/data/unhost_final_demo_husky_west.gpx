@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" version="1.1" creator="gpx.py -- https://github.com/tkrajina/gpxpy">
+    <wpt lat="50.090061" lon="14.133353">
+	<ele>399.160065</ele>
+	<name>New  POI</name>
+    </wpt>
+    <wpt lat="50.090638" lon="14.133361">
+	<ele>398.549896</ele>
+	<name>New  POI</name>
+    </wpt>
     <wpt lat="50.090902" lon="14.132679">
         <ele>397.000000</ele>
         <name>New  POI</name>

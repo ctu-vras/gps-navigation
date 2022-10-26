@@ -7,6 +7,7 @@ import os
 import rospy
 import ros_numpy
 import time
+from ros_numpy.point_cloud2 import merge_rgb_fields
 from threading import Lock
 from sensor_msgs.msg import NavSatFix,PointCloud2
 from geometry_msgs.msg import Point
@@ -30,7 +31,7 @@ import shapely.geometry as geometry
 import copy
 import osm_types
 from numpy.lib import recfunctions as rfn
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree as KDTree
 from itertools import chain
 import math
 import tf2_ros
@@ -75,7 +76,9 @@ class PathPlanner():
                 trav_topic,
                 odom_frame,
                 max_relative_path_cost_change,
-                heading_diff_cost):
+                heading_diff_cost,
+                default_trav_cost,
+                untrav_points_buffer):
 
         self.finished = False
 
@@ -120,6 +123,10 @@ class PathPlanner():
         self.max_relative_path_cost_change = max_relative_path_cost_change
 
         self.heading_diff_cost = heading_diff_cost
+        
+        self.default_trav_cost = default_trav_cost
+
+        self.untrav_points_buffer = untrav_points_buffer
 
         self.min_time_near_goal = min_time_near_goal
         self.near_goal_point_time = -1
@@ -159,7 +166,7 @@ class PathPlanner():
             'processed_waypoints', Waypoints, queue_size=10, latch=True)
 
         self.current_waypoint_marker_pub = rospy.Publisher(
-            'current_waypoint', Marker, queue_size=1, latch=True)
+            'current_waypoint', PointCloud2, queue_size=1, latch=True)
 
         self.static_waypoints_published = False
 
@@ -402,26 +409,34 @@ class PathPlanner():
             self.original_path_cost = []
             self.shortest_path_vertices = None
 
-            marker = Marker()
-            marker.header.stamp = rospy.Time.now()
-            marker.header.frame_id = "utm"
-            marker.id = 0
-            marker.ns = "current_waypoint"
-            marker.action = Marker.ADD
-            marker.pose.position.z = self.current_robot_altitude
-            marker.pose.orientation.w = 1
-            marker.scale.x = marker.scale.y = marker.scale.z = 2
-            marker.color.a = 0.5
             if self.finished:
-                marker.type = Marker.SPHERE
-                marker.pose.position.x, marker.pose.position.y = np.ravel(self.current_robot_position)
-                marker.color.g = 1
+                current_waypoint = np.ravel(self.current_robot_position)
+                r = 0
+                g = 255
             else:
-                marker.type = Marker.CUBE
                 sub_graph = self.sub_graphs[sub_graph_ind + 1]
                 current_waypoint = np.ravel(sub_graph['graph_points'][sub_graph['goal_index_graph']])
-                marker.pose.position.x, marker.pose.position.y = current_waypoint
-                marker.color.r = 1
+                r = 255
+                g = 0
+
+            current_waypoint_data = np.zeros(1, dtype=[
+                ('x', np.float32),
+                ('y', np.float32),
+                ('z', np.float32),
+                ('r', np.uint8),
+                ('g', np.uint8),
+                ('b', np.uint8),
+            ])
+            current_waypoint_data['x'] = [current_waypoint[0]]
+            current_waypoint_data['y'] = [current_waypoint[1]]
+            current_waypoint_data['z'] = self.current_robot_altitude
+            current_waypoint_data['r'] = r
+            current_waypoint_data['g'] = g
+
+            marker = ros_numpy.msgify(PointCloud2, merge_rgb_fields(current_waypoint_data))
+            marker.header.stamp = rospy.Time.now()
+            marker.header.frame_id = "utm"
+
             self.current_waypoint_marker_pub.publish(marker)
 
     def search_graph(self):
@@ -439,13 +454,13 @@ class PathPlanner():
     
             goal_index_graph = graph_dict["goal_index_graph"]
     
-            graph = graph_dict["graph"]
+            #graph = graph_dict["graph"]
     
             graph_points = graph_dict['graph_points']
     
             start_index = self.get_nearest_graph_point_index(graph_points, copy.copy(self.current_robot_position))
-    
-            
+
+
             
             # -------- TRAV ---------
             traversability_points = copy.copy(self.traversability_points)
@@ -547,8 +562,10 @@ class PathPlanner():
                 #    self.absence_mask = absence_mask
                 #    self.current_sub_graph_changed = False
                 # Initialization of trav mask.
-                if self.mean_trav_cost_mask is None:             
-                    mean_trav_cost_mask = np.zeros(len(graph_points))
+                if self.mean_trav_cost_mask is None:        
+                    # LAST MINUTE CHANGE IF BUGGY USE
+                    # mean_trav_cost_mask = np.zeros(len(graph_points))
+                    mean_trav_cost_mask = np.ones(len(graph_points)) * self.default_trav_cost
                     self.mean_trav_cost_mask = mean_trav_cost_mask
                     self.current_sub_graph_changed = False
     
@@ -561,7 +578,8 @@ class PathPlanner():
                     previous_points_tree = KDTree(self.previous_points)
                     dists,inds = previous_points_tree.query(graph_points)
     
-                    new_mask = np.zeros((len(graph_points)))
+                    #new_mask = np.zeros((len(graph_points)))
+                    new_mask = np.ones(len(graph_points)) * self.default_trav_cost
                     new_absence_mask = np.full((len(graph_points)), True)
     
                     new_mask_inds = np.arange(len(new_mask))
@@ -607,7 +625,9 @@ class PathPlanner():
                 self.mean_trav_cost_mask[nearest_graph_points_inds] = self.short_term_memory_longevity * self.mean_trav_cost_mask[nearest_graph_points_inds] + (1-self.short_term_memory_longevity) * near_mean_trav_cost_mask
     
                 # The whole mask ages.
-                self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask
+                # LAST MINUTE CHANGE REVERT TO THIS LINE IF BUGGY
+                # self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask
+                self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask + (1-self.long_term_memory_longevity) * self.default_trav_cost
                 
                 self.previous_points = graph_points # previous points used when the subgraph changes (trav inheritance)
     
@@ -621,6 +641,16 @@ class PathPlanner():
                 trav_and_absence_mask[start_index] = 0 # ZERO THE TRAV COST OF CURRENT ROBOT VORTEX
 
                 trav_and_absence_mask[trav_and_absence_mask >= self.max_traversable_cost] = float('inf')  # oprahovani
+
+                # NAFUKOVANI OPRAHOVANYCH BODU
+                if self.untrav_points_buffer:
+                    untrav_buffer_inds = graph_tree.query_ball_point(graph_points[trav_and_absence_mask >= self.max_traversable_cost],r=0.71)
+                    #print(np.unique(untrav_buffer_inds))
+                    untrav_buffer_inds_set = set()  
+                    for inds in untrav_buffer_inds:
+                        for ind in inds:
+                            untrav_buffer_inds_set.add(ind)
+                    trav_and_absence_mask[list(untrav_buffer_inds_set)] = float('inf')
 
                 trav_and_absence_and_heading_mask = trav_and_absence_mask + heading_diff_cost_mask * self.heading_diff_cost
     
@@ -678,11 +708,14 @@ class PathPlanner():
                 for i in range(len(self.shortest_path_vertices[robot_on_path_index:])-1):
                     v1 = self.shortest_path_vertices[robot_on_path_index+i]
                     v2 = self.shortest_path_vertices[robot_on_path_index+i+1]
-                    edge = graph.get_eid(v1,v2)
-                    current_path_cost += graph.es[edge]["total_weight"]
+                    edge = graph_dict['graph'].get_eid(v1,v2)
+                    current_path_cost += graph_dict['graph'].es[edge]["total_weight"]
     
-                if (current_path_cost/min([original_path_cost_sum,0.0001]) <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) > 5:
+                if (current_path_cost/min([original_path_cost_sum,0.0001]) <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) < 1:
                     replan = False
+
+                if current_path_cost >= float('inf') or original_path_cost_sum >= float('inf'):
+                    replan = True
                     
                 """ print(">././>?>?>/./>?>/./>?././")
                 print(dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]))
@@ -696,7 +729,7 @@ class PathPlanner():
     
             if replan:
                 # Replan.
-                self.shortest_path_vertices = graph.get_shortest_paths(start_index,
+                self.shortest_path_vertices = graph_dict['graph'].get_shortest_paths(start_index,
                                                                     goal_index_graph,
                                                                     weights="total_weight",
                                                                     output="vpath")[0]
@@ -706,10 +739,10 @@ class PathPlanner():
                 for i in range(len(self.shortest_path_vertices)-1):
                     v1 = self.shortest_path_vertices[i]
                     v2 = self.shortest_path_vertices[i+1]
-                    edge = graph.get_eid(v1,v2)
+                    edge = graph_dict['graph'].get_eid(v1,v2)
                     #print(graph.es[edge]["total_weight"])
                     #cost += graph.es[edge]["total_weight"]
-                    self.original_path_cost[i] = graph.es[edge]["total_weight"]
+                    self.original_path_cost[i] = graph_dict['graph'].es[edge]["total_weight"]
                 
                 if np.sum(self.original_path_cost) >= float('inf'):
                     # Publish empty path (stop the robot).
@@ -1040,7 +1073,7 @@ class PathPlanner():
                     rospy.logwarn("Saving finished.")
 
                 self.sub_graphs = self.osm_planner.sub_graphs
-
+                
                 if hasattr(self.osm_planner, 'robot_position_first_point') and self.osm_planner.robot_position_first_point:
                     self.sub_graphs.pop(0)  # Get rid of the fake start position from pickler.
 
@@ -1113,7 +1146,8 @@ def main():
     odom_frame = rospy.get_param('~odom_frame', "gps_odom")
     max_relative_path_cost_change = rospy.get_param('~max_relative_path_cost_change', 1.1)
     heading_diff_cost = rospy.get_param('~heading_diff_cost', 5)
-    
+    default_trav_cost = rospy.get_param('~default_trav_cost', 35.)
+    untrav_points_buffer = rospy.get_param('~untrav_points_buffer', True)
 
     node = PathPlanner(gpx_assignment,
                         publish_pcd,
@@ -1144,7 +1178,9 @@ def main():
                         trav_topic,
                         odom_frame,
                         max_relative_path_cost_change,
-                        heading_diff_cost)
+                        heading_diff_cost,
+                        default_trav_cost,
+                        untrav_points_buffer)
 
     node.run()
 

@@ -76,7 +76,9 @@ class PathPlanner():
                 trav_topic,
                 odom_frame,
                 max_relative_path_cost_change,
-                heading_diff_cost):
+                heading_diff_cost,
+                default_trav_cost,
+                untrav_points_buffer):
 
         self.finished = False
 
@@ -121,6 +123,10 @@ class PathPlanner():
         self.max_relative_path_cost_change = max_relative_path_cost_change
 
         self.heading_diff_cost = heading_diff_cost
+        
+        self.default_trav_cost = default_trav_cost
+
+        self.untrav_points_buffer = untrav_points_buffer
 
         self.min_time_near_goal = min_time_near_goal
         self.near_goal_point_time = -1
@@ -556,8 +562,10 @@ class PathPlanner():
                 #    self.absence_mask = absence_mask
                 #    self.current_sub_graph_changed = False
                 # Initialization of trav mask.
-                if self.mean_trav_cost_mask is None:             
-                    mean_trav_cost_mask = np.zeros(len(graph_points))
+                if self.mean_trav_cost_mask is None:        
+                    # LAST MINUTE CHANGE IF BUGGY USE
+                    # mean_trav_cost_mask = np.zeros(len(graph_points))
+                    mean_trav_cost_mask = np.ones(len(graph_points)) * self.default_trav_cost
                     self.mean_trav_cost_mask = mean_trav_cost_mask
                     self.current_sub_graph_changed = False
     
@@ -570,7 +578,8 @@ class PathPlanner():
                     previous_points_tree = KDTree(self.previous_points)
                     dists,inds = previous_points_tree.query(graph_points)
     
-                    new_mask = np.zeros((len(graph_points)))
+                    #new_mask = np.zeros((len(graph_points)))
+                    new_mask = np.ones(len(graph_points)) * self.default_trav_cost
                     new_absence_mask = np.full((len(graph_points)), True)
     
                     new_mask_inds = np.arange(len(new_mask))
@@ -616,7 +625,9 @@ class PathPlanner():
                 self.mean_trav_cost_mask[nearest_graph_points_inds] = self.short_term_memory_longevity * self.mean_trav_cost_mask[nearest_graph_points_inds] + (1-self.short_term_memory_longevity) * near_mean_trav_cost_mask
     
                 # The whole mask ages.
-                self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask
+                # LAST MINUTE CHANGE REVERT TO THIS LINE IF BUGGY
+                # self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask
+                self.mean_trav_cost_mask = self.long_term_memory_longevity * self.mean_trav_cost_mask + (1-self.long_term_memory_longevity) * self.default_trav_cost
                 
                 self.previous_points = graph_points # previous points used when the subgraph changes (trav inheritance)
     
@@ -630,6 +641,16 @@ class PathPlanner():
                 trav_and_absence_mask[start_index] = 0 # ZERO THE TRAV COST OF CURRENT ROBOT VORTEX
 
                 trav_and_absence_mask[trav_and_absence_mask >= self.max_traversable_cost] = float('inf')  # oprahovani
+
+                # NAFUKOVANI OPRAHOVANYCH BODU
+                if self.untrav_points_buffer:
+                    untrav_buffer_inds = graph_tree.query_ball_point(graph_points[trav_and_absence_mask >= self.max_traversable_cost],r=0.71)
+                    #print(np.unique(untrav_buffer_inds))
+                    untrav_buffer_inds_set = set()  
+                    for inds in untrav_buffer_inds:
+                        for ind in inds:
+                            untrav_buffer_inds_set.add(ind)
+                    trav_and_absence_mask[list(untrav_buffer_inds_set)] = float('inf')
 
                 trav_and_absence_and_heading_mask = trav_and_absence_mask + heading_diff_cost_mask * self.heading_diff_cost
     
@@ -1125,7 +1146,8 @@ def main():
     odom_frame = rospy.get_param('~odom_frame', "gps_odom")
     max_relative_path_cost_change = rospy.get_param('~max_relative_path_cost_change', 1.1)
     heading_diff_cost = rospy.get_param('~heading_diff_cost', 5)
-    
+    default_trav_cost = rospy.get_param('~default_trav_cost', 35.)
+    untrav_points_buffer = rospy.get_param('~untrav_points_buffer', True)
 
     node = PathPlanner(gpx_assignment,
                         publish_pcd,
@@ -1156,7 +1178,9 @@ def main():
                         trav_topic,
                         odom_frame,
                         max_relative_path_cost_change,
-                        heading_diff_cost)
+                        heading_diff_cost,
+                        default_trav_cost,
+                        untrav_points_buffer)
 
     node.run()
 

@@ -650,7 +650,8 @@ class PathPlanner():
                     for inds in untrav_buffer_inds:
                         for ind in inds:
                             untrav_buffer_inds_set.add(ind)
-                    trav_and_absence_mask[list(untrav_buffer_inds_set)] = float('inf')
+                    trav_and_absence_mask[list(untrav_buffer_inds_set)] = float('inf')                
+                    trav_and_absence_mask[start_index] = 0 # ZERO THE TRAV COST OF CURRENT ROBOT VORTEX again in case it got upped to inf
 
                 trav_and_absence_and_heading_mask = trav_and_absence_mask + heading_diff_cost_mask * self.heading_diff_cost
     

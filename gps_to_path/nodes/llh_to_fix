@@ -69,7 +69,6 @@ class LlhToFix():
         self.pub_details = rospy.Publisher('fix_status', NavSatDetailedStatus, queue_size=10)    
         self.fix_msg = NavSatFix()
         self.details_msg = NavSatDetailedStatus()
-        self.antenna_frame_id = rospy.get_param("~antenna_frame_id", "gps")
         self.gps_data = GPSData()
 
         self.sub_llh = rospy.Subscriber('llh', LlhFix, self.llh_handle, queue_size=10)
@@ -83,7 +82,7 @@ class LlhToFix():
         self.pub_details.publish(self.details_msg)
 
     def set_fix_msg(self, stamp):
-        self.fix_msg.header.frame_id = self.antenna_frame_id
+        self.fix_msg.header.frame_id = "gps"
         self.fix_msg.header.stamp = stamp
 
         self.fix_msg.latitude = self.gps_data.lat

@@ -12,11 +12,10 @@ class LlhPublisher():
         self.pub_llh = rospy.Publisher('llh', LlhFix, queue_size=10)
         self.llh_msg = LlhFix()
         self.llh_string = ""
-        self.antenna_frame_id = rospy.get_param("~antenna_frame_id", "gps")
 
     def set_llh_msg(self, llh_sentence):
         self.llh_msg.header.stamp = rospy.Time.now()
-        self.llh_msg.header.frame_id = self.antenna_frame_id
+        self.llh_msg.header.frame_id = "gps"
         self.llh_msg.data = llh_sentence
 
     def run(self):

@@ -17,7 +17,6 @@ class FakeGps():
         self.publisher_status = rospy.Publisher("fix_status", NavSatDetailedStatus, queue_size=10)
         self.gpx_file = rospy.get_param("~gpx_file", None)
         self.gpx_waypoint_nr = int(rospy.get_param("~gpx_waypoint_nr", 0))
-        self.antenna_frame_id = rospy.get_param("~antenna_frame_id", "gps")
         self.msg = NavSatFix()
         self.msg_status = NavSatDetailedStatus()
         self.c = 0
@@ -50,7 +49,7 @@ class FakeGps():
         self.msg.position_covariance[8] = 1
 
         self.msg.header.stamp = rospy.Time.now()
-        self.msg.header.frame_id = self.antenna_frame_id
+        self.msg.header.frame_id = "gps"
         self.msg.status.status = NavSatStatus.STATUS_FIX
         self.msg.status.service = NavSatStatus.SERVICE_GPS
 

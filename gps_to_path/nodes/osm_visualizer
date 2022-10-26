@@ -73,7 +73,7 @@ class OsmVisualizer():
         while self.osm_planner is None: 
 
             try:
-                rospy.loginfo("OSM VISUALIZER: Loading OSM data from pickle {}.".format(fn))
+                rospy.loginfo_throttle(5.0, "OSM VISUALIZER: Loading OSM data from pickle {}.".format(fn))
                 with open(fn, 'rb') as handle:
                     total = os.path.getsize(fn)
                     with TQDMBytesReader(handle, total=total) as handle_with_progress:

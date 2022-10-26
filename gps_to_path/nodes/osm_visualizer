@@ -81,7 +81,7 @@ class OsmVisualizer():
                 rospy.loginfo("OSM VISUALIZER: OSM data loaded.")
 
             except Exception as e:
-                rospy.loginfo("OSM VISUALIZER: OSM pickle not loaded, waiting for it to be created.")
+                rospy.loginfo_once("OSM VISUALIZER: OSM pickle not loaded, waiting for it to be created.")
                 rate.sleep()
 
         self.tf_buffer = tf2_ros.Buffer()

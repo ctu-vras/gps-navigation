@@ -31,7 +31,7 @@ import shapely.geometry as geometry
 import copy
 import osm_types
 from numpy.lib import recfunctions as rfn
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree as KDTree
 from itertools import chain
 import math
 import tf2_ros
@@ -448,13 +448,13 @@ class PathPlanner():
     
             goal_index_graph = graph_dict["goal_index_graph"]
     
-            graph = graph_dict["graph"]
+            #graph = graph_dict["graph"]
     
             graph_points = graph_dict['graph_points']
     
             start_index = self.get_nearest_graph_point_index(graph_points, copy.copy(self.current_robot_position))
-    
-            
+
+
             
             # -------- TRAV ---------
             traversability_points = copy.copy(self.traversability_points)
@@ -687,8 +687,8 @@ class PathPlanner():
                 for i in range(len(self.shortest_path_vertices[robot_on_path_index:])-1):
                     v1 = self.shortest_path_vertices[robot_on_path_index+i]
                     v2 = self.shortest_path_vertices[robot_on_path_index+i+1]
-                    edge = graph.get_eid(v1,v2)
-                    current_path_cost += graph.es[edge]["total_weight"]
+                    edge = graph_dict['graph'].get_eid(v1,v2)
+                    current_path_cost += graph_dict['graph'].es[edge]["total_weight"]
     
                 if (current_path_cost/min([original_path_cost_sum,0.0001]) <= self.max_relative_path_cost_change) or dist(copy.copy(self.current_robot_position),shortest_path_graph_points[robot_on_path_index]) > 5:
                     replan = False
@@ -705,7 +705,7 @@ class PathPlanner():
     
             if replan:
                 # Replan.
-                self.shortest_path_vertices = graph.get_shortest_paths(start_index,
+                self.shortest_path_vertices = graph_dict['graph'].get_shortest_paths(start_index,
                                                                     goal_index_graph,
                                                                     weights="total_weight",
                                                                     output="vpath")[0]
@@ -715,10 +715,10 @@ class PathPlanner():
                 for i in range(len(self.shortest_path_vertices)-1):
                     v1 = self.shortest_path_vertices[i]
                     v2 = self.shortest_path_vertices[i+1]
-                    edge = graph.get_eid(v1,v2)
+                    edge = graph_dict['graph'].get_eid(v1,v2)
                     #print(graph.es[edge]["total_weight"])
                     #cost += graph.es[edge]["total_weight"]
-                    self.original_path_cost[i] = graph.es[edge]["total_weight"]
+                    self.original_path_cost[i] = graph_dict['graph'].es[edge]["total_weight"]
                 
                 if np.sum(self.original_path_cost) >= float('inf'):
                     # Publish empty path (stop the robot).

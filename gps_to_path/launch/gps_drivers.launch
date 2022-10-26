@@ -2,13 +2,13 @@
     <arg name="run_ntrip_relay" default="true" />
     <arg name="sound_fix_alerts" default="true" />
     
-    <arg name="fake_gps_tf" default="true" />
-
     <arg name="fake_driver" default="false" doc="If true, a fake GPS position is published just to satify the nodes that need some GPS." />
     <arg name="fake_driver_gpx_file" default="" />
     <arg name="fake_driver_gpx_waypoint_nr" default="0" />
-        
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0.02 0.27 -0.42 0 0 0 imu gps" if="$(arg fake_gps_tf)" />             
+    
+    <arg name="robot" value="$(optenv HOSTNAME)" />
+    
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_transform_publisher" args="0 0 0 0 0 0 gps_antenna gps" if="$(eval robot == 'ctu-robot')" />             
 
 <node pkg="gps_to_path" type="get_mag_shift" name="get_mag_shift">
 	<param name="measuring_time" value="30" />

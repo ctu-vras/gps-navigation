@@ -9,7 +9,7 @@ GOAL_BASE_DIST = 30     # In meters. Desired distance between start and goal poi
 
 INCREASE = 25           # In meters. How much the graph rectangle grows.
                         
-MAX_RANGE = 100         # In meters. Maximum range of the area that will be searched.
+MAX_RANGE = 75         # In meters. Maximum range of the area that will be searched.
 
 MAX_EFFECTIVE_RANGE = 50000 #  CURRENTLY NOT BEING USED.
 

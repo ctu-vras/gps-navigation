@@ -976,9 +976,20 @@ class PathAnalysis:
             shortest_path_cost = graph.shortest_paths(start_index_graph,
                                         goal_index_graph,
                                         weights="weight")[0][0]
+
+            if increase_graph == 0:
+                self.smallest_graph_dict = {'graph':copy(graph),
+                                    'shortest_path_vertices':copy(shortest_path_vertices),
+                                    'graph_points':copy(graph_points),
+                                    'graph_range':copy(graph_range),
+                                    'start_index_graph':copy(start_index_graph),
+                                    'goal_index_graph':copy(goal_index_graph),
+                                    'graph_points_costs':copy(graph_points_costs)
+                                    }
+                self.smallest_shortest_path_cost = copy(shortest_path_cost)
             
             if shortest_path_vertices:
-                if (shortest_path_cost < MAX_COST_PER_METER * start_point.distance(goal_point)) or graph_range >= MAX_RANGE:# or increase_graph > 0:
+                if (shortest_path_cost < MAX_COST_PER_METER * start_point.distance(goal_point)):# or increase_graph > 0:
 
                     rospy.loginfo("{} s - {} ps. - {}x{} m r.- Found path".format(round(time.time()-t,3), len(graph_points), graph_range, len(points_line.geoms)*density))
                     graph_dict = {'graph':graph,
@@ -990,6 +1001,20 @@ class PathAnalysis:
                                     'graph_points_costs':graph_points_costs
                                     }
                     return graph_dict
+
+                elif graph_range >= MAX_RANGE:
+                    if shortest_path_cost >= 0.5 * self.smallest_shortest_path_cost:
+                        return self.smallest_graph_dict
+                    else:
+                        graph_dict = {'graph':graph,
+                                    'shortest_path_vertices':shortest_path_vertices,
+                                    'graph_points':graph_points,
+                                    'graph_range':graph_range,
+                                    'start_index_graph':start_index_graph,
+                                    'goal_index_graph':goal_index_graph,
+                                    'graph_points_costs':graph_points_costs
+                                    }
+                        return graph_dict
                 else:
                     rospy.loginfo("{} s - {} ps. - {}x{} m r.- No cheap path yet".format(round(time.time()-t,3), len(graph_points), graph_range, len(points_line.geoms)))
                     increase_graph += INCREASE

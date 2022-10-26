@@ -7,7 +7,7 @@
     <arg name="path" default="path"
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
-    <arg name="max_speed" default="$(eval 0.4 if robot in ('ctu-robot', 'tradr') else 1.0)"/>
+    <arg name="max_speed" default="$(eval 0.5 if robot in ('ctu-robot', 'tradr') else 1.0)"/>
     <arg name="allow_backward" default="false"/>
     <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
     

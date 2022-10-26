@@ -28,7 +28,7 @@
         <param name="trav_radius" type="double" value="0.25"/>
         <param name="untrav_cost" type="double" value="100."/>
         <param name="absence_cost" type="double" value="200."/>
-        <param name="max_traversable_cost" type="double" value="100."/>
+        <param name="max_traversable_cost" type="double" value="70."/>
         <param name="long_term_memory_longevity" type="double" value="0.997" />
         <param name="short_term_memory_longevity" type="double" value="0.9"/>
         <param name="trav_inheritance_radius" type="double" value="0.36"/>	

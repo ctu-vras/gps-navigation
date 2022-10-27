@@ -99,4 +99,22 @@
     <node name="$(anon robotsound_viz)" pkg="topic_tools" type="relay_field"
           args="/robotsound robotsound_viz std_msgs/String &quot;{data: m.arg}&quot; --wait-for-start" respawn="true" />
 
+    <!-- Overview camera. On TRADR, viz/pano/compressed should be transmitted directly. -->
+    
+    <node name="overview_cam_manager" pkg="nodelet" type="nodelet" args="manager" respawn="true" />
+    <node name="overview_cam_throttle" pkg="nodelet" type="nodelet" args="load camera_throttle/CameraThrottle overview_cam_manager">
+        <remap from="camera_in" to="camera_front" />
+        <remap from="camera_out" to="camera_front_slow" />
+        <param name="sub_base_name" value="image_color" />
+        <param name="rate" value="1" />
+    </node>
+    <node name="overview_cam_resize" pkg="nodelet" type="nodelet" args="load image_proc/resize overview_cam_manager">
+        <remap from="image" to="camera_front_slow/image_color" />
+        <remap from="camera_info" to="camera_front_slow/camera_info" />
+        <remap from="~image" to="camera_front_small/image_color" />
+        <remap from="~camera_info" to="camera_front_small/camera_info" />
+        <param name="scale_height" value="0.25" />
+        <param name="scale_width" value="0.25" />
+    </node>
+    
 </launch>    

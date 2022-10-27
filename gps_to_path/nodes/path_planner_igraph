@@ -674,9 +674,9 @@ class PathPlanner():
                 # -----------------------
                 #print(graph_dict['start_index_graph'],goal_index_graph)
                 # If waypoint (current goal point) is untraversable - choose the point on the line along the gas pipe.
-                if self.mean_trav_cost_mask[goal_index_graph] > self.max_goal_untrav_cost:
+                if trav_and_absence_mask[goal_index_graph] > self.max_goal_untrav_cost:
                     rospy.logwarn("Waypoint {}/{} is untraversable. Moving goal one point closer.".format(self.num_sub_graphs-len(self.sub_graphs),self.num_sub_graphs))
-                    graph_dict['goal_index_graph'] -= 1
+                    self.current_sub_graph['goal_index_graph'] -= 1
         
                     #self.next_waypoint()
                     return None

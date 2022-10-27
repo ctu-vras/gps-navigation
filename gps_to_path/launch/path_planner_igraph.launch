@@ -13,6 +13,7 @@
     <arg name="run_gps_drivers" default="false" />
     <arg name="fake_driver" default="false" />
     <arg name="fake_driver_from_gpx" default="true" />
+    <arg name="untrav_points_buffer" default="false"/>
 
     <include file="$(dirname)/gps_drivers.launch" if="$(eval run_gps_drivers or fake_driver)" pass_all_args="true">
         <arg name="fake_driver_gpx_file" value="$(arg gpx_assignment)" if="$(arg fake_driver_from_gpx)" />
@@ -28,7 +29,7 @@
         <param name="trav_radius" type="double" value="0.36"/>
         <param name="untrav_cost" type="double" value="100."/>
         <param name="absence_cost" type="double" value="200."/>
-        <param name="max_traversable_cost" type="double" value="70."/>
+        <param name="max_traversable_cost" type="double" value="100."/>
         <param name="long_term_memory_longevity" type="double" value="0.997" />
         <param name="short_term_memory_longevity" type="double" value="0.7"/>
         <param name="trav_inheritance_radius" type="double" value="0.36"/>	
@@ -44,7 +45,7 @@
         <param name="flip" type="bool" value="$(arg flip)"/>
 
         <param name="default_trav_cost" type="double" value="0.35"/>
-        <param name="untrav_points_buffer" type="bool" value="true"/>
+        <param name="untrav_points_buffer" type="bool" value="$(arg untrav_points_buffer)"/>
 
         <param name="max_height" type="double" value="$(arg max_height)"/>
         <param name="min_height" type="double" value="$(arg min_height)"/>

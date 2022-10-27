@@ -8,6 +8,7 @@
          doc="Path topic to follow."/>
     <arg name="points" default="points_slow_filtered"/>
     <arg name="max_speed" default="$(eval 0.5 if robot in ('ctu-robot', 'tradr') else 1.0)"/>
+    <arg name="max_ang_speed" default="$(eval 0.5 if robot in ('ctu-robot', 'tradr') else 1.0)"/>
     <arg name="allow_backward" default="false"/>
     <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
     
@@ -42,7 +43,7 @@
             max_speed: $(arg max_speed)
             allow_backward: $(arg allow_backward)
             max_force_through_speed: 0.2
-            max_angular_rate: 0.5
+            max_angular_rate: $(arg max_ang_speed)
             keep_path: $(arg keep_path)
             keep_cloud_box: [[-3.0, 3.0], [-3.0, 3.0], [-2.0, 2.0]]
             clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.6]]

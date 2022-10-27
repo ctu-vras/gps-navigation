@@ -55,8 +55,8 @@ class UtmFix(object):
 class NavSatFixFilter(object):
     def __init__(self):
 
-        self.min_fix_cov = float(rospy.get_param("~min_fix_cov", 1e-5))
-        self.min_float_cov = float(rospy.get_param("~min_float_cov", 1e-3))
+        self.min_fix_cov = float(rospy.get_param("~min_fix_cov", 1e-4))
+        self.min_float_cov = float(rospy.get_param("~min_float_cov", 1e-2))
         self.max_cov = float(rospy.get_param("~max_cov", 10))
 
         self.min_fix_lat_cov = float(rospy.get_param("~min_fix_lat_cov", self.min_fix_cov))

@@ -3,10 +3,12 @@
     <arg name="utm_z_offset" default="0.0" />
     <arg name="utm_zone" default="" />
     <arg name="osm_vis" default="false" />
+    <arg name="gpx_file" default="" />
+    <arg name="replay" default="false" />
 
-    <node name="autonomy_override_vis" pkg="gps_to_path" type="autonomy_override_vis"/>
+    <node name="autonomy_override_vis" pkg="gps_to_path" type="autonomy_override_vis" unless="$(arg replay)" />
 
-    <node name="fix_to_utm" pkg="gps_to_path" type="fix_to_utm">
+    <node name="fix_to_utm" pkg="gps_to_path" type="fix_to_utm" unless="$(arg replay)">
         <param name="publish_pose" value="true" />
         <param name="publish_odom" value="true" />
         <param name="publish_path" value="true" />
@@ -14,10 +16,11 @@
         <param name="path_frame_id" value="utm_local" />
         <param name="z_offset" value="$(arg utm_z_offset)" />
         <param name="utm_zone" value="$(arg utm_zone)" if="$(eval utm_zone != '')" />
+        <param name="path_max_size" value="50000" />
         <remap from="~fix" to="fix" />
     </node>
 
-    <node name="fix_filtered_to_utm" pkg="gps_to_path" type="fix_to_utm">
+    <node name="fix_filtered_to_utm" pkg="gps_to_path" type="fix_to_utm" unless="$(arg replay)">
         <param name="publish_pose" value="true" />
         <param name="publish_odom" value="true" />
         <param name="publish_path" value="true" />
@@ -25,10 +28,11 @@
         <param name="path_frame_id" value="utm_local" />
         <param name="z_offset" value="$(arg utm_z_offset)" />
         <param name="utm_zone" value="$(arg utm_zone)" if="$(eval utm_zone != '')" />
+        <param name="path_max_size" value="50000" />
         <remap from="~fix" to="gps/fix_filtered" />
     </node>
 
-    <node name="fix_smoothed_to_utm" pkg="gps_to_path" type="fix_to_utm">
+    <node name="fix_smoothed_to_utm" pkg="gps_to_path" type="fix_to_utm" unless="$(arg replay)">
         <param name="publish_pose" value="true" />
         <param name="publish_odom" value="true" />
         <param name="publish_path" value="true" />
@@ -36,6 +40,7 @@
         <param name="path_frame_id" value="utm_local" />
         <param name="z_offset" value="$(arg utm_z_offset)" />
         <param name="utm_zone" value="$(arg utm_zone)" if="$(eval utm_zone != '')" />
+        <param name="path_max_size" value="50000" />
         <remap from="~fix" to="gps/filtered" />
     </node>
 
@@ -43,7 +48,8 @@
         <param name="z_offset" value="$(arg utm_z_offset)" />
         <param name="utm_zone" value="$(arg utm_zone)" if="$(eval utm_zone != '')" />
         <param name="path_frame_id" value="utm_local" />
-        <remap from="~gpx_file" to="$(arg path_planner_node_name)/gpx_assignment" />
+        <param name="gpx_file" value="$(arg gpx_file)" if="$(eval gpx_file != '')" />
+        <remap from="~gpx_file" to="$(arg path_planner_node_name)/gpx_assignment" if="$(eval gpx_file == '')" />
         <remap from="~reverse" to="$(arg path_planner_node_name)/flip" />
     </node>
     
@@ -59,7 +65,8 @@
     </node>
 
     <node name="osm_visualize" pkg="gps_to_path" type="osm_visualize" if="$(arg osm_vis)">
-        <remap from="~gpx_assignment" to="$(arg path_planner_node_name)/gpx_assignment" />
+        <param name="gpx_assignment" value="$(arg gpx_file)" if="$(eval gpx_file != '')" />
+        <remap from="~gpx_assignment" to="$(arg path_planner_node_name)/gpx_assignment" if="$(eval gpx_file == '')" />
         <param name="z_offset" value="$(arg utm_z_offset)" />
     </node>
 
@@ -69,14 +76,14 @@
     <node name="fix_utm_slow" pkg="topic_tools" type="throttle" args="messages fix_to_utm/path 1 fix_to_utm/path_slow" respawn="true" />
     <node name="fix_smoothed_utm_slow" pkg="topic_tools" type="throttle" args="messages fix_smoothed_to_utm/path 1 fix_smoothed_to_utm/path_slow" respawn="true" />
 
-    <node name="processed_waypoints_path" pkg="gps_to_path" type="waypoints_to_path_simple">
+    <node name="processed_waypoints_path" pkg="gps_to_path" type="waypoints_to_path_simple" unless="$(arg replay)">
         <param name="target_frame" value="utm" />
         <param name="z_frame" value="base_link" />
         <remap from="waypoints" to="processed_waypoints" />
         <remap from="path" to="processed_waypoints_path" />
     </node>
 
-    <node name="original_waypoints_path" pkg="gps_to_path" type="waypoints_to_path_simple">
+    <node name="original_waypoints_path" pkg="gps_to_path" type="waypoints_to_path_simple" unless="$(arg replay)">
         <param name="target_frame" value="utm" />
         <param name="z_frame" value="base_link" />
         <remap from="waypoints" to="original_waypoints" />

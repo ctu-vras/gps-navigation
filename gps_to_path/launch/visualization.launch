@@ -89,6 +89,13 @@
         <remap from="waypoints" to="original_waypoints" />
         <remap from="path" to="original_waypoints_path" />
     </node>
+    
+    <node name="path_coverage" pkg="gps_to_path" type="path_coverave" respawn="true">
+        <param name="out_frame_id" value="utm_local" />
+        <param name="num_dimensions" value="2" />
+        <remap from="~path" to="/original_waypoints_path" />
+        <remap from="~odom" to="/gps_odom" />
+    </node>
 
     <!-- Support for remaining battery visualization. -->
     <node name="$(anon tradr_battery_viz)" pkg="topic_tools" type="relay_field"

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<launch>
+    <arg name="robot" doc="Robot name from {ctu-robot, husky-robot, spot-3}"/><group if="$(eval {'ctu-robot': 0, 'husky-robot': 0, 'spot-3': 0}[robot])"/>
+    <arg name="cmd_vel" default="$(anon priority_wrapper)/nav/cmd_vel" doc="Topic to which to publish velocity commands." if="$(eval robot == 'ctu-robot')"/>
+    <arg name="cmd_vel" default="/nav/cmd_vel_slow" doc="Topic to which to publish velocity commands." if="$(eval robot == 'spot-3')"/>
+    <arg name="cmd_vel" default="/nav/cmd_vel" doc="Topic to which to publish velocity commands." unless="$(eval robot == 'ctu-robot' or robot == 'spot-3')"/>
+    <arg name="path" default="path"
+         doc="Path topic to follow."/>
+    <arg name="points" default="points_slow_filtered"/>
+    <arg name="max_speed" default="$(eval 0.5 if robot in ('ctu-robot', 'tradr') else 1.0)"/>
+    <arg name="max_ang_speed" default="$(eval 0.5 if robot in ('ctu-robot', 'tradr') else 1.0)"/>
+    <arg name="allow_backward" default="false"/>
+    <node name="$(anon priority_wrapper)" pkg="nifti_teleop" type="priority_wrapper.py" if="$(eval robot == 'ctu-robot')" />
+    
+    <arg name="control_freq" value="10.0" unless="$(eval robot == 'spot-3')" />
+    <arg name="control_freq" value="15.0" if="$(eval robot == 'spot-3')" />
+    <arg name="keep_path" value="0.18" unless="$(eval robot == 'spot-3')" />
+    <arg name="keep_path" value="2.0" if="$(eval robot == 'spot-3')" />
+    <arg name="turn_on_spot_angle" value="2.5" unless="$(eval robot == 'spot-3')" />
+    <arg name="turn_on_spot_angle" value="1.0" if="$(eval robot == 'spot-3')" />
+
+    <node name="path_follower" pkg="naex" type="path_follower"
+          respawn="true" respawn_delay="1.0" output="screen">
+
+        <rosparam subst_value="true">
+            map_frame: gps_odom
+            odom_frame: gps_odom
+            robot_frame: base_link
+            control_freq: $(arg control_freq)
+            goal_reached_dist: 1.
+            goal_reached_angle: .inf
+            use_path_theta: none
+            max_age: 1.0
+            <!--
+            Max. path distances, tail is consumed first by reached goals.
+            A higher value is used in the beginning to traverse across
+            unobserved area around robot.
+            -->
+            max_path_dist: 100
+            look_ahead: 1.0
+            <!-- Allow increasing only waypoint index, to avoid oscillations. -->
+            increasing_waypoint_index: true
+            max_speed: $(arg max_speed)
+            allow_backward: $(arg allow_backward)
+            max_force_through_speed: 0.2
+            max_angular_rate: $(arg max_ang_speed)
+            keep_path: $(arg keep_path)
+            keep_cloud_box: [[-3.0, 3.0], [-3.0, 3.0], [-2.0, 2.0]]
+            clearance_box: [[-0.5, 0.5], [-0.4, 0.4], [0.2, 0.6]]
+            show_clearance_pos: [-2, 2]
+            min_points_obstacle: 0
+            force_through_after: 10.
+            backtrack_after: .inf
+            <!-- For the virtual bumber, allow forward motion even for larger angular goal displacement. -->
+            turn_on_spot_angle: $(arg turn_on_spot_angle)
+        </rosparam>
+
+        <!-- Inputs -->
+        <remap from="path" to="$(arg path)"/>
+        <!--<remap from="cloud" to="$(arg points)"/>-->
+        <remap from="cloud" to="topic_not_used"/>
+
+        <!-- Outputs -->
+        <remap from="clearance" to="clearance"/>
+        <remap from="cmd_vel" to="$(arg cmd_vel)"/>
+    </node>
+    
+    <node name="spot_cmd_vel_repeater" pkg="cras_topic_tools" type="repeat">
+        <remap from="~input" to="/nav/cmd_vel_slow" />
+        <remap from="~output" to="/nav/cmd_vel" />
+        <param name="rate" value="20.0" />
+        <param name="max_repeats" value="5" />
+    </node>
+</launch>

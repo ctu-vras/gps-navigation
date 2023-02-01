@@ -1,4 +1,3 @@
-from audioop import mul
 import zipfile
 from fastkml import kml # https://fastkml.readthedocs.io/en/latest/usage_guide.html#read-a-kml-file-string
 import shapely
@@ -6,8 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import utm
 from scipy.spatial import KDTree
-from numpy.lib.recfunctions import structured_to_unstructured
-from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 from matplotlib.widgets import Button
 import math
@@ -17,42 +14,6 @@ import os
 import xml.etree.ElementTree as ET
 
 from background_map import *
-
-#MIN_DIST_WAYPOINTS = 1 # meters
-
-""" class ButtonHandle:
-
-    def save_path(self,event):
-        fn = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gpx/path.gpx")
-        c = 1
-        while os.path.isfile(fn):
-            fn = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gpx/path({}).gpx".format(c))
-            c += 1
-
-        gpx = gpxpy.gpx.GPX()
-
-        gpx_track = gpxpy.gpx.GPXTrack()
-        gpx.tracks.append(gpx_track)
-
-        gpx_segment = gpxpy.gpx.GPXTrackSegment()
-        gpx_track.segments.append(gpx_segment)
-
-        for point in self.chosen_points:
-            gpx_segment.points.append(gpxpy.gpx.GPXTrackPoint(point[0], point[1], elevation=0))
-
-        xml = gpx.to_xml()
-        with open(fn, "w") as f:
-            f.write(xml)
-            f.close()
-        
-        print("Path saved to {}.".format(fn))
-
-
-    def undo(self,event):
-        pass
-
-    def reset(self,event):
-        pass """
 
 plt.ion()
 
@@ -370,10 +331,10 @@ class KmzParser:
         self.visualize()
 
 if __name__ == "__main__":
+    kml_fn = "/home/robot/unhost.kml"
+    kmz_fn = None
+    #kmz_fn = "/home/robot/Downloads/001_p.kmz"
     #kml_fn = "/home/robot/unhost.kml"
-    #kmz_fn = None
-    kmz_fn = "/home/robot/Downloads/001_p.kmz"
-    kml_fn = "doc.kml"
     parser = KmzParser(kml_fn = kml_fn, kmz_fn = kmz_fn)
     parser.run()
 

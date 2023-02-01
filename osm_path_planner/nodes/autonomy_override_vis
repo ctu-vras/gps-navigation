@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Czech Technical University in Prague
+
+"""
+Visualize when the operator manually intervened during an autonomous mission.
+
+Red spheres mean occasions where the operator just stopped the robot. Green spheres mean occasions where the operator
+did actively drive the robot.
+
+Subscriptions:
+- `local_joy/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+- `joy_local/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+- `secondary_joy/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+- `joy_secondary/cmd_vel` (:class:`geometry_msgs.msg.Twist`): Manual override cmd_vel topic.
+
+Publications:
+- `autonomy_override_vis` (:class:`visualization_msgs.msg.MarkerArray`): Markers visualizing the manual interventions.
+
+Parameters:
+- `~time_threshold` (float, defaults to 5.0, seconds): After how long time a new marker should be added.
+- `~marker_frame_id` (str, defaults to "base_link"): The frame in which the markers are published.
+- `~marker_size` (float, defaults to 1.0, meters): Size of the markers.
+- `~marker_alpha` (float, defaults to 0.8, range [0.0-1.0]): Transparency of the markers.
+"""
+
+import numpy as np
+import rospy
+
+from geometry_msgs.msg import PointStamped, Twist
+from ros_numpy import msgify
+from ros_numpy.point_cloud2 import merge_rgb_fields
+from tf2_ros import Buffer, TransformException, TransformListener
+from sensor_msgs.msg import PointCloud2
+
+import cras
+
+
+pcl_dtype = [
+    ('x', np.float32),
+    ('y', np.float32),
+    ('z', np.float32),
+    ('r', np.uint8),
+    ('g', np.uint8),
+    ('b', np.uint8),
+]
+
+
+class AutonomyOverrideVisualization(cras.Node):
+    def __init__(self):
+        super(AutonomyOverrideVisualization, self).__init__()
+
+        self.last_override_stamp = None
+
+        self.time_threshold = cras.get_param("~time_threshold", rospy.Duration(5))
+        self.base_link_frame_id = cras.get_param("~base_link_frame_id", "base_link")
+        self.fixed_frame_id = cras.get_param("~fixed_frame_id", "utm_local")
+
+        self.point_data = np.zeros(0, dtype=pcl_dtype)
+
+        self.tf = Buffer()
+        self.tf_listener = TransformListener(self.tf)
+
+        self.point = PointStamped()
+        self.point.header.frame_id = self.base_link_frame_id
+        self.point.header.stamp = rospy.Time(0)
+
+        self.pub = rospy.Publisher('autonomy_override_pcl', PointCloud2, queue_size=1, latch=True)
+
+        self.sub1 = rospy.Subscriber('local_joy/cmd_vel', Twist, self.cb)
+        self.sub2 = rospy.Subscriber('joy_local/cmd_vel', Twist, self.cb)
+        self.sub3 = rospy.Subscriber('secondary_joy/cmd_vel', Twist, self.cb)
+        self.sub4 = rospy.Subscriber('joy_secondary/cmd_vel', Twist, self.cb)
+
+    def cb(self, msg):
+        """Twist callback.
+
+        :param Twist msg: The receieved message.
+        """
+        if self.last_override_stamp is not None and rospy.Time.now() < self.last_override_stamp + self.time_threshold:
+            return
+        self.last_override_stamp = rospy.Time.now()
+
+        try:
+            fixed_point = self.tf.transform(self.point, self.fixed_frame_id, timeout=rospy.Duration(0.1))
+        except TransformException as e:
+            rospy.logerr_throttle_identical(10.0, "Cannot get current robot position: " + str(e))
+            return
+
+        is_zero = msg.linear.x == 0 and msg.linear.y == 0 and msg.angular.z == 0
+        point = np.zeros(1, dtype=pcl_dtype)
+        point['x'] = fixed_point.point.x
+        point['y'] = fixed_point.point.y
+        point['z'] = fixed_point.point.z
+        point['r'] = 255 if is_zero else 0
+        point['g'] = 0 if is_zero else 255
+        point['b'] = 0
+        self.point_data = np.concatenate([self.point_data, point])
+
+        self.pub.publish(self.create_pcl_msg())
+
+    def create_pcl_msg(self):
+        msg = msgify(PointCloud2, merge_rgb_fields(self.point_data))
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = self.fixed_frame_id
+        return msg
+
+    def reset(self):
+        self.point_data = np.zeros(0, dtype=pcl_dtype)
+        self.pub.publish(self.create_pcl_msg())
+        self.last_override_stamp = None
+        super(AutonomyOverrideVisualization, self).reset()
+
+    def run(self):
+        self.start_auto_check_time_jump()  # call reset() if time jumps
+
+        rospy.spin()
+
+
+def main():
+    rospy.init_node('autonomy_override_vis')
+
+    node = AutonomyOverrideVisualization()
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

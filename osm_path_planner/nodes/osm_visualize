@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Czech Technical University in Prague
+
+"""
+Visualize interesting objects from OpenStreetMaps in RViz.
+
+The node requires internet access at its startup to download the OpenStreetMaps data.
+
+Publications:
+- `osm_vis` (:class:`sensor_msgs.msg.PointCloud2`): The interesting map elements converted to pointcloud.
+
+Parameters:
+- `~gpx_assignment` (str, defaults to "$(find osm_path_planner)/data/coords.gpx"): The GPX file whose extents define the area
+                                                                              to be processed.
+- `~z_offset` (float, default 0.0, meters): Height offset from the UTM frame origin at which the cloud should be
+                                            published.
+"""
+
+import os
+import time
+
+import rospy
+import ros_numpy
+
+from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import Header
+import numpy as np
+import osm_analysis_igraph
+import osm_types
+
+import cras
+
+
+class OsmVisualization(cras.Node):
+    """Visualize OpenStreetMap data."""
+    def __init__(self):
+        super(OsmVisualization, self).__init__()
+
+        self.gpx_assignment = cras.get_param(
+            '~gpx_assignment', os.path.join(os.path.dirname(__file__), "..",  "data", "coords.gpx"))
+        self._z_offset = cras.get_param("~z_offset", 0.0, "m")
+        self.pub_pcd = rospy.Publisher('osm_vis', PointCloud2, queue_size=10, latch=True)
+
+    def get_osm_points(self):
+        osm_objects = {
+            'roads': self.roads,
+            'untraversables': self.untraversables,
+            'footways': self.footways,
+        }
+
+        osm_points = {
+            'roads': np.array([]).reshape((0, 2)),
+            'untraversables': np.array([]).reshape((0, 2)),
+            'footways': np.array([]).reshape((0, 2)),
+        }
+
+        for key in osm_objects:
+            for ob in osm_objects[key]:
+                points = ob.to_pcd_points(filled=False)
+                osm_points[key] = np.concatenate([osm_points[key], points])
+
+        return osm_points
+
+    def publish_osm_objects_pcd(self):
+        rospy.loginfo("Generating points")
+        self.roads = np.array(list(self.osm_planner.roads))
+        self.footways = np.array(list(self.osm_planner.footways))
+        self.untraversables = np.array(list(self.osm_planner.barriers))
+
+        self.osm_points = self.get_osm_points()
+        self.set_pcd_msg()
+        self.pub_pcd.publish(self.osm_pcd_msg)
+        rospy.loginfo("Done generating points.")
+        del self.pcd_data
+        del self.osm_points
+
+    def set_pcd_msg(self):
+        self.pcd_data = np.zeros(0, dtype=[
+            ('x', np.float32),
+            ('y', np.float32),
+            ('z', np.float32),
+            ('type', np.uint8)])
+
+        for key in self.osm_points:
+            osm_pcd_data = np.zeros(len(self.osm_points[key]), dtype=[
+                ('x', np.float32),
+                ('y', np.float32),
+                ('z', np.float32),
+                ('type', np.uint8)])
+
+            osm_pcd_data['x'] = self.osm_points[key][:, 0]
+            osm_pcd_data['y'] = self.osm_points[key][:, 1]
+            osm_pcd_data['z'] = np.zeros((self.osm_points[key][:, 1].shape)) + self._z_offset
+            osm_pcd_data['type'] = osm_types.OSM_TYPES[key] * np.ones((self.osm_points[key][:, 1].shape))
+
+            self.pcd_data = np.concatenate([self.pcd_data, osm_pcd_data])
+
+        self.osm_pcd_msg = ros_numpy.msgify(PointCloud2, self.pcd_data)
+
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "utm"
+
+        self.osm_pcd_msg.header = header
+
+    def reset(self):
+        # republish the latched message
+        self.osm_pcd_msg.header.stamp = rospy.Time.now()
+        self.pub_pcd.publish(self.osm_pcd_msg)
+
+        super(OsmVisualization, self).reset()
+
+    def run(self):
+        while not rospy.is_shutdown() and not rospy.rostime.is_rostime_initialized() and rospy.Time.now().is_zero():
+            time.sleep(1)
+
+        self.osm_planner = osm_analysis_igraph.PathAnalysis(self.gpx_assignment, False, None)
+        self.osm_planner.run_queries()
+        self.osm_planner.run_parse()
+
+        self.publish_osm_objects_pcd()
+        rospy.loginfo("OSM PCD UTM published once")
+
+        self.start_auto_check_time_jump()  # call reset() if time jumps
+
+        rospy.spin()
+
+
+def main():
+    rospy.init_node('osm_visualize')
+
+    node = OsmVisualization()
+    node.run()
+
+
+if __name__ == '__main__':
+    main()

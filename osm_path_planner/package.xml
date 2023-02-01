@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>osm_path_planner</name>
+  <version>1.0.0</version>
+  <description>Tools for path planning based on OSM (OpenStreetMap) and traversability point-cloud. Includes visualisation tools.</description>
+
+  <author email="herolada@fel.cvut.cz">Adam Herold</author>
+  <author email="herolada@fel.cvut.cz">Martin Pecka</author>
+  <author email="vlkjan6@fel.cvut.cz">Jan Vlk</author>
+  <maintainer email="herolada@fel.cvut.cz">Adam Herold</maintainer>
+  <maintainer email="peckama2@fel.cvut.cz">Martin Pecka</maintainer>
+
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>compass</exec_depend>
+  <exec_depend>cras_py_common</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>llh_gnss_driver</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>nav_utils</exec_depend>
+  <exec_depend>nodelet</exec_depend>
+  <exec_depend>ros_numpy</exec_depend>
+  <exec_depend>rospkg</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>rostopic</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>stamped_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>topic_tools</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>tf2_py</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+
+</package>

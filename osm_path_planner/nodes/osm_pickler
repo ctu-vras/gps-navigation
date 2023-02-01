@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+import os.path
+import sys
+
+import osm_analysis_igraph
+import rospy
+import rospkg
+
+rospy.init_node('osm_pickler', anonymous=True)
+
+rospack = rospkg.RosPack()
+gpx_pre = rospack.get_path("osm_path_planner") + "/data"
+
+if len(sys.argv) > 1:
+    gpx_file_names = sys.argv[1:]
+else:
+    gpx_file_names = ["CH-forest-north_short_circle_debug.gpx"]#"unhost_final_demo_spot_east_trimmed.gpx"]
+
+robot_pose = None
+#robot_pose = np.array([[459595,5553117]])
+
+for fn in gpx_file_names:
+    fn = os.path.join(gpx_pre, fn)
+    osm_planner = osm_analysis_igraph.PathAnalysis(fn,
+                                                    True,
+                                                    robot_pose,
+                                                    True,
+                                                    False,
+                                                    False)
+    osm_planner.run_ros()
+    print("Saving the graph to pickle.")
+    osm_planner.save_to_pickle()
+
+""" with open('/home/robot/0923/src/gps-navigation/osm_path_planner/data/unhost_final_demo_spot_east', 'rb') as handle:
+    b = pickle.load(handle)
+
+b.sub_graphs.pop(0)
+
+first_waypoint = geometry.Point(np.ravel(b.sub_graphs[0]['graph_points'][b.sub_graphs[0]['goal_index_graph']]))
+current_position_point = geometry.Point(np.ravel(np.array([[438000, 5549040]])))
+current_pos_to_start_point_graph = b.generate_graph(current_position_point, first_waypoint)
+
+# ... with current position of robot to first waypoint.
+b.sub_graphs.insert(0, current_pos_to_start_point_graph)
+sub_graph_ind = 0
+
+#print(b.sub_graphs) """

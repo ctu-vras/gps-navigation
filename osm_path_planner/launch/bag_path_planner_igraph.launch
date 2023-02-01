@@ -1,0 +1,77 @@
+ <launch>   
+    <param name="use_sim_time" value="true"/>
+    <!--rosparam command="load" file="/home/robot/Downloads/ugv_2022-08-12-16-27-46.bag.params"/-->
+    <arg name="gpx_assignment" default="$(find osm_path_planner)/data/CH-forest-north_short_circle_debug.gpx" />
+    <arg name="robot_base_frame" default="base_link" />
+    <arg name="odom_frame" default="gps_odom" />
+    <arg name="use_osm" default="true" />
+    <arg name="repeat" default="false" />
+    <arg name="flip" default="false" />
+    <arg name="trav_obstacle_field" default="cost" />
+    <arg name="trav_topic" default="geometric_traversability_raw" />
+    <arg name="max_height" default="1.00"/>
+    <arg name="min_height" default="-1.00"/>
+
+<!-- PATH PLANNER -->
+    <node pkg="osm_path_planner" type="path_planner_igraph_bag" name="path_planner_igraph_bag" output="screen">
+
+    	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
+        <param name="goal_reached_distance" type="double" value="2."/>
+        <param name="publish_pcd" type="bool" value="true"/>
+        <param name="trav_max_dist" type="double" value="20."/>	
+        <param name="points_absence_radius" type="double" value="2."/>	
+        <param name="trav_radius" type="double" value="0.36"/>
+        <param name="untrav_cost" type="double" value="100."/>
+        <param name="absence_cost" type="double" value="200."/>
+        <param name="max_traversable_cost" type="double" value="70."/>
+        <param name="long_term_memory_longevity" type="double" value="0.997" />
+        <param name="short_term_memory_longevity" type="double" value="0.7"/>
+        <param name="trav_inheritance_radius" type="double" value="0.36"/>	
+        <param name="robot_base_frame" type="string" value="$(arg robot_base_frame)"/>
+        <param name="max_goal_untrav_cost" type="double" value="100."/>
+        <!--param name="max_path_cost" type="double" value="1000." /-->
+        <param name="max_subgraph_time" type="double" value="30." />    <!-- in seconds per meter of path length -->
+        <param name="use_osm" type="bool" value="$(arg use_osm)"/>
+	    <param name="osm_use_solitary_nodes" type="bool" value="false"/>
+        <param name="repeat" type="bool" value="$(arg repeat)"/>
+        <param name="next_waypoint_proximity_switch" type="bool" value="true"/>
+        <param name="min_time_near_goal" type="double" value="0.5"/>
+        <param name="flip" type="bool" value="$(arg flip)"/>
+
+        <param name="default_trav_cost" type="double" value="0.35"/>
+        <param name="untrav_points_buffer" type="bool" value="true"/>
+
+        <param name="max_height" type="double" value="$(arg max_height)"/>
+        <param name="min_height" type="double" value="$(arg min_height)"/>
+        <param name="max_age" type="double" value="1."/>	
+        <param name="trav_obstacle_field" type="string" value="$(arg trav_obstacle_field)"/>
+        <param name="trav_topic" type="string" value="$(arg trav_topic)"/>
+        <param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+        <param name="max_relative_path_cost_change" type="double" value="500."/>	
+        <param name="heading_diff_cost" type="double" value="10."/>
+    </node>
+
+<!-- PATH -->
+    <node name="path_waypoints_to_path" pkg="osm_path_planner" type="waypoints_to_path_simple" output="screen">
+        <param name="target_frame" value="$(arg odom_frame)"/>
+        <param name="z_frame" value="base_link"/>
+        <remap from="waypoints" to="path_waypoints"/>
+        <remap from="path" to="new_path"/>
+    </node>
+    <node name="path_waypoints_to_path_utm" pkg="osm_path_planner" type="waypoints_to_path_simple" output="screen">
+        <param name="target_frame" value="utm"/>
+        <param name="z_frame" value="base_link"/>
+        <remap from="waypoints" to="path_waypoints"/>
+        <remap from="path" to="path_utm"/>
+    </node>
+
+
+<!-- OSM -->
+    <node pkg="osm_path_planner" type="osm_visualizer" name="osm_visualizer" output="screen">
+    	<param name="gpx_assignment" type="string" value="$(arg gpx_assignment)"/>
+    	<param name="do_transform_to_odom" type="bool" value="true"/>
+    	<param name="odom_frame" type="string" value="$(arg odom_frame)"/>
+    	<param name="offset" type="string" value="0,0"/>
+    </node>
+
+</launch>    

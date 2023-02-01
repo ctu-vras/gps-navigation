@@ -15,12 +15,13 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <build_depends>message_generation</build_depend>
-
   <exec_depend>message_runtime</exec_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
 
   <exec_depend>compass</exec_depend>
   <exec_depend>cras_py_common</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>llh_gnss_driver</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>nav_utils</exec_depend>
@@ -31,11 +32,36 @@
   <exec_depend>rostopic</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>stamped_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
   <exec_depend>topic_tools</exec_depend>
   <exec_depend>tf</exec_depend>
   <exec_depend>tf2_py</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
+
+  <exec_depend condition="$ROS_DISTRO != noetic">python-geopy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-gpxpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-overpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-shapely</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-utm-pip</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-numpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-matplotlib</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-pyproj</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-scipy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-OSMPythonTools</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-igraph</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-tqdm</exec_depend>
+
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-geopy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-gpxpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-overpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-shapely</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-utm</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-numpy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-matplotlib</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-pyproj</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python3-scipy</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-OSMPythonTools</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-igraph</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-tqdm</exec_depend>
 
 </package>

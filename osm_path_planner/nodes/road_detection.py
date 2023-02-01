@@ -1,5 +1,5 @@
 import numpy as np
-from geodesy import utm
+import utm
 import shapely.geometry as geom
 from matplotlib import pyplot as plt
 from matplotlib import patches as ptch
@@ -61,8 +61,8 @@ def gps_to_utm(data: list, withID: bool = True) -> np.ndarray:
     withID: bool
         Is ID present in tuple. Base value -> True.
     '''
-    data = [utm.fromLatLong(node[1 if withID else 0], node[2 if withID else 1]) for node in data]
-    return np.array([[node.easting, node.northing] for node in data])
+    data = [utm.from_latlon(node[1 if withID else 0], node[2 if withID else 1]) for node in data]
+    return np.array([[node[0], node[1]] for node in data])
 
 
 def create_line_for_road(road: list, withId: bool = True) -> geom.LineString:

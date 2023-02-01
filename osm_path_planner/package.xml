@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
   <name>osm_path_planner</name>
   <version>1.0.0</version>
   <description>Tools for path planning based on OSM (OpenStreetMap) and traversability point-cloud. Includes visualisation tools.</description>
@@ -14,7 +14,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depends>message_generation</build_depend>
+  <build_depend>message_generation</build_depend>
   <exec_depend>message_runtime</exec_depend>
 
   <depend>geometry_msgs</depend>
@@ -22,12 +22,13 @@
 
   <exec_depend>compass</exec_depend>
   <exec_depend>cras_py_common</exec_depend>
+  <exec_depend>joy</exec_depend>
   <exec_depend>llh_gnss_driver</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>nav_utils</exec_depend>
   <exec_depend>nodelet</exec_depend>
   <exec_depend>ros_numpy</exec_depend>
-  <exec_depend>rospkg</exec_depend>
+  <exec_depend>rosbag</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>rostopic</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
@@ -38,6 +39,7 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
 
+  <exec_depend condition="$ROS_DISTRO != noetic">python-rospkg</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-geopy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-gpxpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-overpy</exec_depend>
@@ -47,21 +49,22 @@
   <exec_depend condition="$ROS_DISTRO != noetic">python-matplotlib</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-pyproj</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-scipy</exec_depend>
-  <exec_depend condition="$ROS_DISTRO != noetic">python-OSMPythonTools</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-igraph</exec_depend>
   <exec_depend condition="$ROS_DISTRO != noetic">python-tqdm</exec_depend>
+  <exec_depend condition="$ROS_DISTRO != noetic">python-fastkml</exec_depend>
 
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-rospkg</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-geopy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-gpxpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-overpy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-shapely</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-utm</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-numpy</exec_depend>
-  <exec_depend condition="$ROS_DISTRO != noetic">python3-matplotlib</exec_depend>
-  <exec_depend condition="$ROS_DISTRO != noetic">python3-pyproj</exec_depend>
-  <exec_depend condition="$ROS_DISTRO != noetic">python3-scipy</exec_depend>
-  <exec_depend condition="$ROS_DISTRO == noetic">python3-OSMPythonTools</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-matplotlib</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-pyproj</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-scipy</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-igraph</exec_depend>
   <exec_depend condition="$ROS_DISTRO == noetic">python3-tqdm</exec_depend>
+  <exec_depend condition="$ROS_DISTRO == noetic">python3-fastkml</exec_depend>
 
 </package>
